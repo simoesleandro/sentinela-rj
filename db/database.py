@@ -11,6 +11,21 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "sentinela_rj.db"
 _MEMORIA = ":memory:"
+_TABELA_ANOMALIAS = "alertas"
+_DDL_ANOMALIAS = """
+CREATE TABLE IF NOT EXISTS alertas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_controle_pncp TEXT,
+    tipo TEXT,
+    severidade TEXT,
+    descricao TEXT,
+    metodologia TEXT,
+    valor_referencia REAL,
+    status TEXT DEFAULT 'aberto',
+    criado_em TEXT DEFAULT (datetime('now')),
+    narrativa_ia TEXT
+)
+"""
 
 
 def _eh_banco_memoria(db_path: Path) -> bool:
@@ -98,6 +113,14 @@ def _montar_linhas(
     ]
 
 
+def _garantir_tabela_anomalias(conn: sqlite3.Connection) -> None:
+    conn.execute(_DDL_ANOMALIAS.strip())
+    colunas = {row[1] for row in conn.execute("PRAGMA table_info(alertas)")}
+    if "narrativa_ia" not in colunas:
+        conn.execute("ALTER TABLE alertas ADD COLUMN narrativa_ia TEXT")
+    conn.commit()
+
+
 def _executar_upsert(
     conn: sqlite3.Connection,
     tabela: str,
@@ -159,3 +182,77 @@ class GerenciadorBanco:
             len(registros),
             tabela,
         )
+
+    def garantir_tabela_anomalias(self) -> None:
+        conn = self._obter_conexao()
+        try:
+            _garantir_tabela_anomalias(conn)
+        except sqlite3.Error as exc:
+            logger.error("Falha ao garantir tabela '%s': %s", _TABELA_ANOMALIAS, exc)
+            raise
+        finally:
+            if self._owns_connection and not _eh_banco_memoria(self._db_path):
+                conn.close()
+
+    def listar_anomalias_sem_narrativa(
+        self,
+        limite: int = 10,
+    ) -> list[dict[str, Any]]:
+        self.garantir_tabela_anomalias()
+        conn = self._obter_conexao()
+        conn.row_factory = sqlite3.Row
+        try:
+            cur = conn.execute(
+                """
+                SELECT a.id, a.numero_controle_pncp, a.tipo, a.severidade,
+                       a.descricao, a.metodologia, a.valor_referencia, a.status,
+                       COALESCE(c.objeto, '') AS objeto,
+                       COALESCE(c.valor_global, 0) AS valor_global,
+                       COALESCE(f.razao_social, '') AS fornecedor
+                FROM alertas a
+                LEFT JOIN contratos c
+                       ON c.numero_controle_pncp = a.numero_controle_pncp
+                LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+                WHERE a.narrativa_ia IS NULL OR TRIM(a.narrativa_ia) = ''
+                ORDER BY CASE a.severidade
+                         WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END,
+                         a.valor_referencia DESC, a.id DESC
+                LIMIT ?
+                """,
+                (limite,),
+            )
+            return [dict(linha) for linha in cur.fetchall()]
+        except sqlite3.Error as exc:
+            logger.error("Falha ao listar anomalias sem narrativa: %s", exc)
+            raise
+        finally:
+            if self._owns_connection and not _eh_banco_memoria(self._db_path):
+                conn.close()
+
+    def atualizar_narrativa_anomalia(self, id_anomalia: int, texto: str) -> None:
+        if id_anomalia <= 0:
+            raise ValueError("id_anomalia deve ser positivo.")
+        narrativa = texto.strip()
+        if not narrativa:
+            raise ValueError("texto da narrativa não pode ser vazio.")
+        self.garantir_tabela_anomalias()
+        conn = self._obter_conexao()
+        try:
+            cur = conn.execute(
+                f'UPDATE "{_TABELA_ANOMALIAS}" SET narrativa_ia = ? WHERE id = ?',
+                (narrativa, id_anomalia),
+            )
+            conn.commit()
+            if cur.rowcount == 0:
+                raise ValueError(f"Anomalia não encontrada: id={id_anomalia}")
+        except sqlite3.Error as exc:
+            logger.error(
+                "Falha ao atualizar narrativa (id=%s): %s",
+                id_anomalia,
+                exc,
+            )
+            raise
+        finally:
+            if self._owns_connection and not _eh_banco_memoria(self._db_path):
+                conn.close()
+        logger.info("Narrativa IA salva para anomalia id=%s", id_anomalia)

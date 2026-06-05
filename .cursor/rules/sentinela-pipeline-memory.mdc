@@ -1,0 +1,78 @@
+---
+description: Memória do pipeline Sentinela RJ — arquitetura, front-ends, IA, env vars e convenções
+alwaysApply: true
+---
+
+# Sentinela RJ — Memória de Sessão (atualizada)
+
+## Fluxo ponta a ponta
+
+```
+PNCP/Extrator → SQLite (sentinela_rj.db) → Analisador (outliers/concentração/licitação)
+    → alertas → [opcional] InvestigadorIA (Gemini) → narrativa_ia
+    → Painéis: Streamlit (app.py) | Reflex (sentinela_web/) | HTML estático (painel_html)
+```
+
+## Entrypoints
+
+| Comando | Arquivo | Função |
+|---------|---------|--------|
+| `python __main__.py status\|coletar\|analisar\|relatorio` | `__main__.py` | CLI principal PNCP |
+| `python __main__.py painel` | `__main__.py` → `relatorios/painel_html.py` | Gera `data/painel_controle.html` |
+| `python __main__.py investigar` | `__main__.py` → `analise/motor_ia.py` | Laudos IA em lote (top 10 sem narrativa) |
+| `streamlit run app.py` | `app.py` | Dashboard Threat Intelligence (Streamlit, design tokens) |
+| `reflex run` | `sentinela_web/sentinela_web.py` + `rxconfig.py` | Dashboard alternativo Reflex |
+| `python main.py` | `main.py` | Pipeline legado (em evolução) |
+
+## Módulos-chave desta sessão
+
+| Arquivo | Responsabilidade |
+|---------|------------------|
+| `db/database.py` | `GerenciadorBanco` nativo `sqlite3`; `salvar_despesas(list[dict])`; `listar_anomalias_sem_narrativa`; `atualizar_narrativa_anomalia`; coluna `narrativa_ia` em `alertas` |
+| `analise/motor_ia.py` | `InvestigadorIA` — Gemini `gemini-2.5-flash`, requer `GEMINI_API_KEY` |
+| `analise/transformador.py` | Sem pandas; IQR + Z-score; saída JSON/CSV |
+| `app.py` | Streamlit: sidebar com `st.button` (menu), métricas design tokens (`#18181b`), Plotly paleta `["#4f46e5","#06b6d4","#334155"]`, investigação IA on-demand |
+| `sentinela_web/sentinela_web.py` | Reflex: `SentinelaState` + sqlite3, tema `rx.theme(dark, crimson)`, páginas Visão Geral / Investigação / Logs |
+| `relatorios/painel_html.py` | `GeradorPainelHTML` — Chart.js, métricas SQLite → HTML estático |
+| `rxconfig.py` | Config Reflex (`app_name="sentinela_web"`) |
+| `.streamlit/config.toml` | Tema dark nativo Streamlit (complementar ao CSS injetado) |
+
+## Design Tokens — `app.py` (Streamlit)
+
+- **Métricas:** fundo `#18181b`, borda `1px solid #27272a`, radius `8px`; label uppercase `0.8rem` `#a1a1aa`; valor monospace `2rem` `700` `white-space: nowrap`; sem bordas neon
+- **Sidebar nav:** `st.button` em `st.container`, transparente → hover `#27272a`, ativo `#27272a` via `type="primary"`
+- **Plotly:** `plotly_dark`, `paper_bgcolor='rgba(0,0,0,0)'`, `showgrid=False`, `showlegend=False`, `coloraxis_showscale=False`
+- **Tabela:** `st.dataframe` com CSS escuro `#18181b` / bordas `#27272a`
+
+## Variáveis de ambiente
+
+| Variável | Obrigatória | Uso |
+|----------|-------------|-----|
+| `GEMINI_API_KEY` | sim* | `InvestigadorIA`, CLI `investigar`, botão IA no `app.py` |
+| `DB_PATH` / `DATABASE_URL` | não | Override do SQLite (default: `data/sentinela_rj.db`) |
+| `.env` | não | Carregado nativamente em `__main__.py` e `app.py` |
+
+\* Necessária apenas para funcionalidades de IA.
+
+## Dependências (`requirements.txt`)
+
+`requests`, `reflex`, `streamlit`, `pandas`, `plotly`, `google-generativeai`
+
+## Convenções de código
+
+- **Type hints** (`from __future__ import annotations`)
+- **Fail-fast** em entradas e env vars críticas
+- **sqlite3** padrão para persistência e painéis (sem SQLAlchemy no fluxo novo)
+- **Funções ≤ 25 linhas** quando possível
+- **Logging nativo** — `INFO` estados, `ERROR` falhas
+
+## Git (histórico recente local)
+
+- `4bf5b28` — refactor DB/tests para sqlite3 nativo
+- `de79004` — transformador sem pandas (statistics)
+- `1aa27e7` — fix UI Streamlit (width stretch, sidebar)
+- **Pendente:** commit com IA Gemini, painéis Streamlit+Reflex, CLI painel/investigar, design tokens
+
+## Artefatos a NÃO versionar
+
+- `data/*.db`, `.env`, `backend.zip`, `frontend.zip`, `.web/`, `reflex.lock/` (gerado pelo Reflex)

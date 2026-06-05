@@ -6,12 +6,15 @@ Uso:
     python -m sentinela coletar [data_ini data_fim]
     python -m sentinela analisar [--dir DIR]
     python -m sentinela relatorio [--dir DIR]
+    python -m sentinela painel
+    python -m sentinela investigar
 
 Executar a partir da raiz do projeto (onde fica este arquivo).
 """
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from collections import Counter
@@ -209,6 +212,94 @@ def cmd_analisar(args) -> int:
     return 0
 
 
+# ── Sub-comando: painel ─────────────────────────────────────────────────────
+
+def cmd_painel(_args) -> int:
+    from relatorios.painel_html import GeradorPainelHTML
+
+    _header("painel")
+    t0 = time.perf_counter()
+
+    try:
+        caminho = GeradorPainelHTML().gerar()
+    except FileNotFoundError as exc:
+        _warn(str(exc))
+        _warn("Execute primeiro: python -m sentinela coletar")
+        print()
+        return 1
+
+    print()
+    print(SEP)
+    print("  RESUMO DO PAINEL")
+    print(SEP)
+    print(f"  Arquivo : {caminho}")
+    print(f"  Tamanho : {caminho.stat().st_size:,} bytes")
+    print(f"  Tempo   : {_elapsed(t0)}")
+    print()
+    return 0
+
+
+# ── Sub-comando: investigar ─────────────────────────────────────────────────
+
+def cmd_investigar(_args) -> int:
+    from db.conexao import DB_PATH
+    from db.database import GerenciadorBanco
+    from analise.motor_ia import InvestigadorIA
+
+    _header("investigar")
+
+    if not DB_PATH.exists():
+        _warn(f"Banco nao encontrado: {DB_PATH}")
+        _warn("Execute primeiro: python -m sentinela coletar")
+        print()
+        return 1
+
+    if not os.environ.get("GEMINI_API_KEY", "").strip():
+        _warn("GEMINI_API_KEY nao definida no ambiente.")
+        print()
+        return 1
+
+    t0 = time.perf_counter()
+    gerenciador = GerenciadorBanco(db_path=DB_PATH)
+
+    try:
+        investigador = InvestigadorIA()
+    except ValueError as exc:
+        _warn(str(exc))
+        print()
+        return 1
+
+    pendentes = gerenciador.listar_anomalias_sem_narrativa(limite=10)
+    if not pendentes:
+        _info("Nenhuma anomalia pendente de narrativa IA.")
+        print()
+        return 0
+
+    print()
+    _info(f"Processando {len(pendentes)} anomalias...")
+    sucesso = 0
+
+    for anomalia in pendentes:
+        id_anomalia = int(anomalia["id"])
+        try:
+            narrativa = investigador.investigar_anomalia(anomalia)
+            gerenciador.atualizar_narrativa_anomalia(id_anomalia, narrativa)
+            sucesso += 1
+            _ok(f"id={id_anomalia}  narrativa salva ({len(narrativa)} chars)")
+        except Exception as exc:
+            _warn(f"id={id_anomalia}  falhou: {exc}")
+
+    print()
+    print(SEP)
+    print("  RESUMO DA INVESTIGACAO")
+    print(SEP)
+    print(f"  Processadas : {len(pendentes)}")
+    print(f"  Com sucesso : {sucesso}")
+    print(f"  Tempo       : {_elapsed(t0)}")
+    print()
+    return 0 if sucesso == len(pendentes) else 1
+
+
 # ── Sub-comando: relatorio ────────────────────────────────────────────────────
 
 def cmd_relatorio(args) -> int:
@@ -275,7 +366,34 @@ def _build_parser() -> argparse.ArgumentParser:
     rel.add_argument("--dir", metavar="DIR",
                      help="Diretorio de saida (padrao: relatorios/)")
 
+    # painel
+    sub.add_parser("painel", help="Gera painel HTML estatico de controle")
+
+    # investigar
+    sub.add_parser(
+        "investigar",
+        help="Gera narrativas IA via Gemini (requer GEMINI_API_KEY)",
+    )
+
     return p
+
+
+def _carregar_env() -> None:
+    env_path = Path(__file__).resolve().parent / ".env"
+    try:
+        with env_path.open(encoding="utf-8") as handle:
+            for linha in handle:
+                linha = linha.strip()
+                if not linha or linha.startswith("#"):
+                    continue
+                chave, separador, valor = linha.partition("=")
+                if not separador:
+                    continue
+                chave = chave.strip()
+                if chave:
+                    os.environ[chave] = valor.strip()
+    except FileNotFoundError:
+        pass
 
 
 def main() -> None:
@@ -287,6 +405,8 @@ def main() -> None:
         "coletar":   cmd_coletar,
         "analisar":  cmd_analisar,
         "relatorio": cmd_relatorio,
+        "painel":      cmd_painel,
+        "investigar":  cmd_investigar,
     }
 
     try:
@@ -300,4 +420,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    _carregar_env()
     main()

@@ -80,7 +80,8 @@ CREATE TABLE IF NOT EXISTS alertas (
     metodologia         TEXT,
     valor_referencia    REAL,
     status              TEXT DEFAULT 'aberto',   -- aberto/investigando/confirmado/descartado
-    criado_em           TEXT DEFAULT (datetime('now'))
+    criado_em           TEXT DEFAULT (datetime('now')),
+    narrativa_ia        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS coletas_log (

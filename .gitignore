@@ -1,3 +1,7 @@
+*.db
+.web
+assets/external/
+.states
 # ── Banco de dados ────────────────────────────────────────────────────────────
 data/*.db
 data/*.db-shm
