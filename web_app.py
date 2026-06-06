@@ -3,8 +3,7 @@ import json
 import math
 import os
 import sqlite3
-
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 
 from db.conexao import DB_PATH
 
@@ -16,6 +15,9 @@ def get_db() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
+@app.route('/dashboard')
+def dashboard():
+    return render_template('index.html')
 
 @app.after_request
 def add_cors(response):

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentinela RJ — Painel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1>Sentinela RJ</h1>
+      <p class="subtitle">Monitoramento independente de contratos públicos municipais</p>
+    </div>
+  </header>
+
+  <nav id="main-nav">
+    <button class="tab-btn active" data-tab="visao-geral">Visão Geral</button>
+    <button class="tab-btn" data-tab="alertas">Alertas</button>
+    <button class="tab-btn" data-tab="timeline">Linha do Tempo</button>
+    <button class="tab-btn" data-tab="fornecedores">Fornecedores</button>
+    <button class="tab-btn" data-tab="sobre">Sobre</button>
+  </nav>
+
+  <main>
+    <!-- Section 1: Visão Geral -->
+    <section id="tab-visao-geral" class="tab-section active">
+      <div id="kpi-cards" class="kpi-grid"></div>
+      <div class="charts-grid">
+        <div class="chart-box">
+          <h3 class="chart-title">Anomalias por tipo</h3>
+          <canvas id="chart-tipos"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3 class="chart-title">Distribuição por severidade</h3>
+          <canvas id="chart-severidade"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: Alertas -->
+    <section id="tab-alertas" class="tab-section">
+      <div class="filter-bar">
+        <select id="filter-tipo">
+          <option value="">Todos os tipos</option>
+          <option value="outlier_valor">Outlier de valor</option>
+          <option value="concentracao_fornecedor">Concentração de fornecedor</option>
+          <option value="sem_licitacao_inexigibilidade">Inexigibilidade</option>
+          <option value="sem_licitacao_emergencia">Emergência</option>
+          <option value="sem_licitacao_dispensa">Dispensa</option>
+        </select>
+        <select id="filter-severidade">
+          <option value="">Todas as severidades</option>
+          <option value="alta">Alta</option>
+          <option value="media">Média</option>
+          <option value="baixa">Baixa</option>
+        </select>
+        <select id="filter-ano">
+          <option value="">Todos os anos</option>
+          <option value="2023">2023</option>
+          <option value="2024">2024</option>
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+        </select>
+        <input id="filter-fornecedor" type="text" placeholder="Buscar fornecedor...">
+      </div>
+      <div id="alertas-table-wrap">
+        <table id="alertas-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tipo</th>
+              <th>Severidade</th>
+              <th>Valor</th>
+              <th>Fornecedor</th>
+              <th>Data</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="alertas-tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination">
+        <button id="btn-prev" class="btn-page">← Anterior</button>
+        <span id="page-indicator">Página 1</span>
+        <button id="btn-next" class="btn-page">Próximo →</button>
+      </div>
+    </section>
+
+    <!-- Section 3: Linha do Tempo -->
+    <section id="tab-timeline" class="tab-section">
+      <div class="timeline-controls">
+        <div class="toggle-group" id="timeline-toggle">
+          <button class="toggle-btn active" data-granularity="month">Mensal</button>
+          <button class="toggle-btn" data-granularity="year">Anual</button>
+        </div>
+        <div class="year-checkboxes">
+          <label><input type="checkbox" class="year-check" value="2023" checked> 2023</label>
+          <label><input type="checkbox" class="year-check" value="2024" checked> 2024</label>
+          <label><input type="checkbox" class="year-check" value="2025" checked> 2025</label>
+          <label><input type="checkbox" class="year-check" value="2026" checked> 2026</label>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-box">
+          <h3 class="chart-title">Contratos por período</h3>
+          <canvas id="chart-timeline-contratos"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3 class="chart-title">Valor por período (R$)</h3>
+          <canvas id="chart-timeline-valor"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: Fornecedores -->
+    <section id="tab-fornecedores" class="tab-section">
+      <div class="toggle-group" id="fornecedores-toggle">
+        <button class="toggle-btn active" data-orderby="valor">Por Valor</button>
+        <button class="toggle-btn" data-orderby="contratos">Por Contratos</button>
+      </div>
+      <div class="chart-box" style="margin-bottom:1.5rem">
+        <canvas id="chart-fornecedores"></canvas>
+      </div>
+      <div class="table-wrap">
+        <table id="fornecedores-table">
+          <thead>
+            <tr>
+              <th>Fornecedor</th>
+              <th>Contratos</th>
+              <th>Valor Total</th>
+              <th>Alertas</th>
+            </tr>
+          </thead>
+          <tbody id="fornecedores-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section 5: Sobre -->
+    <section id="tab-sobre" class="tab-section sobre-section">
+      <h2>Sobre o Sentinela RJ</h2>
+      <p>O <strong>Sentinela RJ</strong> é um sistema independente de monitoramento de contratos públicos do município do Rio de Janeiro. Nosso objetivo é tornar mais fácil para qualquer cidadão identificar irregularidades ou padrões suspeitos nos contratos firmados pela prefeitura.</p>
+
+      <h3>De onde vêm os dados?</h3>
+      <p>Todos os dados são obtidos diretamente do <strong>Portal Nacional de Contratações Públicas (PNCP)</strong>, a plataforma oficial do governo federal que centraliza informações de contratos de todos os entes públicos brasileiros. Os dados são coletados e atualizados periodicamente de forma automática.</p>
+
+      <h3>Como detectamos anomalias?</h3>
+      <ul>
+        <li><strong>Outlier de valor:</strong> contrato com valor muito acima da mediana histórica para o mesmo tipo de objeto ou categoria.</li>
+        <li><strong>Concentração de fornecedor:</strong> empresa que recebeu volume desproporcional de contratos em curto período de tempo.</li>
+        <li><strong>Sem licitação — Inexigibilidade:</strong> contrato dispensado de licitação por alegação de fornecedor exclusivo.</li>
+        <li><strong>Sem licitação — Emergência:</strong> contrato emergencial firmado sem processo licitatório.</li>
+        <li><strong>Sem licitação — Dispensa:</strong> contrato com dispensa de licitação por valor ou outras condições.</li>
+      </ul>
+
+      <h3>Limitações</h3>
+      <p>Este sistema identifica <em>padrões estatísticos</em> que merecem atenção. Uma anomalia detectada não significa necessariamente irregularidade — pode haver justificativas legais para qualquer contrato. O Sentinela RJ é uma ferramenta de transparência, não de acusação.</p>
+
+      <h3>Fonte de dados</h3>
+      <p>Portal Nacional de Contratações Públicas (PNCP) · <a href="https://pncp.gov.br" target="_blank" rel="noopener">pncp.gov.br</a></p>
+    </section>
+  </main>
+
+  <!-- Detail slide-in panel (outside main) -->
+  <div id="detail-backdrop"></div>
+  <aside id="detail-panel">
+    <button id="detail-close">✕</button>
+    <div id="detail-content"></div>
+  </aside>
+</body>
+</html>
