@@ -1,0 +1,295 @@
+"""Flask REST API — Sentinela RJ (read-only dashboard)."""
+import json
+import math
+import os
+import sqlite3
+
+from flask import Flask, jsonify, request
+
+from db.conexao import DB_PATH
+
+app = Flask(__name__)
+
+
+def get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+@app.after_request
+def add_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+def index():
+    return "Sentinela RJ API - OK", 200
+
+
+# ---------------------------------------------------------------------------
+# Stats
+# ---------------------------------------------------------------------------
+
+@app.route("/api/stats")
+def stats():
+    db = get_db()
+    try:
+        contratos_total = db.execute(
+            "SELECT COUNT(*) FROM contratos WHERE valor_global > 0"
+        ).fetchone()[0]
+        valor_total = db.execute(
+            "SELECT SUM(valor_global) FROM contratos WHERE valor_global > 0"
+        ).fetchone()[0]
+        alertas_total = db.execute(
+            "SELECT COUNT(*) FROM alertas"
+        ).fetchone()[0]
+        alertas_alta = db.execute(
+            "SELECT COUNT(*) FROM alertas WHERE severidade = 'alta'"
+        ).fetchone()[0]
+        fornecedores_distintos = db.execute(
+            "SELECT COUNT(DISTINCT fornecedor_ni) FROM contratos"
+        ).fetchone()[0]
+        ultima_coleta = db.execute(
+            "SELECT MAX(finalizado_em) FROM coletas_log"
+        ).fetchone()[0]
+        periodo_inicio = db.execute(
+            "SELECT MIN(data_assinatura) FROM contratos"
+        ).fetchone()[0]
+        periodo_fim = db.execute(
+            "SELECT MAX(data_assinatura) FROM contratos"
+        ).fetchone()[0]
+        return jsonify(
+            {
+                "contratos_total": contratos_total,
+                "valor_total": valor_total,
+                "alertas_total": alertas_total,
+                "alertas_alta": alertas_alta,
+                "fornecedores_distintos": fornecedores_distintos,
+                "ultima_coleta": ultima_coleta,
+                "periodo_inicio": periodo_inicio,
+                "periodo_fim": periodo_fim,
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Alertas — list
+# ---------------------------------------------------------------------------
+
+@app.route("/api/alertas")
+def alertas_list():
+    db = get_db()
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = min(100, max(1, int(request.args.get("per_page", 20))))
+        tipo = request.args.get("tipo")
+        severidade = request.args.get("severidade")
+        ano = request.args.get("ano")
+        fornecedor = request.args.get("fornecedor")
+
+        base = """
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+        """
+        conditions: list[str] = []
+        params: list = []
+
+        if tipo:
+            conditions.append("a.tipo = ?")
+            params.append(tipo)
+        if severidade:
+            conditions.append("a.severidade = ?")
+            params.append(severidade)
+        if ano:
+            conditions.append("strftime('%Y', c.data_assinatura) = ?")
+            params.append(ano)
+        if fornecedor:
+            conditions.append("f.razao_social LIKE ?")
+            params.append(f"%{fornecedor}%")
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        total = db.execute(
+            f"SELECT COUNT(*) {base} {where}", params
+        ).fetchone()[0]
+
+        pages = math.ceil(total / per_page) if total else 0
+        offset = (page - 1) * per_page
+
+        rows = db.execute(
+            f"""
+            SELECT a.id, a.tipo, a.severidade, a.descricao, a.valor_referencia,
+                   a.narrativa_ia, a.numero_controle_pncp,
+                   f.razao_social AS fornecedor,
+                   c.objeto, c.data_assinatura, c.orgao_cnpj,
+                   o.razao_social AS orgao
+            {base} {where}
+            ORDER BY a.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            params + [per_page, offset],
+        ).fetchall()
+
+        return jsonify(
+            {
+                "items": [dict(r) for r in rows],
+                "total": total,
+                "page": page,
+                "pages": pages,
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Alertas — detail
+# ---------------------------------------------------------------------------
+
+@app.route("/api/alertas/<int:alert_id>")
+def alertas_detail(alert_id: int):
+    db = get_db()
+    try:
+        row = db.execute(
+            """
+            SELECT a.*,
+                   c.objeto, c.data_assinatura, c.data_vigencia_inicio,
+                   c.data_vigencia_fim, c.valor_inicial, c.valor_global,
+                   c.informacao_complementar, c.numero_contrato_empenho,
+                   f.razao_social AS fornecedor, f.tipo_pessoa,
+                   o.razao_social AS orgao
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            WHERE a.id = ?
+            """,
+            (alert_id,),
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(dict(row))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Timeline
+# ---------------------------------------------------------------------------
+
+@app.route("/api/timeline")
+def timeline():
+    db = get_db()
+    try:
+        granularity = request.args.get("granularity", "month")
+        strftime_expr = (
+            "strftime('%Y-%m', data_assinatura)"
+            if granularity == "month"
+            else "strftime('%Y', data_assinatura)"
+        )
+        rows = db.execute(
+            f"""
+            SELECT {strftime_expr} AS periodo,
+                   COUNT(*) AS contratos,
+                   SUM(valor_global) AS valor
+            FROM contratos
+            WHERE valor_global > 0 AND data_assinatura IS NOT NULL
+            GROUP BY periodo
+            ORDER BY periodo
+            """
+        ).fetchall()
+        return jsonify(
+            {
+                "labels": [r["periodo"] for r in rows],
+                "contratos": [r["contratos"] for r in rows],
+                "valor": [r["valor"] for r in rows],
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Fornecedores ranking
+# ---------------------------------------------------------------------------
+
+@app.route("/api/fornecedores/ranking")
+def fornecedores_ranking():
+    db = get_db()
+    try:
+        limit = min(100, max(1, int(request.args.get("limit", 10))))
+        orderby = request.args.get("orderby", "valor")
+        order_col = "total_contratos" if orderby == "contratos" else "valor_total"
+
+        rows = db.execute(
+            f"""
+            SELECT f.razao_social AS fornecedor,
+                   COUNT(*) AS total_contratos,
+                   SUM(c.valor_global) AS valor_total,
+                   COUNT(DISTINCT a.id) AS alertas
+            FROM contratos c
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN alertas a ON a.numero_controle_pncp = c.numero_controle_pncp
+            WHERE c.valor_global > 0
+            GROUP BY c.fornecedor_ni
+            ORDER BY {order_col} DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return jsonify({"items": [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Anomalias por tipo
+# ---------------------------------------------------------------------------
+
+@app.route("/api/anomalias/por-tipo")
+def anomalias_por_tipo():
+    db = get_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT tipo, severidade, COUNT(*) AS quantidade
+            FROM alertas
+            GROUP BY tipo, severidade
+            ORDER BY tipo, severidade
+            """
+        ).fetchall()
+        return jsonify({"items": [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    from waitress import serve
+
+    serve(app, host="0.0.0.0", port=5055)
