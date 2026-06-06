@@ -583,6 +583,103 @@ tr:last-child td {
   text-align: center;
 }
 
+/* ─── Grouped alertas table ─── */
+.row-group {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.row-group:hover td {
+  background: #1c1c1c;
+}
+
+.row-group.expanded td {
+  background: #191919;
+}
+
+.row-detail {
+  display: none;
+}
+
+.row-detail.visible {
+  display: table-row;
+}
+
+.row-detail > td {
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem 0.5rem 1.25rem;
+  background: #111;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.detail-col-objeto {
+  flex: 2;
+  min-width: 0;
+  color: #d4d4d4;
+}
+
+.detail-col-valor {
+  flex: 0 0 auto;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.detail-col-data {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.detail-col-orgao {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.detail-col-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 0.5rem;
+  line-height: 1;
+}
+
+.expand-btn:hover {
+  color: var(--text);
+}
+
+.badge-count {
+  background: #f97316;
+  color: white;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-count-single {
+  background: #374151;
+  color: #9ca3af;
+}
+
 /* ─── Mobile ─── */
 @media (max-width: 768px) {
   header { padding: 1rem; }

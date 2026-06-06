@@ -159,6 +159,128 @@ def alertas_list():
 
 
 # ---------------------------------------------------------------------------
+# Alertas — grouped
+# ---------------------------------------------------------------------------
+
+_SEV_PRIORITY = {'alta': 3, 'media': 2, 'baixa': 1}
+
+
+@app.route("/api/alertas/agrupados")
+def alertas_agrupados():
+    db = get_db()
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = min(100, max(1, int(request.args.get("per_page", 20))))
+        tipo = request.args.get("tipo")
+        severidade = request.args.get("severidade")
+        ano = request.args.get("ano")
+        fornecedor = request.args.get("fornecedor")
+
+        joins = """
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+        """
+        conditions: list[str] = []
+        params: list = []
+
+        if tipo:
+            conditions.append("a.tipo = ?")
+            params.append(tipo)
+        if severidade:
+            conditions.append("a.severidade = ?")
+            params.append(severidade)
+        if ano:
+            conditions.append("strftime('%Y', c.data_assinatura) = ?")
+            params.append(ano)
+        if fornecedor:
+            conditions.append("f.razao_social LIKE ?")
+            params.append(f"%{fornecedor}%")
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        total = db.execute(
+            f"SELECT COUNT(*) FROM (SELECT DISTINCT c.fornecedor_ni, a.tipo {joins} {where})",
+            params,
+        ).fetchone()[0]
+
+        pages = math.ceil(total / per_page) if total else 0
+        offset = (page - 1) * per_page
+
+        group_rows = db.execute(
+            f"""
+            SELECT DISTINCT c.fornecedor_ni, a.tipo, f.razao_social AS fornecedor_nome
+            {joins} {where}
+            ORDER BY c.fornecedor_ni, a.tipo
+            LIMIT ? OFFSET ?
+            """,
+            params + [per_page, offset],
+        ).fetchall()
+
+        items = []
+        for gr in group_rows:
+            fni = gr["fornecedor_ni"]
+            tp = gr["tipo"]
+
+            detail_cond = ["c.fornecedor_ni = ?", "a.tipo = ?"]
+            detail_params: list = [fni, tp]
+            if ano:
+                detail_cond.append("strftime('%Y', c.data_assinatura) = ?")
+                detail_params.append(ano)
+
+            alerts = db.execute(
+                f"""
+                SELECT a.id, a.severidade, a.descricao, a.valor_referencia, a.narrativa_ia,
+                       a.numero_controle_pncp, c.objeto, c.data_assinatura,
+                       o.razao_social AS orgao
+                FROM alertas a
+                LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+                LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+                WHERE {' AND '.join(detail_cond)}
+                ORDER BY a.id DESC
+                """,
+                detail_params,
+            ).fetchall()
+
+            severidades = [a["severidade"] for a in alerts]
+            max_sev = max(severidades, key=lambda s: _SEV_PRIORITY.get(s, 0), default="baixa")
+            valor_total = sum(a["valor_referencia"] or 0 for a in alerts)
+            valor_max = max((a["valor_referencia"] or 0 for a in alerts), default=0)
+            datas = [a["data_assinatura"] for a in alerts if a["data_assinatura"]]
+            narrativa = next((a["narrativa_ia"] for a in alerts if a["narrativa_ia"]), None)
+
+            items.append({
+                "grupo_id": f"{fni}__{tp}",
+                "fornecedor": gr["fornecedor_nome"] or fni,
+                "tipo": tp,
+                "severidade": max_sev,
+                "ocorrencias": len(alerts),
+                "valor_total": valor_total,
+                "valor_max": valor_max,
+                "data_mais_recente": max(datas) if datas else None,
+                "narrativa_ia": narrativa,
+                "alertas": [
+                    {
+                        "id": a["id"],
+                        "descricao": a["descricao"],
+                        "valor_referencia": a["valor_referencia"],
+                        "objeto": a["objeto"],
+                        "data_assinatura": a["data_assinatura"],
+                        "numero_controle_pncp": a["numero_controle_pncp"],
+                        "orgao": a["orgao"],
+                    }
+                    for a in alerts
+                ],
+            })
+
+        return jsonify({"items": items, "total": total, "page": page, "pages": pages})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Alertas — detail
 # ---------------------------------------------------------------------------
 

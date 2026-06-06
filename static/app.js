@@ -320,33 +320,85 @@ async function loadAlertas() {
     if (f.ano)        params.set('ano',        f.ano);
     if (f.fornecedor) params.set('fornecedor', f.fornecedor);
 
-    const res = await fetch(`${BASE}/api/alertas?${params}`);
+    const res = await fetch(`${BASE}/api/alertas/agrupados?${params}`);
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
 
     if (!d.items.length) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">Nenhuma anomalia encontrada.</td></tr>';
     } else {
-      tbody.innerHTML = d.items.map((item, i) => `
-        <tr data-id="${item.id}">
-          <td style="color:var(--muted);font-size:0.8rem">${(state.alertasPage - 1) * 20 + i + 1}</td>
-          <td>${tipoBadge(item.tipo)}</td>
-          <td>${sevBadge(item.severidade)}</td>
-          <td style="white-space:nowrap;font-weight:500">${formatCurrency(item.valor_referencia)}</td>
-          <td>${truncate(item.fornecedor || '—', 30)}</td>
-          <td style="white-space:nowrap;color:var(--muted)">${formatDate(item.data_assinatura)}</td>
-          <td><button class="btn-page" data-id="${item.id}">Ver</button></td>
-        </tr>
-      `).join('');
+      const html = [];
+      d.items.forEach(grupo => {
+        const countBadge = grupo.ocorrencias > 1
+          ? `<span class="badge-count">${grupo.ocorrencias} contratos</span>`
+          : `<span class="badge-count badge-count-single">1 contrato</span>`;
+        const analisBtn = grupo.narrativa_ia
+          ? `<button class="btn-page btn-analise" data-grupo="${grupo.grupo_id}" style="font-size:0.75rem">Ver análise</button>`
+          : '';
+        const gid = grupo.grupo_id;
 
-      tbody.querySelectorAll('tr[data-id]').forEach(tr => {
+        html.push(`
+          <tr class="row-group" data-grupo="${gid}">
+            <td><button class="expand-btn" data-grupo="${gid}">▶</button></td>
+            <td>${tipoBadge(grupo.tipo)}</td>
+            <td>${sevBadge(grupo.severidade)}</td>
+            <td style="white-space:nowrap;font-weight:500">${formatCurrency(grupo.valor_total)}</td>
+            <td>${truncate(grupo.fornecedor || '—', 30)} ${countBadge}</td>
+            <td style="white-space:nowrap;color:var(--muted)">${formatDate(grupo.data_mais_recente)}</td>
+            <td>${analisBtn}</td>
+          </tr>
+        `);
+
+        const tipoColor = TIPO_COLORS[grupo.tipo] || '#6b7280';
+        grupo.alertas.forEach(a => {
+          const pncpLink = a.numero_controle_pncp
+            ? `<a href="https://pncp.gov.br/app/contratos/${a.numero_controle_pncp}" target="_blank" rel="noopener" class="detail-link" style="font-size:0.75rem;padding:0.2rem 0.5rem">PNCP ↗</a>`
+            : '';
+          html.push(`
+            <tr class="row-detail" data-grupo="${gid}">
+              <td colspan="7">
+                <div class="detail-row-inner" style="border-left:3px solid ${tipoColor}">
+                  <span class="detail-col-objeto">${truncate(a.objeto || '—', 60)}</span>
+                  <span class="detail-col-valor">${formatCurrency(a.valor_referencia)}</span>
+                  <span class="detail-col-data">${formatDate(a.data_assinatura)}</span>
+                  <span class="detail-col-orgao">${truncate(a.orgao || '—', 30)}</span>
+                  <span class="detail-col-actions">
+                    ${pncpLink}
+                    <button class="btn-page btn-ver-detalhes" data-id="${a.id}" style="font-size:0.75rem;padding:0.2rem 0.5rem">Ver detalhes</button>
+                  </span>
+                </div>
+              </td>
+            </tr>
+          `);
+        });
+      });
+
+      tbody.innerHTML = html.join('');
+
+      tbody.querySelectorAll('.row-group').forEach(tr => {
+        const gid = tr.dataset.grupo;
+        const expandToggle = () => {
+          const expanded = tr.classList.toggle('expanded');
+          tr.querySelector('.expand-btn').textContent = expanded ? '▼' : '▶';
+          tbody.querySelectorAll(`.row-detail[data-grupo="${gid}"]`).forEach(dr => {
+            dr.classList.toggle('visible', expanded);
+          });
+        };
         tr.addEventListener('click', e => {
-          if (e.target.tagName === 'BUTTON') return;
-          openDetail(parseInt(tr.dataset.id, 10));
+          if (e.target.classList.contains('btn-analise') || e.target.classList.contains('btn-ver-detalhes')) return;
+          expandToggle();
         });
-        tr.querySelector('button').addEventListener('click', () => {
-          openDetail(parseInt(tr.dataset.id, 10));
+      });
+
+      tbody.querySelectorAll('.btn-analise').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const grupo = d.items.find(g => g.grupo_id === btn.dataset.grupo);
+          if (grupo?.alertas[0]) openDetail(grupo.alertas[0].id);
         });
+      });
+
+      tbody.querySelectorAll('.btn-ver-detalhes').forEach(btn => {
+        btn.addEventListener('click', () => openDetail(parseInt(btn.dataset.id, 10)));
       });
     }
 
