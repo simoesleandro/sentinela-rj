@@ -286,8 +286,13 @@ def cmd_investigar(_args) -> int:
             gerenciador.atualizar_narrativa_anomalia(id_anomalia, narrativa)
             sucesso += 1
             _ok(f"id={id_anomalia}  narrativa salva ({len(narrativa)} chars)")
+            time.sleep(13)
         except Exception as exc:
             _warn(f"id={id_anomalia}  falhou: {exc}")
+            if "429" in str(exc):
+                time.sleep(30)
+            else:
+                time.sleep(13)
 
     print()
     print(SEP)

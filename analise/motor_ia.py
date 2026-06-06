@@ -7,6 +7,7 @@ import os
 from typing import Any
 
 import google.generativeai as genai
+import groq as groq_sdk
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,18 @@ def _serializar_anomalia(anomalia: dict[str, Any]) -> str:
 
 def _montar_prompt(anomalia: dict[str, Any]) -> str:
     return f"{_PROMPT_AUDITOR}\n\nDados da anomalia:\n{_serializar_anomalia(anomalia)}"
+
+
+def _call_groq(prompt: str) -> str:
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("GROQ_API_KEY não definida.")
+    client = groq_sdk.Groq(api_key=api_key)
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return completion.choices[0].message.content.strip()
 
 
 def _extrair_texto_resposta(resposta: genai.types.GenerateContentResponse) -> str:
@@ -62,6 +75,16 @@ class InvestigadorIA:
             anomalia.get("id", "?"),
         )
         prompt = _montar_prompt(anomalia)
-        narrativa = self._gerar_narrativa(prompt)
+        try:
+            narrativa = self._gerar_narrativa(prompt)
+        except Exception as exc:
+            if "429" in str(exc):
+                logger.warning("Gemini 429 — usando Groq como fallback.")
+                try:
+                    narrativa = _call_groq(prompt)
+                except Exception:
+                    raise exc
+            else:
+                raise
         logger.info("Narrativa gerada (%d caracteres)", len(narrativa))
         return narrativa

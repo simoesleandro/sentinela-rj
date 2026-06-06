@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentinela RJ — Painel de Controle</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#fafafa;
+      line-height:1.5;padding:2rem}
+    header{margin-bottom:2rem}
+    h1{font-weight:300;font-size:1.75rem;letter-spacing:-0.02em}
+    .meta{color:#a3a3a3;font-size:.875rem;margin-top:.25rem}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;
+      margin-bottom:2rem}
+    .card{background:#171717;border:1px solid #262626;border-radius:8px;padding:1.25rem}
+    .card-label{color:#a3a3a3;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}
+    .card-value{font-size:2rem;font-weight:300;margin:.5rem 0}
+    .card-hint{color:#737373;font-size:.75rem}
+    .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;
+      margin-bottom:2rem}
+    .chart-box{background:#171717;border:1px solid #262626;border-radius:8px;padding:1rem}
+    .chart-box h2{font-size:.875rem;font-weight:400;color:#a3a3a3;margin-bottom:1rem}
+    table{width:100%;border-collapse:collapse;background:#171717;border:1px solid #262626;
+      border-radius:8px;overflow:hidden}
+    th,td{padding:.75rem 1rem;text-align:left;border-bottom:1px solid #262626;font-size:.875rem}
+    th{color:#a3a3a3;font-weight:500;font-size:.75rem;text-transform:uppercase}
+    tr:last-child td{border-bottom:none}
+    .tag{background:#262626;padding:.15rem .5rem;border-radius:4px;font-size:.75rem}
+    .vazio{text-align:center;color:#737373}
+    section h2{font-size:1rem;font-weight:400;margin-bottom:1rem;color:#d4d4d4}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sentinela RJ — Painel de Controle</h1>
+    <p class="meta">Gerado em 05/06/2026 12:42 UTC</p>
+  </header>
+  <section class="cards"><article class="card"><p class="card-label">Contratos brutos</p><p class="card-value">531,228</p><p class="card-hint">Extraídos pelo módulo Extrator</p></article>
+<article class="card"><p class="card-label">Contratos analisados</p><p class="card-value">501</p><p class="card-hint">Persistidos no banco</p></article>
+<article class="card"><p class="card-label">Anomalias detectadas</p><p class="card-value">103</p><p class="card-hint">Identificadas pelo Analisador</p></article>
+<article class="card"><p class="card-label">Tipos distintos</p><p class="card-value">5</p><p class="card-hint">Categorias de alerta</p></article></section>
+  <section class="charts">
+    <div class="chart-box"><h2>Anomalias por tipo</h2><canvas id="chartTipo"></canvas></div>
+    <div class="chart-box"><h2>Distribuição por tipo</h2><canvas id="chartDonut"></canvas></div>
+  </section>
+  <section>
+    <h2>Top 10 anomalias — risco ALTO</h2>
+    <table>
+      <thead><tr><th>#</th><th>Tipo</th><th>Valor</th><th>Fornecedor</th><th>Descrição</th></tr></thead>
+      <tbody><tr><td>1</td><td><span class='tag'>Outlier de valor</span></td><td>R$ 145.806.365,40</td><td>COMPANHIA MUNICIPAL DE LIMPEZA URBANA - COMLURB</td><td>Contrato de R$ 145,806,365.40 está 100.9× acima do limite IQR da categoria 'Serviços' (Q3 + 1,5×IQR = R$ 1,445,078.66). </td></tr>
+<tr><td>2</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 106.559.786,83</td><td>ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA</td><td>ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA recebeu 3 contratos entre 2026-02-20 e 2026-05-21 (90 dias), </td></tr>
+<tr><td>3</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 106.559.786,83</td><td>ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA</td><td>ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA recebeu 3 contratos entre 2026-02-20 e 2026-05-21 (90 dias), </td></tr>
+<tr><td>4</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 106.559.786,83</td><td>ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA</td><td>ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA recebeu 3 contratos entre 2026-02-20 e 2026-05-21 (90 dias), </td></tr>
+<tr><td>5</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 86.716.974,53</td><td>CONSTRUTORA ENTRE OS RIOS LTDA</td><td>CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53</td></tr>
+<tr><td>6</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 86.716.974,53</td><td>CONSTRUTORA ENTRE OS RIOS LTDA</td><td>CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53</td></tr>
+<tr><td>7</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 86.716.974,53</td><td>CONSTRUTORA ENTRE OS RIOS LTDA</td><td>CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53</td></tr>
+<tr><td>8</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 86.716.974,53</td><td>CONSTRUTORA ENTRE OS RIOS LTDA</td><td>CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53</td></tr>
+<tr><td>9</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 86.716.974,53</td><td>CONSTRUTORA ENTRE OS RIOS LTDA</td><td>CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53</td></tr>
+<tr><td>10</td><td><span class='tag'>Concentração de fornecedor</span></td><td>R$ 80.761.482,93</td><td>MATOS COSTA ENGENHARIA LTDA.</td><td>MATOS COSTA ENGENHARIA LTDA. recebeu 3 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 80,761,482.93. </td></tr></tbody>
+    </table>
+  </section>
+  <script>
+    const dados = {"gerado_em": "05/06/2026 12:42 UTC", "brutos_extraidos": 531228, "contratos_analisados": 501, "total_anomalias": 103, "anomalias_por_tipo": [{"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "quantidade": 54}, {"tipo": "sem_licitacao_inexigibilidade", "label": "Inexigibilidade", "quantidade": 19}, {"tipo": "outlier_valor", "label": "Outlier de valor", "quantidade": 14}, {"tipo": "sem_licitacao_emergencia", "label": "Emergência", "quantidade": 10}, {"tipo": "sem_licitacao_dispensa", "label": "Dispensa", "quantidade": 6}], "top_alta": [{"tipo": "outlier_valor", "label": "Outlier de valor", "descricao": "Contrato de R$ 145,806,365.40 está 100.9× acima do limite IQR da categoria 'Serviços' (Q3 + 1,5×IQR = R$ 1,445,078.66). Z-score: 11.7. Objeto: Prestação de serviços de limpeza, conservação e desinfecção hospitalar de áreas internas e externas, inclusive manutençã.", "valor_referencia": 145806365.4, "numero_controle_pncp": "42498733000148-2-001928/2024", "objeto": "Prestação de serviços de limpeza, conservação e desinfecção hospitalar de áreas internas e externas, inclusive manutenção e tratamento de pisos e desinfecção de incubadoras, com gestão interna de RSS e externa de resíduos do subgrupo A1 e grupo E, controle de vetores, com fornecimento de todos os insumos, materiais e equipamentos necessários, para diversas Unidades da SMS", "fornecedor": "COMPANHIA MUNICIPAL DE LIMPEZA URBANA - COMLURB"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA recebeu 3 contratos entre 2026-02-20 e 2026-05-21 (90 dias), totalizando R$ 106,559,786.83. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras, Serviços de Engenharia.", "valor_referencia": 106559786.83, "numero_controle_pncp": "42498733000148-2-000355/2026", "objeto": "OBRAS DE EXPANSÃO DO PARQUE REALENGO -  XXXIII R.A - AP 5.1", "fornecedor": "ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA recebeu 3 contratos entre 2026-02-20 e 2026-05-21 (90 dias), totalizando R$ 106,559,786.83. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras, Serviços de Engenharia.", "valor_referencia": 106559786.83, "numero_controle_pncp": "42498733000148-2-000148/2026", "objeto": "Conservação e Manutenção de Passeios em Concreto e Outros Tipos de Pavimento na Área da AP5", "fornecedor": "ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA recebeu 3 contratos entre 2026-02-20 e 2026-05-21 (90 dias), totalizando R$ 106,559,786.83. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras, Serviços de Engenharia.", "valor_referencia": 106559786.83, "numero_controle_pncp": "42498733000148-2-000118/2026", "objeto": "Conservação e Manutenção de Passeios em Concreto e Outros Tipos de Pavimento na Área da AP1 e AP2", "fornecedor": "ENIMONT - EMPRESA NACIONAL DE INSTALACOES E MONTAGENS LTDA"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras, Serviços, Serviços de Engenharia.", "valor_referencia": 86716974.53, "numero_controle_pncp": "42498733000148-2-000448/2026", "objeto": "Prestação do serviço associado de fornecimento, instalação e manutenção de aparelhos de ar-condicionado para atender aos órgãos e entidades da Prefeitura da Cidade do Rio de Janeiro – PCRJ.\nAta  SRP nº 110/2026", "fornecedor": "CONSTRUTORA ENTRE OS RIOS LTDA"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras, Serviços, Serviços de Engenharia.", "valor_referencia": 86716974.53, "numero_controle_pncp": "42498733000148-2-000288/2026", "objeto": "OBRAS DE REQUALIFICAÇÃO URBANA DO CALÇADÃO DE CAMPO GRANDE E ADJACÊNCIAS - RUA CORONEL AGOSTINHO, PARTE DAS RUAS BARCELOS DOMINGOS, VIÚVA DANTAS E MAJOR DE ALMEIDA COSTA", "fornecedor": "CONSTRUTORA ENTRE OS RIOS LTDA"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras, Serviços, Serviços de Engenharia.", "valor_referencia": 86716974.53, "numero_controle_pncp": "42498733000148-2-000250/2026", "objeto": "BAIRRO MARAVILHA OESTE - OBRAS DE URBANIZAÇÃO E INFRAESTRUTURA NA VIA F E OUTRAS, NO CONJUNTO DOS BANDEIRANTES (CESAR MAIA) - FASE I, NO BAIRRO DE VARGEM PEQUENA, NA AREA DA I/SUBI/CGO/2ªGO - XXIV R.A. - A.P.4.2.", "fornecedor": "CONSTRUTORA ENTRE OS RIOS LTDA"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras, Serviços, Serviços de Engenharia.", "valor_referencia": 86716974.53, "numero_controle_pncp": "42498733000148-2-000236/2026", "objeto": "OBRAS DE IMPLANTAÇÃO DE PARQUE LINEAR COM ECOPONTO NA RUA PROJETADA C, VILA DOS PINHEIROS, E REFORMA DE EDIFICAÇÃO MUNICIPAL PARA ABRIGAR O POSTO TERRITORIAL (GEL) NO COMPLEXO DA MARÉ, PAC PERIFERIA VIVA - XXX RA/AP 3.1.", "fornecedor": "CONSTRUTORA ENTRE OS RIOS LTDA"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "CONSTRUTORA ENTRE OS RIOS LTDA recebeu 5 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 86,716,974.53. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras, Serviços, Serviços de Engenharia.", "valor_referencia": 86716974.53, "numero_controle_pncp": "42498733000148-2-000120/2026", "objeto": "Instalação e/ou Recuperação dos Pisos em Grama Sintética e Alambrados nos Campos das AP4 e AP5", "fornecedor": "CONSTRUTORA ENTRE OS RIOS LTDA"}, {"tipo": "concentracao_fornecedor", "label": "Concentração de fornecedor", "descricao": "MATOS COSTA ENGENHARIA LTDA. recebeu 3 contratos entre 2026-03-09 e 2026-06-07 (90 dias), totalizando R$ 80,761,482.93. Órgãos: PREFEITURA MUNICIPAL DO RIO DE JANEIRO - RJ. Categorias: Obras.", "valor_referencia": 80761482.93, "numero_controle_pncp": "42498733000148-2-000452/2026", "objeto": "Contratação de empresa especializada na prestação de serviços de Manutenção dos sistemas de infraestrutura em favelas urbanizadas e parcialmente urbanizadas na cidade do Rio de Janeiro no âmbito da Secretaria Municipal de Habitação, sob regime de Empreitada por Preço Unitário, conforme as especificações constantes do Termo de Referência/ Projeto Básico (Anexo I), do Projeto Executivo, da Descrição dos Serviços, do Escopo dos Serviços e do Memorial Descritivo do processo administrativo nº HBT-PRO-2025/00273, para o Item para o Item 1 – AP 1-RP CENTRO   \n\n", "fornecedor": "MATOS COSTA ENGENHARIA LTDA."}]};
+    const tipos = dados.anomalias_por_tipo.map((i) => i.label);
+    const qtds = dados.anomalias_por_tipo.map((i) => i.quantidade);
+    const cor = '#3b82f6';
+    new Chart(document.getElementById('chartTipo'), {
+      type: 'bar',
+      data: { labels: tipos, datasets: [{ data: qtds, backgroundColor: cor }] },
+      options: { plugins: { legend: { display: false } }, scales: {
+        x: { ticks: { color: '#a3a3a3' }, grid: { color: '#262626' } },
+        y: { ticks: { color: '#a3a3a3' }, grid: { color: '#262626' } }
+      } }
+    });
+    new Chart(document.getElementById('chartDonut'), {
+      type: 'doughnut',
+      data: { labels: tipos, datasets: [{ data: qtds,
+        backgroundColor: ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#6366f1'] }] },
+      options: { plugins: { legend: { labels: { color: '#a3a3a3' } } } }
+    });
+  </script>
+</body>
+</html>
