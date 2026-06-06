@@ -355,6 +355,22 @@ def timeline():
 # Fornecedores ranking
 # ---------------------------------------------------------------------------
 
+def _calcular_score(
+    alertas_count: int,
+    valor_total: float,
+    severidades: list[str],
+    tipos: list[str],
+) -> float:
+    if alertas_count == 0:
+        return 0.0
+    severity_sum = sum(3 if s == "alta" else 2 if s == "media" else 1 for s in severidades)
+    type_diversity = len(set(tipos))
+    valor_factor = min(valor_total / 100_000_000, 3.0)
+    raw = severity_sum + type_diversity + valor_factor
+    score = min(round(raw / (alertas_count + 1) * alertas_count, 1), 10.0)
+    return score
+
+
 @app.route("/api/fornecedores/ranking")
 def fornecedores_ranking():
     db = get_db()
@@ -365,7 +381,8 @@ def fornecedores_ranking():
 
         rows = db.execute(
             f"""
-            SELECT f.razao_social AS fornecedor,
+            SELECT c.fornecedor_ni,
+                   f.razao_social AS fornecedor,
                    COUNT(*) AS total_contratos,
                    SUM(c.valor_global) AS valor_total,
                    COUNT(DISTINCT a.id) AS alertas
@@ -379,7 +396,39 @@ def fornecedores_ranking():
             """,
             (limit,),
         ).fetchall()
-        return jsonify({"items": [dict(r) for r in rows]})
+
+        items = []
+        for r in rows:
+            item = dict(r)
+            alert_rows = db.execute(
+                """
+                SELECT a.severidade, a.tipo
+                FROM alertas a
+                LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+                WHERE c.fornecedor_ni = ?
+                """,
+                (item["fornecedor_ni"],),
+            ).fetchall()
+            severidades = [ar["severidade"] for ar in alert_rows]
+            tipos = [ar["tipo"] for ar in alert_rows]
+            score = _calcular_score(item["alertas"], item["valor_total"] or 0, severidades, tipos)
+            item["risk_score"] = score
+            item["risk_label"] = (
+                "CRÍTICO" if score >= 8 else
+                "ALTO"    if score >= 6 else
+                "MÉDIO"   if score >= 4 else
+                "BAIXO"
+            )
+            item["risk_color"] = (
+                "#ef4444" if score >= 8 else
+                "#f97316" if score >= 6 else
+                "#eab308" if score >= 4 else
+                "#22c55e"
+            )
+            items.append(item)
+
+        items.sort(key=lambda x: x["risk_score"], reverse=True)
+        return jsonify({"items": items})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

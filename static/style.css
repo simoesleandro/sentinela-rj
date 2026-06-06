@@ -665,6 +665,14 @@ tr:last-child td {
   color: var(--text);
 }
 
+.badge-risk {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .badge-count {
   background: #f97316;
   color: white;

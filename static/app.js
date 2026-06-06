@@ -636,15 +636,21 @@ async function loadFornecedores() {
       },
     });
 
+    const sortedItems = [...d.items].sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0));
+
     const tbody = document.getElementById('fornecedores-tbody');
-    tbody.innerHTML = d.items.map(r => {
+    tbody.innerHTML = sortedItems.map(r => {
       const nome = (r.fornecedor || 'N/I').replace(/'/g, '&#39;');
+      const riskCell = r.risk_score != null
+        ? `<span class="badge-risk" style="background:${r.risk_color}20;color:${r.risk_color};border:1px solid ${r.risk_color}40">${r.risk_score} ${r.risk_label}</span>`
+        : '—';
       return `
         <tr>
           <td><button class="fornecedor-link" data-nome="${nome}">${r.fornecedor || 'N/I'}</button></td>
           <td>${(r.total_contratos || 0).toLocaleString('pt-BR')}</td>
           <td>${formatCurrency(r.valor_total)}</td>
           <td>${r.alertas || 0}</td>
+          <td>${riskCell}</td>
         </tr>
       `;
     }).join('');
