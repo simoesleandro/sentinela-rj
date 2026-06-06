@@ -146,7 +146,7 @@ def cmd_coletar(args) -> int:
 
 def cmd_analisar(args) -> int:
     from db.conexao import get_conn, DB_PATH
-    from analisador import outliers, concentracao, licitacao
+    from analisador import outliers, concentracao, licitacao, fracionamento
     from analisador.engine import persistir_alertas
 
     _header("analisar")
@@ -172,7 +172,10 @@ def cmd_analisar(args) -> int:
     r_lic  = licitacao.detectar(conn)
     _ok(f"licitacao     {len(r_lic):3d} anomalias")
 
-    todas = sorted(r_out + r_conc + r_lic, key=lambda a: a.score, reverse=True)
+    r_frac = fracionamento.detectar(conn)
+    _ok(f"fracionamento {len(r_frac):3d} anomalias")
+
+    todas = sorted(r_out + r_conc + r_lic + r_frac, key=lambda a: a.score, reverse=True)
 
     # Limpa alertas anteriores e persiste os novos
     conn.execute("DELETE FROM alertas")
