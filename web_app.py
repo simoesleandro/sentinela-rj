@@ -595,9 +595,19 @@ def fornecedor_dossie(fornecedor_ni: str):
             (fornecedor_ni,),
         ).fetchone()
 
+        cadastro = dict(cadastro_row) if cadastro_row else None
+        if cadastro:
+            for campo in ("socios", "cnaes_secundarios"):
+                raw = cadastro.get(campo)
+                if raw:
+                    try:
+                        cadastro[campo] = json.loads(raw)
+                    except Exception:
+                        cadastro[campo] = []
+
         return jsonify({
             "identidade": dict(forn),
-            "cadastro": dict(cadastro_row) if cadastro_row else None,
+            "cadastro": cadastro,
             "resumo": {
                 "total_contratos": total_contratos,
                 "valor_total": valor_total,
