@@ -744,8 +744,9 @@ async function loadFornecedores() {
 
     const tbody = document.getElementById('fornecedores-tbody');
     tbody.innerHTML = sortedItems.map(r => {
+      const sancaoIcon = r.tem_sancao ? ' <span title="Fornecedor sancionado (CEIS/CNEP)">⚠️</span>' : '';
       const riskCell = r.risk_score != null
-        ? `<span class="badge-risk" style="background:${r.risk_color}20;color:${r.risk_color};border:1px solid ${r.risk_color}40">${r.risk_score} ${r.risk_label}</span>`
+        ? `<span class="badge-risk" style="background:${r.risk_color}20;color:${r.risk_color};border:1px solid ${r.risk_color}40">${r.risk_score} ${r.risk_label}</span>${sancaoIcon}`
         : '—';
       const link = r.fornecedor_ni
         ? `<a href="/fornecedor/${r.fornecedor_ni}" target="_self" class="fornecedor-link">${r.fornecedor || 'N/I'}</a>`

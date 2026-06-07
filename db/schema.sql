@@ -97,7 +97,38 @@ CREATE TABLE IF NOT EXISTS coletas_log (
     observacao          TEXT
 );
 
+CREATE TABLE IF NOT EXISTS fornecedor_sancoes (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    fornecedor_ni       TEXT NOT NULL,
+    fonte               TEXT NOT NULL,          -- 'CEIS', 'CNEP', 'CEPIM'
+    tipo_sancao         TEXT,
+    orgao_sancionador   TEXT,
+    data_inicio         TEXT,
+    data_fim            TEXT,
+    descricao           TEXT,
+    coletado_em         TEXT DEFAULT (datetime('now')),
+    UNIQUE(fornecedor_ni, fonte, data_inicio)
+);
+
+CREATE TABLE IF NOT EXISTS fornecedor_cadastro (
+    fornecedor_ni           TEXT PRIMARY KEY,
+    situacao_cadastral      INTEGER,
+    descricao_situacao      TEXT,
+    data_inicio_atividade   TEXT,
+    cnae_fiscal             INTEGER,
+    cnae_fiscal_descricao   TEXT,
+    capital_social          REAL,
+    porte                   TEXT,
+    natureza_juridica       TEXT,
+    socios                  TEXT,               -- JSON serializado da lista qsa
+    cnaes_secundarios       TEXT,               -- JSON serializado
+    municipio               TEXT,
+    uf                      TEXT,
+    atualizado_em           TEXT
+);
+
 -- Índices
+CREATE INDEX IF NOT EXISTS idx_sancoes_fornecedor    ON fornecedor_sancoes(fornecedor_ni);
 CREATE INDEX IF NOT EXISTS idx_contratos_fornecedor  ON contratos(fornecedor_ni);
 CREATE INDEX IF NOT EXISTS idx_contratos_orgao        ON contratos(orgao_cnpj);
 CREATE INDEX IF NOT EXISTS idx_contratos_valor        ON contratos(valor_global);

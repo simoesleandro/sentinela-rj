@@ -208,6 +208,12 @@
         <div id="forn-risk"></div>
       </section>
 
+      <!-- Dados Cadastrais -->
+      <section class="forn-section" id="cadastro-section" style="margin-bottom:1.5rem">
+        <h2 class="section-title">Dados Cadastrais</h2>
+        <div id="cadastro-content"></div>
+      </section>
+
       <!-- KPI cards -->
       <div id="forn-resumo" class="kpi-grid" style="margin-bottom:2.5rem"></div>
 
@@ -362,6 +368,7 @@
 
         document.title = `${d.identidade.razao_social} — Sentinela RJ`;
         renderHero(d.identidade, d.resumo);
+        renderCadastro(d.cadastro, d.identidade);
         renderResumo(d.resumo);
         renderTimeline(d.timeline);
         renderOrgaos(d.orgaos_contratantes);
@@ -381,6 +388,56 @@
       const el = document.getElementById('error-state');
       el.innerHTML = `<div class="error-msg">${msg}</div>`;
       el.style.display = 'block';
+    }
+
+    function renderCadastro(cadastro, identidade) {
+      const el = document.getElementById('cadastro-content');
+      if (!el) return;
+
+      if (!cadastro) {
+        el.innerHTML = '<span class="badge badge-gray">Dados cadastrais não disponíveis</span>';
+        return;
+      }
+
+      const ativa = cadastro.situacao_cadastral === 2;
+      const sitBadge = ativa
+        ? `<span class="badge badge-green">${escapeHtml(cadastro.descricao_situacao || 'ATIVA')}</span>`
+        : `<span class="badge badge-red">⚠ ${escapeHtml(cadastro.descricao_situacao || 'INATIVA')}</span>`;
+
+      let socios = [];
+      try { socios = JSON.parse(cadastro.socios || '[]'); } catch (_) {}
+      const sociosHtml = socios.length
+        ? socios.map(s => `<li style="font-size:0.8rem;color:#d4d4d4;margin-bottom:2px">${escapeHtml(s.nome_socio || s.nome || '—')} <span style="color:var(--muted);font-size:0.75rem">${escapeHtml(s.qualificacao_socio || '')}</span></li>`).join('')
+        : '<li style="color:var(--muted);font-size:0.8rem">Não informado</li>';
+
+      el.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;align-items:center">
+          ${sitBadge}
+          ${cadastro.porte ? `<span class="badge badge-gray">${escapeHtml(cadastro.porte)}</span>` : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
+          <div>
+            <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">CNAE Principal</div>
+            <div style="font-size:0.82rem;color:#d4d4d4">${escapeHtml(cadastro.cnae_fiscal_descricao || '—')}</div>
+            ${cadastro.cnae_fiscal ? `<div style="font-size:0.72rem;color:var(--muted);font-family:monospace">${cadastro.cnae_fiscal}</div>` : ''}
+          </div>
+          <div>
+            <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Capital Social</div>
+            <div style="font-size:0.82rem;color:#d4d4d4">${formatCurrency(cadastro.capital_social)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Abertura</div>
+            <div style="font-size:0.82rem;color:#d4d4d4">${formatDate(cadastro.data_inicio_atividade)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Município / UF</div>
+            <div style="font-size:0.82rem;color:#d4d4d4">${escapeHtml(cadastro.municipio || '—')}${cadastro.uf ? ' / ' + escapeHtml(cadastro.uf) : ''}</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Sócios / QSA</div>
+          <ul style="list-style:none;padding:0;margin:0">${sociosHtml}</ul>
+        </div>`;
     }
 
     function renderHero(id, resumo) {

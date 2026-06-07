@@ -56,12 +56,13 @@ def analisar(conn: sqlite3.Connection) -> list[AnomaliaResult]:
     Os detectores ficam em módulos separados (outliers, concentracao, licitacao)
     para facilitar testes e adição de novos sem mexer aqui.
     """
-    from analisador import outliers, concentracao, licitacao
+    from analisador import outliers, concentracao, licitacao, sancoes
 
     resultados: list[AnomaliaResult] = []
     resultados.extend(outliers.detectar(conn))
     resultados.extend(concentracao.detectar(conn))
     resultados.extend(licitacao.detectar(conn))
+    resultados.extend(sancoes.detectar(conn))
 
     resultados.sort(key=lambda a: a.score, reverse=True)
     return resultados

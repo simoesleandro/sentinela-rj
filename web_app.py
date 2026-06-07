@@ -407,7 +407,8 @@ def fornecedores_ranking():
                    f.razao_social AS fornecedor,
                    COUNT(*) AS total_contratos,
                    SUM(c.valor_global) AS valor_total,
-                   COUNT(DISTINCT a.id) AS alertas
+                   COUNT(DISTINCT a.id) AS alertas,
+                   COALESCE(f.tem_sancao, 0) AS tem_sancao
             FROM contratos c
             LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
             LEFT JOIN alertas a ON a.numero_controle_pncp = c.numero_controle_pncp
@@ -422,6 +423,7 @@ def fornecedores_ranking():
         items = []
         for r in rows:
             item = dict(r)
+            item["tem_sancao"] = bool(item.get("tem_sancao"))
             alert_rows = db.execute(
                 """
                 SELECT a.severidade, a.tipo
@@ -466,7 +468,7 @@ def fornecedor_dossie(fornecedor_ni: str):
     db = get_db()
     try:
         forn = db.execute(
-            "SELECT ni, razao_social, tipo_pessoa FROM fornecedores WHERE ni = ?",
+            "SELECT ni, razao_social, tipo_pessoa, tem_sancao, ultima_consulta_sancao FROM fornecedores WHERE ni = ?",
             (fornecedor_ni,),
         ).fetchone()
         if forn is None:
@@ -581,8 +583,21 @@ def fornecedor_dossie(fornecedor_ni: str):
             (fornecedor_ni,),
         ).fetchall()
 
+        cadastro_row = db.execute(
+            """
+            SELECT situacao_cadastral, descricao_situacao,
+                   data_inicio_atividade, cnae_fiscal, cnae_fiscal_descricao,
+                   capital_social, porte, natureza_juridica,
+                   socios, cnaes_secundarios, municipio, uf, atualizado_em
+            FROM fornecedor_cadastro
+            WHERE fornecedor_ni = ?
+            """,
+            (fornecedor_ni,),
+        ).fetchone()
+
         return jsonify({
             "identidade": dict(forn),
+            "cadastro": dict(cadastro_row) if cadastro_row else None,
             "resumo": {
                 "total_contratos": total_contratos,
                 "valor_total": valor_total,

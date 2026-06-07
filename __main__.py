@@ -146,7 +146,7 @@ def cmd_coletar(args) -> int:
 
 def cmd_analisar(args) -> int:
     from db.conexao import get_conn, DB_PATH
-    from analisador import outliers, concentracao, licitacao, fracionamento
+    from analisador import outliers, concentracao, licitacao, fracionamento, sancoes
     from analisador.engine import persistir_alertas
 
     _header("analisar")
@@ -175,7 +175,10 @@ def cmd_analisar(args) -> int:
     r_frac = fracionamento.detectar(conn)
     _ok(f"fracionamento {len(r_frac):3d} anomalias")
 
-    todas = sorted(r_out + r_conc + r_lic + r_frac, key=lambda a: a.score, reverse=True)
+    r_sanc = sancoes.detectar(conn)
+    _ok(f"sancoes       {len(r_sanc):3d} anomalias")
+
+    todas = sorted(r_out + r_conc + r_lic + r_frac + r_sanc, key=lambda a: a.score, reverse=True)
 
     # Limpa alertas anteriores e persiste os novos
     conn.execute("DELETE FROM alertas")
@@ -211,6 +214,87 @@ def cmd_analisar(args) -> int:
 
     print()
     print(f"  Tempo total: {_elapsed(t0)}")
+    print()
+    return 0
+
+
+# ── Sub-comando: enriquecer ──────────────────────────────────────────────────
+
+def cmd_enriquecer(args) -> int:
+    from db.conexao import get_conn, DB_PATH
+    from extrator.enriquecedor import Enriquecedor
+
+    _header("enriquecer")
+
+    if not DB_PATH.exists():
+        _warn(f"Banco nao encontrado: {DB_PATH}")
+        _warn("Execute primeiro: python -m sentinela coletar")
+        print()
+        return 1
+
+    conn = get_conn(row_factory=True)
+
+    if args.reset:
+        _warn("--reset: limpando sancoes e zerando flags em todos os fornecedores...")
+        conn.execute("DELETE FROM fornecedor_sancoes")
+        conn.execute("UPDATE fornecedores SET tem_sancao = 0, ultima_consulta_sancao = NULL")
+        conn.commit()
+        _ok("Reset concluido.")
+        print()
+
+    c = conn.cursor()
+    c.execute("""
+        SELECT ni, razao_social FROM fornecedores
+        WHERE ultima_consulta_sancao IS NULL
+           OR ultima_consulta_sancao < datetime('now', '-24 hours')
+        ORDER BY ni
+    """)
+    pendentes = c.fetchall()
+
+    total = len(pendentes)
+    if total == 0:
+        _info("Todos os fornecedores ja foram consultados nas ultimas 24h.")
+        print()
+        conn.close()
+        return 0
+
+    _info(f"{total} fornecedor(es) a consultar...")
+    print()
+
+    enriquecedor = Enriquecedor()
+    t0 = time.perf_counter()
+    consultados = com_sancao = sem_sancao = erros = 0
+    _VERBOSE_ATE = 5  # diagnóstico detalhado nos primeiros N fornecedores
+
+    for i, forn in enumerate(pendentes, 1):
+        razao = (forn["razao_social"] or forn["ni"])[:50]
+        enriquecedor.verbose = (i <= _VERBOSE_ATE)
+        _info(f"Enriquecendo {i}/{total}: {razao}")
+        try:
+            resumo = enriquecedor.enriquecer_fornecedor(conn, forn["ni"])
+            consultados += 1
+            if not resumo["encontrado"]:
+                sem_sancao += 1  # CNPJ não encontrado na BrasilAPI
+            elif not resumo["ativo"]:
+                com_sancao += 1
+                _ok(f"  Inativo/inapto: {resumo['situacao'] or '?'}")
+            else:
+                sem_sancao += 1
+        except Exception as e:
+            erros += 1
+            _warn(f"  Excecao inesperada: {e}")
+
+    conn.close()
+
+    print()
+    print(SEP)
+    print("  RESUMO DO ENRIQUECIMENTO")
+    print(SEP)
+    print(f"  Consultados   : {consultados}")
+    print(f"  Inativos/aptos: {com_sancao}")
+    print(f"  Ativos/n.enc. : {sem_sancao}")
+    print(f"  Com erro/API  : {erros}")
+    print(f"  Tempo total   : {_elapsed(t0)}")
     print()
     return 0
 
@@ -383,6 +467,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Gera narrativas IA via Gemini (requer GEMINI_API_KEY)",
     )
 
+    # enriquecer
+    enr = sub.add_parser(
+        "enriquecer",
+        help="Enriquece fornecedores com dados de sancoes (CEIS/CNEP)",
+    )
+    enr.add_argument(
+        "--reset",
+        action="store_true",
+        help="Zera tem_sancao e ultima_consulta_sancao antes de re-consultar tudo",
+    )
+
     return p
 
 
@@ -415,6 +510,7 @@ def main() -> None:
         "relatorio": cmd_relatorio,
         "painel":      cmd_painel,
         "investigar":  cmd_investigar,
+        "enriquecer":  cmd_enriquecer,
     }
 
     try:
