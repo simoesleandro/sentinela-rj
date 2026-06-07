@@ -425,6 +425,10 @@ async function loadAlertas() {
                       <span class="detail-label">Órgão</span>
                       <span class="detail-value">${truncate(a.orgao || '—', 40)}</span>
                     </div>
+                    <div class="detail-item" style="grid-column:1/-1">
+                      <span class="detail-label">Anomalia</span>
+                      <span class="detail-value" style="font-size:0.8rem;color:#d4d4d4">${a.descricao || '—'}</span>
+                    </div>
                   </div>
                   <div class="detail-actions">
                     ${pncpLink}
@@ -751,6 +755,9 @@ async function loadFornecedores() {
       const link = r.fornecedor_ni
         ? `<a href="/fornecedor/${r.fornecedor_ni}" target="_self" class="fornecedor-link">${r.fornecedor || 'N/I'}</a>`
         : (r.fornecedor || 'N/I');
+      const perfilLink = r.fornecedor_ni
+        ? `<a href="/fornecedor/${r.fornecedor_ni}" class="fornecedor-link" style="font-size:0.78rem">Ver perfil →</a>`
+        : '';
       return `
         <tr>
           <td>${link}</td>
@@ -758,6 +765,7 @@ async function loadFornecedores() {
           <td>${formatCurrency(r.valor_total)}</td>
           <td>${r.alertas || 0}</td>
           <td>${riskCell}</td>
+          <td>${perfilLink}</td>
         </tr>
       `;
     }).join('');
@@ -926,15 +934,15 @@ async function openOrgaoDetail(cnpj, nome) {
     const items = d.items || [];
 
     const rows = items.map(c => {
-      const alertaBadge = c.alertas > 0
-        ? `<span class="badge badge-red">${c.alertas} alerta${c.alertas > 1 ? 's' : ''}</span>`
-        : '<span class="count-gray">—</span>';
+      const pncpLink = c.numero_controle_pncp
+        ? `<a href="https://pncp.gov.br/app/contratos/${c.numero_controle_pncp}" target="_blank" rel="noopener" class="btn-pncp" style="font-size:0.75rem">PNCP ↗</a>`
+        : '';
       return `
         <tr>
           <td style="font-size:0.8rem;line-height:1.4">${truncate(c.objeto || '—', 60)}</td>
           <td style="white-space:nowrap;font-size:0.8rem">${formatCurrency(c.valor_global)}</td>
           <td style="white-space:nowrap;font-size:0.8rem;color:var(--muted)">${formatDate(c.data_assinatura)}</td>
-          <td>${alertaBadge}</td>
+          <td style="white-space:nowrap">${pncpLink}</td>
         </tr>
       `;
     }).join('');
@@ -951,7 +959,7 @@ async function openOrgaoDetail(cnpj, nome) {
               <th>Objeto</th>
               <th>Valor</th>
               <th>Data</th>
-              <th>Alertas</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
