@@ -165,6 +165,29 @@
     .relacionados-section td:nth-child(3) { width: 10%; white-space: nowrap; text-align: center; }
     .relacionados-section th:nth-child(4),
     .relacionados-section td:nth-child(4) { width: 15%; white-space: nowrap; text-align: right; }
+
+    .section-note {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    .btn-expand-desc {
+      background: none;
+      border: none;
+      color: #3b82f6;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 0;
+      margin-left: 4px;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .valor-hint {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -216,6 +239,7 @@
       <!-- Anomalias -->
       <section class="forn-section">
         <h2 class="section-title">Anomalias detectadas</h2>
+        <p class="section-note">Cada linha representa um contrato individual com anomalia detectada</p>
         <div id="anomalias-content"></div>
       </section>
 
@@ -440,17 +464,26 @@
       }
       const rows = anomalias.map((a, i) => {
         const narrativaHtml = a.narrativa_ia
-          ? `<div>
+          ? `<div style="margin-top:0.5rem">
                <button class="btn-expand" onclick="toggleNarrativa(${i})">▶ Ver narrativa IA</button>
                <div id="narrativa-${i}" class="narrative-expand" style="display:none">${escapeHtml(a.narrativa_ia)}</div>
              </div>`
           : '';
+
+        const desc = a.descricao || '';
+        const descHtml = `<span class="desc-preview">${escapeHtml(truncate(desc, 100))}</span>${desc.length > 100 ? `<span class="desc-full" hidden>${escapeHtml(desc)}</span><button class="btn-expand-desc" onclick="toggleDesc(this)">Ver mais</button>` : ''}`;
+
+        const valorCell = a.tipo === 'concentracao_fornecedor'
+          ? `<div style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_contrato)}</div>
+             <div class="valor-hint">contrato: ${formatCurrency(a.valor_contrato)} | grupo: ${formatCurrency(a.valor_grupo)}</div>`
+          : `<span style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_grupo)}</span>`;
+
         return `
           <tr>
             <td>${tipoBadge(a.tipo)}</td>
             <td>${sevBadge(a.severidade)}</td>
-            <td style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_referencia)}</td>
-            <td style="color:#d4d4d4;font-size:0.8rem">${escapeHtml(truncate(a.descricao, 120))}${narrativaHtml}</td>
+            <td>${valorCell}</td>
+            <td style="color:#d4d4d4;font-size:0.8rem">${descHtml}${narrativaHtml}</td>
           </tr>`;
       }).join('');
 
@@ -479,9 +512,11 @@
         const pncpLink = c.numero_controle_pncp
           ? `<a href="https://pncp.gov.br/app/contratos/${c.numero_controle_pncp}" target="_blank" rel="noopener" class="contratos-link">PNCP ↗</a>`
           : '';
+        const obj = c.objeto || '';
+        const objHtml = `<span class="obj-preview">${escapeHtml(truncate(obj, 60))}</span>${obj.length > 60 ? `<span class="obj-full" hidden>${escapeHtml(obj)}</span><button class="btn-expand-obj" onclick="toggleObj(this)">Ver mais</button>` : ''}`;
         return `
           <tr>
-            <td style="font-size:0.8rem;color:#d4d4d4">${alerta}${escapeHtml(truncate(c.objeto, 70))}</td>
+            <td style="font-size:0.8rem;color:#d4d4d4">${alerta}${objHtml}</td>
             <td style="white-space:nowrap;font-weight:500">${formatCurrency(c.valor_global)}</td>
             <td style="white-space:nowrap;color:var(--muted)">${formatDate(c.data_assinatura)}</td>
             <td style="font-size:0.8rem;color:var(--muted)">${escapeHtml(truncate(c.orgao, 30))}</td>
@@ -520,6 +555,26 @@
             <tbody>${rows}</tbody>
           </table>
         </div>`;
+    }
+
+    function toggleObj(btn) {
+      const wrap    = btn.closest('td');
+      const preview = wrap.querySelector('.obj-preview');
+      const full    = wrap.querySelector('.obj-full');
+      const expanded = !full.hidden;
+      preview.hidden = !expanded;
+      full.hidden    = expanded;
+      btn.textContent = expanded ? 'Ver mais' : 'Ver menos';
+    }
+
+    function toggleDesc(btn) {
+      const wrap    = btn.closest('td');
+      const preview = wrap.querySelector('.desc-preview');
+      const full    = wrap.querySelector('.desc-full');
+      const expanded = !full.hidden;
+      preview.hidden = !expanded;
+      full.hidden    = expanded;
+      btn.textContent = expanded ? 'Ver mais' : 'Ver menos';
     }
 
     function toggleObjeto(btn) {

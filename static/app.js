@@ -54,6 +54,7 @@ const state = {
   timelineData: null,
   timelineGranularity: 'month',
   fornecedoresOrderby: 'valor',
+  orgaosData: {},
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -158,6 +159,9 @@ function loadTab(name) {
       break;
     case 'fornecedores':
       loadFornecedores();
+      break;
+    case 'orgaos':
+      loadOrgaos();
       break;
   }
 }
@@ -704,8 +708,11 @@ async function loadFornecedores() {
     const d = await res.json();
 
     const isValor = state.fornecedoresOrderby === 'valor';
-    const labels = d.items.map(r => truncate(r.fornecedor || 'N/I', 32));
-    const values = d.items.map(r => isValor ? r.valor_total : r.total_contratos);
+    const chartItems = [...d.items].sort((a, b) =>
+      isValor ? (b.valor_total || 0) - (a.valor_total || 0) : (b.total_contratos || 0) - (a.total_contratos || 0)
+    );
+    const labels = chartItems.map(r => truncate(r.fornecedor || 'N/I', 32));
+    const values = chartItems.map(r => isValor ? r.valor_total : r.total_contratos);
 
     if (state.charts.fornecedores) state.charts.fornecedores.destroy();
     state.charts.fornecedores = new Chart(document.getElementById('chart-fornecedores'), {
@@ -780,6 +787,183 @@ function toggleObj(btn) {
   preview.hidden = !expanded;
   full.hidden    = expanded;
   btn.textContent = expanded ? 'Ver mais' : 'Ver menos';
+}
+
+// ─── Órgãos ────────────────────────────────────────────────────────────────
+
+async function loadOrgaos() {
+  const cardsEl = document.getElementById('orgaos-cards');
+  const tbody   = document.getElementById('orgaos-tbody');
+  if (cardsEl) cardsEl.innerHTML = '<div class="loading-msg">Carregando…</div>';
+  if (tbody)   tbody.innerHTML   = '<tr><td colspan="8" class="loading-msg">Carregando…</td></tr>';
+
+  try {
+    const res = await fetch(`${BASE}/api/orgaos/ranking`);
+    if (!res.ok) throw new Error(res.statusText);
+    const d = await res.json();
+    const items = d.items || [];
+
+    state.orgaosData = {};
+    items.forEach(r => { state.orgaosData[r.cnpj] = r; });
+
+    // KPI cards
+    const topAlerta = items[0];
+    if (cardsEl) {
+      cardsEl.innerHTML = `
+        <div class="kpi-card">
+          <div class="kpi-value">${items.length.toLocaleString('pt-BR')}</div>
+          <div class="kpi-label">Órgãos monitorados</div>
+          <div class="kpi-hint">Com contratos registrados</div>
+        </div>
+        <div class="kpi-card highlight">
+          <div class="kpi-value" style="font-size:1.1rem;padding-top:0.4rem;line-height:1.4">${topAlerta ? truncate(topAlerta.orgao || '—', 35) : '—'}</div>
+          <div class="kpi-label">Órgão com mais alertas</div>
+          <div class="kpi-hint">${topAlerta ? `${(topAlerta.total_alertas || 0).toLocaleString('pt-BR')} alertas` : '—'}</div>
+        </div>
+      `;
+    }
+
+    // Chart: top 10 por alertas
+    const top10Alertas = [...items].sort((a, b) => (b.total_alertas || 0) - (a.total_alertas || 0)).slice(0, 10);
+    if (state.charts.orgaosAlertas) state.charts.orgaosAlertas.destroy();
+    state.charts.orgaosAlertas = new Chart(document.getElementById('chart-orgaos-alertas'), {
+      type: 'bar',
+      data: {
+        labels: top10Alertas.map(r => truncate(r.orgao || '—', 28)),
+        datasets: [{ data: top10Alertas.map(r => r.total_alertas), backgroundColor: '#ef4444', borderRadius: 4 }],
+      },
+      options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#737373', font: { size: 11 } }, grid: { color: '#1f1f1f' } },
+          y: { ticks: { color: '#a3a3a3', font: { size: 10 } }, grid: { color: '#1f1f1f' } },
+        },
+      },
+    });
+
+    // Chart: top 10 por valor
+    const top10Valor = [...items].sort((a, b) => (b.valor_total || 0) - (a.valor_total || 0)).slice(0, 10);
+    if (state.charts.orgaosValor) state.charts.orgaosValor.destroy();
+    state.charts.orgaosValor = new Chart(document.getElementById('chart-orgaos-valor'), {
+      type: 'bar',
+      data: {
+        labels: top10Valor.map(r => truncate(r.orgao || '—', 28)),
+        datasets: [{ data: top10Valor.map(r => r.valor_total), backgroundColor: '#3b82f6', borderRadius: 4 }],
+      },
+      options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            ticks: {
+              color: '#737373',
+              font: { size: 11 },
+              callback: v => v >= 1e9 ? `${(v / 1e9).toFixed(1)}bi` : v >= 1e6 ? `${(v / 1e6).toFixed(0)}mi` : v,
+            },
+            grid: { color: '#1f1f1f' },
+          },
+          y: { ticks: { color: '#a3a3a3', font: { size: 10 } }, grid: { color: '#1f1f1f' } },
+        },
+      },
+    });
+
+    // Table
+    if (tbody) {
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Nenhum órgão encontrado.</td></tr>';
+      } else {
+        tbody.innerHTML = items.map(r => {
+          const alertasCell = r.total_alertas > 0 ? `<span class="count-red">${r.total_alertas}</span>` : '<span class="count-gray">0</span>';
+          const altaCell    = r.alertas_alta > 0   ? `<span class="count-red">${r.alertas_alta}</span>`   : '<span class="count-gray">0</span>';
+          const semLicCell  = r.sem_licitacao > 0  ? `<span class="count-orange">${r.sem_licitacao}</span>` : '<span class="count-gray">0</span>';
+          const fracCell    = r.fracionamento > 0  ? `<span class="count-green">${r.fracionamento}</span>`  : '<span class="count-gray">0</span>';
+          const cnpjSafe    = (r.cnpj || '').replace(/"/g, '');
+          return `
+            <tr>
+              <td>${truncate(r.orgao || '—', 40)}</td>
+              <td>${(r.total_contratos || 0).toLocaleString('pt-BR')}</td>
+              <td style="white-space:nowrap">${formatCurrency(r.valor_total)}</td>
+              <td>${alertasCell}</td>
+              <td>${altaCell}</td>
+              <td>${semLicCell}</td>
+              <td>${fracCell}</td>
+              <td><button class="btn-ver-analise btn-ver-orgao" data-cnpj="${cnpjSafe}">Ver contratos</button></td>
+            </tr>
+          `;
+        }).join('');
+
+        tbody.querySelectorAll('.btn-ver-orgao').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const cnpj = btn.dataset.cnpj;
+            const item = state.orgaosData[cnpj];
+            openOrgaoDetail(cnpj, item ? (item.orgao || cnpj) : cnpj);
+          });
+        });
+      }
+    }
+
+  } catch (e) {
+    if (cardsEl) cardsEl.innerHTML = `<div class="error-msg">Erro ao carregar: ${e.message}</div>`;
+    if (tbody)   tbody.innerHTML   = `<tr><td colspan="8"><div class="error-msg">Erro: ${e.message}</div></td></tr>`;
+  }
+}
+
+async function openOrgaoDetail(cnpj, nome) {
+  const panel    = document.getElementById('detail-panel');
+  const backdrop = document.getElementById('detail-backdrop');
+  const content  = document.getElementById('detail-content');
+
+  content.innerHTML = '<div class="loading-msg">Carregando contratos…</div>';
+  panel.classList.add('panel-open');
+  backdrop.classList.add('backdrop-open');
+
+  try {
+    const res = await fetch(`${BASE}/api/orgaos/${encodeURIComponent(cnpj)}/contratos`);
+    if (!res.ok) throw new Error(res.statusText);
+    const d = await res.json();
+    const items = d.items || [];
+
+    const rows = items.map(c => {
+      const alertaBadge = c.alertas > 0
+        ? `<span class="badge badge-red">${c.alertas} alerta${c.alertas > 1 ? 's' : ''}</span>`
+        : '<span class="count-gray">—</span>';
+      return `
+        <tr>
+          <td style="font-size:0.8rem;line-height:1.4">${truncate(c.objeto || '—', 60)}</td>
+          <td style="white-space:nowrap;font-size:0.8rem">${formatCurrency(c.valor_global)}</td>
+          <td style="white-space:nowrap;font-size:0.8rem;color:var(--muted)">${formatDate(c.data_assinatura)}</td>
+          <td style="font-size:0.8rem">${truncate(c.fornecedor || '—', 25)}</td>
+          <td>${alertaBadge}</td>
+        </tr>
+      `;
+    }).join('');
+
+    content.innerHTML = `
+      <div class="detail-fornecedor">${nome}</div>
+      <div class="detail-badges">
+        <span class="badge badge-gray">${items.length} contrato${items.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="table-wrap" style="margin-top:1rem">
+        <table>
+          <thead>
+            <tr>
+              <th>Objeto</th>
+              <th>Valor</th>
+              <th>Data</th>
+              <th>Fornecedor</th>
+              <th>Alertas</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem">Nenhum contrato encontrado.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    content.innerHTML = `<div class="error-msg">Erro ao carregar: ${e.message}</div>`;
+  }
 }
 
 // ─── Tour ──────────────────────────────────────────────────────────────────

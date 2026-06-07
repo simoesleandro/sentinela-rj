@@ -1,0 +1,332 @@
+========================================= 
+COLETA INICIADA: 06/06/2026 19:18:13,81 
+========================================= 
+
+--------------------------------------------------------
+  SENTINELA RJ  |  coletar  20260308 -> 20260606
+--------------------------------------------------------
+Coletando contratos PNCP de 20260308 a 20260606
+Filtro: municipio IBGE 3304557 (Rio) + esfera 'M' (Municipal)
+Dividido em 4 janela(s) mensal(is): [('20260308', '20260331'), ('20260401', '20260430'), ('20260501', '20260531'), ('20260601', '20260606')]
+
+>>> Janela 20260308 a 20260331
+  Brasil: 157108 contratos, 315 paginas
+  pag 4/315 | do Rio 1 | acumulado janela 1
+  pag 14/315 | do Rio 1 | acumulado janela 2
+  pag 15/315 | do Rio 1 | acumulado janela 3
+  pag 27/315 | do Rio 3 | acumulado janela 6
+  pag 28/315 | do Rio 18 | acumulado janela 24
+  pag 29/315 | do Rio 2 | acumulado janela 26
+  pag 30/315 | do Rio 1 | acumulado janela 27
+  pag 50/315 | do Rio 0 | acumulado janela 27
+  pag 52/315 | do Rio 1 | acumulado janela 28
+  pag 67/315 | do Rio 1 | acumulado janela 29
+  pag 68/315 | do Rio 2 | acumulado janela 31
+  pag 71/315 | do Rio 1 | acumulado janela 32
+  pag 81/315 | do Rio 2 | acumulado janela 34
+  pag 82/315 | do Rio 10 | acumulado janela 44
+  pag 83/315 | do Rio 11 | acumulado janela 55
+  pag 84/315 | do Rio 4 | acumulado janela 59
+  pag 85/315 | do Rio 13 | acumulado janela 72
+  pag 100/315 | do Rio 0 | acumulado janela 72
+  pag 103/315 | do Rio 2 | acumulado janela 74
+  pag 104/315 | do Rio 2 | acumulado janela 76
+  pag 105/315 | do Rio 3 | acumulado janela 79
+  pag 106/315 | do Rio 10 | acumulado janela 89
+  pag 109/315 | do Rio 6 | acumulado janela 95
+  pag 110/315 | do Rio 7 | acumulado janela 102
+  pag 111/315 | do Rio 1 | acumulado janela 103
+  pag 122/315 | do Rio 1 | acumulado janela 104
+  pag 123/315 | do Rio 8 | acumulado janela 112
+  pag 140/315 | do Rio 2 | acumulado janela 114
+  pag 141/315 | do Rio 1 | acumulado janela 115
+  pag 150/315 | do Rio 0 | acumulado janela 115
+  pag 162/315 | do Rio 1 | acumulado janela 116
+  pag 163/315 | do Rio 1 | acumulado janela 117
+  pag 168/315 | do Rio 2 | acumulado janela 119
+  pag 169/315 | do Rio 1 | acumulado janela 120
+  pag 171/315 | do Rio 2 | acumulado janela 122
+  pag 180/315 | do Rio 2 | acumulado janela 124
+  pag 182/315 | do Rio 1 | acumulado janela 125
+  pag 183/315 | do Rio 1 | acumulado janela 126
+  pag 186/315 | do Rio 1 | acumulado janela 127
+  pag 200/315 | do Rio 0 | acumulado janela 127
+  pag 202/315 | do Rio 1 | acumulado janela 128
+  pag 206/315 | do Rio 1 | acumulado janela 129
+  pag 214/315 | do Rio 2 | acumulado janela 131
+  pag 233/315 | do Rio 1 | acumulado janela 132
+  pag 234/315 | do Rio 1 | acumulado janela 133
+  pag 235/315 | do Rio 1 | acumulado janela 134
+  pag 237/315 | do Rio 1 | acumulado janela 135
+  pag 239/315 | do Rio 1 | acumulado janela 136
+  pag 250/315 | do Rio 1 | acumulado janela 137
+  pag 251/315 | do Rio 1 | acumulado janela 138
+  pag 252/315 | do Rio 2 | acumulado janela 140
+  pag 253/315 | do Rio 2 | acumulado janela 142
+  pag 254/315 | do Rio 1 | acumulado janela 143
+  pag 258/315 | do Rio 1 | acumulado janela 144
+  pag 265/315 | do Rio 1 | acumulado janela 145
+  pag 268/315 | do Rio 1 | acumulado janela 146
+  pag 269/315 | do Rio 14 | acumulado janela 160
+  pag 270/315 | do Rio 7 | acumulado janela 167
+  pag 271/315 | do Rio 5 | acumulado janela 172
+  pag 272/315 | do Rio 9 | acumulado janela 181
+  pag 273/315 | do Rio 2 | acumulado janela 183
+  pag 274/315 | do Rio 1 | acumulado janela 184
+  pag 287/315 | do Rio 1 | acumulado janela 185
+  pag 295/315 | do Rio 1 | acumulado janela 186
+  pag 296/315 | do Rio 1 | acumulado janela 187
+  pag 300/315 | do Rio 0 | acumulado janela 187
+  pag 301/315 | do Rio 1 | acumulado janela 188
+  pag 303/315 | do Rio 1 | acumulado janela 189
+  pag 310/315 | do Rio 1 | acumulado janela 190
+  Janela ok: brutos 157108 | salvos 190
+
+>>> Janela 20260401 a 20260430
+  Brasil: 178263 contratos, 357 paginas
+  pag 7/357 | do Rio 1 | acumulado janela 1
+  pag 8/357 | do Rio 1 | acumulado janela 2
+  pag 13/357 | do Rio 1 | acumulado janela 3
+  pag 16/357 | do Rio 1 | acumulado janela 4
+  pag 45/357 | do Rio 1 | acumulado janela 5
+  pag 50/357 | do Rio 0 | acumulado janela 5
+  pag 61/357 | do Rio 1 | acumulado janela 6
+  pag 62/357 | do Rio 1 | acumulado janela 7
+  pag 67/357 | do Rio 1 | acumulado janela 8
+  pag 83/357 | do Rio 1 | acumulado janela 9
+  pag 85/357 | do Rio 1 | acumulado janela 10
+  pag 86/357 | do Rio 3 | acumulado janela 13
+  pag 96/357 | do Rio 1 | acumulado janela 14
+  pag 97/357 | do Rio 1 | acumulado janela 15
+  pag 100/357 | do Rio 0 | acumulado janela 15
+  pag 104/357 | do Rio 3 | acumulado janela 18
+  pag 110/357 | do Rio 1 | acumulado janela 19
+  pag 111/357 | do Rio 1 | acumulado janela 20
+  pag 112/357 | do Rio 6 | acumulado janela 26
+  pag 113/357 | do Rio 1 | acumulado janela 27
+  pag 114/357 | do Rio 1 | acumulado janela 28
+  pag 129/357 | do Rio 1 | acumulado janela 29
+  pag 148/357 | do Rio 2 | acumulado janela 31
+  pag 150/357 | do Rio 2 | acumulado janela 33
+  pag 152/357 | do Rio 4 | acumulado janela 37
+  pag 153/357 | do Rio 2 | acumulado janela 39
+  pag 154/357 | do Rio 1 | acumulado janela 40
+  pag 158/357 | do Rio 1 | acumulado janela 41
+  pag 166/357 | do Rio 1 | acumulado janela 42
+  pag 167/357 | do Rio 1 | acumulado janela 43
+  pag 173/357 | do Rio 1 | acumulado janela 44
+  pag 185/357 | do Rio 1 | acumulado janela 45
+  pag 186/357 | do Rio 6 | acumulado janela 51
+  pag 187/357 | do Rio 7 | acumulado janela 58
+  pag 188/357 | do Rio 1 | acumulado janela 59
+  pag 200/357 | do Rio 0 | acumulado janela 59
+  pag 205/357 | do Rio 3 | acumulado janela 62
+  pag 208/357 | do Rio 1 | acumulado janela 63
+  pag 209/357 | do Rio 2 | acumulado janela 65
+  pag 210/357 | do Rio 1 | acumulado janela 66
+  pag 217/357 | do Rio 1 | acumulado janela 67
+  pag 218/357 | do Rio 1 | acumulado janela 68
+  pag 219/357 | do Rio 1 | acumulado janela 69
+  pag 230/357 | do Rio 1 | acumulado janela 70
+  pag 234/357 | do Rio 4 | acumulado janela 74
+    JSONDecodeError (tentativa 1/8)
+    JSONDecodeError (tentativa 2/8)
+    JSONDecodeError (tentativa 3/8)
+    JSONDecodeError (tentativa 4/8)
+  pag 237/357 | do Rio 1 | acumulado janela 75
+  pag 250/357 | do Rio 0 | acumulado janela 75
+  pag 283/357 | do Rio 1 | acumulado janela 76
+  pag 284/357 | do Rio 1 | acumulado janela 77
+  pag 286/357 | do Rio 1 | acumulado janela 78
+  pag 287/357 | do Rio 1 | acumulado janela 79
+  pag 288/357 | do Rio 1 | acumulado janela 80
+  pag 289/357 | do Rio 2 | acumulado janela 82
+  pag 295/357 | do Rio 1 | acumulado janela 83
+  pag 300/357 | do Rio 0 | acumulado janela 83
+  pag 306/357 | do Rio 1 | acumulado janela 84
+  pag 307/357 | do Rio 2 | acumulado janela 86
+  pag 308/357 | do Rio 3 | acumulado janela 89
+  pag 309/357 | do Rio 1 | acumulado janela 90
+  pag 313/357 | do Rio 2 | acumulado janela 92
+  pag 315/357 | do Rio 3 | acumulado janela 95
+  pag 328/357 | do Rio 2 | acumulado janela 97
+  pag 335/357 | do Rio 1 | acumulado janela 98
+    HTTP 500 (tentativa 1/8)
+  pag 348/357 | do Rio 1 | acumulado janela 99
+    HTTP 500 (tentativa 1/8)
+  pag 350/357 | do Rio 1 | acumulado janela 100
+  pag 351/357 | do Rio 2 | acumulado janela 102
+  pag 352/357 | do Rio 2 | acumulado janela 104
+  pag 353/357 | do Rio 2 | acumulado janela 106
+    JSONDecodeError (tentativa 1/8)
+    JSONDecodeError (tentativa 2/8)
+    JSONDecodeError (tentativa 3/8)
+    JSONDecodeError (tentativa 4/8)
+  Janela ok: brutos 178263 | salvos 106
+
+>>> Janela 20260501 a 20260531
+  Brasil: 162948 contratos, 326 paginas
+  pag 4/326 | do Rio 1 | acumulado janela 1
+  pag 12/326 | do Rio 1 | acumulado janela 2
+  pag 14/326 | do Rio 1 | acumulado janela 3
+  pag 17/326 | do Rio 1 | acumulado janela 4
+  pag 18/326 | do Rio 1 | acumulado janela 5
+  pag 30/326 | do Rio 2 | acumulado janela 7
+  pag 40/326 | do Rio 1 | acumulado janela 8
+  pag 50/326 | do Rio 0 | acumulado janela 8
+  pag 57/326 | do Rio 2 | acumulado janela 10
+  pag 66/326 | do Rio 1 | acumulado janela 11
+  pag 70/326 | do Rio 1 | acumulado janela 12
+  pag 71/326 | do Rio 2 | acumulado janela 14
+  pag 72/326 | do Rio 4 | acumulado janela 18
+  pag 75/326 | do Rio 1 | acumulado janela 19
+  pag 87/326 | do Rio 2 | acumulado janela 21
+  pag 100/326 | do Rio 0 | acumulado janela 21
+  pag 103/326 | do Rio 3 | acumulado janela 24
+  pag 104/326 | do Rio 1 | acumulado janela 25
+  pag 105/326 | do Rio 1 | acumulado janela 26
+  pag 121/326 | do Rio 1 | acumulado janela 27
+  pag 122/326 | do Rio 1 | acumulado janela 28
+  pag 123/326 | do Rio 3 | acumulado janela 31
+  pag 124/326 | do Rio 1 | acumulado janela 32
+  pag 125/326 | do Rio 1 | acumulado janela 33
+  pag 128/326 | do Rio 1 | acumulado janela 34
+  pag 129/326 | do Rio 1 | acumulado janela 35
+  pag 130/326 | do Rio 3 | acumulado janela 38
+  pag 131/326 | do Rio 1 | acumulado janela 39
+  pag 133/326 | do Rio 2 | acumulado janela 41
+  pag 134/326 | do Rio 5 | acumulado janela 46
+  pag 135/326 | do Rio 3 | acumulado janela 49
+  pag 136/326 | do Rio 5 | acumulado janela 54
+  pag 139/326 | do Rio 1 | acumulado janela 55
+  pag 143/326 | do Rio 1 | acumulado janela 56
+  pag 147/326 | do Rio 1 | acumulado janela 57
+  pag 149/326 | do Rio 1 | acumulado janela 58
+  pag 150/326 | do Rio 2 | acumulado janela 60
+  pag 153/326 | do Rio 1 | acumulado janela 61
+  pag 157/326 | do Rio 1 | acumulado janela 62
+  pag 161/326 | do Rio 1 | acumulado janela 63
+  pag 162/326 | do Rio 2 | acumulado janela 65
+  pag 164/326 | do Rio 2 | acumulado janela 67
+  pag 165/326 | do Rio 1 | acumulado janela 68
+  pag 169/326 | do Rio 1 | acumulado janela 69
+  pag 170/326 | do Rio 1 | acumulado janela 70
+  pag 197/326 | do Rio 1 | acumulado janela 71
+  pag 199/326 | do Rio 1 | acumulado janela 72
+  pag 200/326 | do Rio 0 | acumulado janela 72
+  pag 201/326 | do Rio 1 | acumulado janela 73
+  pag 202/326 | do Rio 1 | acumulado janela 74
+  pag 204/326 | do Rio 2 | acumulado janela 76
+  pag 207/326 | do Rio 3 | acumulado janela 79
+  pag 210/326 | do Rio 1 | acumulado janela 80
+  pag 211/326 | do Rio 1 | acumulado janela 81
+  pag 212/326 | do Rio 1 | acumulado janela 82
+  pag 213/326 | do Rio 1 | acumulado janela 83
+  pag 214/326 | do Rio 1 | acumulado janela 84
+  pag 216/326 | do Rio 2 | acumulado janela 86
+  pag 217/326 | do Rio 1 | acumulado janela 87
+  pag 222/326 | do Rio 1 | acumulado janela 88
+  pag 232/326 | do Rio 2 | acumulado janela 90
+  pag 233/326 | do Rio 6 | acumulado janela 96
+  pag 234/326 | do Rio 8 | acumulado janela 104
+  pag 235/326 | do Rio 7 | acumulado janela 111
+  pag 236/326 | do Rio 5 | acumulado janela 116
+  pag 238/326 | do Rio 5 | acumulado janela 121
+  pag 247/326 | do Rio 1 | acumulado janela 122
+  pag 248/326 | do Rio 1 | acumulado janela 123
+  pag 249/326 | do Rio 1 | acumulado janela 124
+  pag 250/326 | do Rio 0 | acumulado janela 124
+  pag 254/326 | do Rio 2 | acumulado janela 126
+  pag 255/326 | do Rio 4 | acumulado janela 130
+  pag 264/326 | do Rio 5 | acumulado janela 135
+  pag 265/326 | do Rio 1 | acumulado janela 136
+  pag 274/326 | do Rio 1 | acumulado janela 137
+  pag 278/326 | do Rio 1 | acumulado janela 138
+  pag 281/326 | do Rio 4 | acumulado janela 142
+  pag 283/326 | do Rio 2 | acumulado janela 144
+  pag 289/326 | do Rio 1 | acumulado janela 145
+  pag 300/326 | do Rio 1 | acumulado janela 146
+  pag 303/326 | do Rio 1 | acumulado janela 147
+  pag 304/326 | do Rio 1 | acumulado janela 148
+  pag 313/326 | do Rio 1 | acumulado janela 149
+  pag 314/326 | do Rio 1 | acumulado janela 150
+  pag 315/326 | do Rio 1 | acumulado janela 151
+  pag 319/326 | do Rio 1 | acumulado janela 152
+  pag 321/326 | do Rio 8 | acumulado janela 160
+  pag 322/326 | do Rio 7 | acumulado janela 167
+  Janela ok: brutos 162948 | salvos 167
+
+>>> Janela 20260601 a 20260606
+  Brasil: 26996 contratos, 54 paginas
+  pag 2/54 | do Rio 1 | acumulado janela 1
+  pag 3/54 | do Rio 1 | acumulado janela 2
+  pag 6/54 | do Rio 1 | acumulado janela 3
+  pag 7/54 | do Rio 1 | acumulado janela 4
+  pag 8/54 | do Rio 2 | acumulado janela 6
+  pag 9/54 | do Rio 1 | acumulado janela 7
+  pag 11/54 | do Rio 1 | acumulado janela 8
+  pag 22/54 | do Rio 4 | acumulado janela 12
+  pag 23/54 | do Rio 4 | acumulado janela 16
+  pag 27/54 | do Rio 1 | acumulado janela 17
+  pag 28/54 | do Rio 2 | acumulado janela 19
+  pag 30/54 | do Rio 1 | acumulado janela 20
+  pag 39/54 | do Rio 1 | acumulado janela 21
+  pag 41/54 | do Rio 5 | acumulado janela 26
+  pag 50/54 | do Rio 0 | acumulado janela 26
+  Janela ok: brutos 26996 | salvos 26
+
+=== Coleta concluida ===
+Brutos varridos: 525315 | Salvos (Rio/municipal): 489
+
+--------------------------------------------------------
+  RESUMO DA COLETA
+--------------------------------------------------------
+  Brutos varridos : 525315
+  Salvos (Rio/mun): 489
+  Tempo total     : 4234.9s
+
+ 
+ANALISE INICIADA: 06/06/2026 20:28:49,33 
+
+--------------------------------------------------------
+  SENTINELA RJ  |  analisar
+--------------------------------------------------------
+
+  ..   Executando detectores...
+  OK   outliers       14 anomalias
+  OK   concentracao    9 anomalias
+  OK   licitacao      35 anomalias
+  OK   fracionamento  22 anomalias
+
+--------------------------------------------------------
+  RESUMO DA ANALISE
+--------------------------------------------------------
+  Total de anomalias : 80
+  ALTA               : 27
+  MEDIA              : 21
+  BAIXA              : 32
+
+  Por tipo:
+     22  fracionamento ap
+     19  inexigibilidade
+     14  outlier valor
+     10  emergencia
+      9  concentracao fornecedor
+      6  dispensa
+
+  Alertas salvos no banco: 125
+
+  Top anomalias:
+     1. 1.000  [MEDIA]  Fracionamento AP: 2 fornecedores — conservação manutenç
+     2. 1.000  [MEDIA]  Fracionamento AP: 2 fornecedores — conservação manutenç
+     3. 1.000  [MEDIA]  Fracionamento AP: 2 fornecedores — conservação manutenç
+     4. 1.000  [ALTA ]  Fracionamento AP: 4 fornecedores — prestação serviços m
+     5. 1.000  [ALTA ]  Fracionamento AP: 4 fornecedores — prestação serviços m
+     6. 1.000  [ALTA ]  Fracionamento AP: 4 fornecedores — prestação serviços m
+     7. 1.000  [ALTA ]  Fracionamento AP: 4 fornecedores — prestação serviços m
+     8. 1.000  [ALTA ]  Fracionamento AP: 6 fornecedores — contratação empresa 
+
+  Tempo total: 41ms
+
+ 
+PIPELINE CONCLUIDO: 06/06/2026 20:28:49,48 

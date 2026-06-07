@@ -500,11 +500,15 @@ def fornecedor_dossie(fornecedor_ni: str):
 
         anomalias_rows = db.execute(
             """
-            SELECT a.id, a.tipo, a.severidade, a.descricao, a.valor_referencia, a.narrativa_ia
+            SELECT a.id, a.tipo, a.severidade, a.descricao,
+                   a.valor_referencia AS valor_grupo,
+                   c.valor_global AS valor_contrato,
+                   a.narrativa_ia, a.numero_controle_pncp,
+                   c.objeto, c.data_assinatura
             FROM alertas a
-            JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
             WHERE c.fornecedor_ni = ?
-            ORDER BY a.severidade DESC, a.valor_referencia DESC
+            ORDER BY a.severidade DESC, c.valor_global DESC
             """,
             (fornecedor_ni,),
         ).fetchall()
@@ -599,6 +603,61 @@ def fornecedor_dossie(fornecedor_ni: str):
                 "valor": [r["valor"] for r in timeline_rows],
             },
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Órgãos ranking
+# ---------------------------------------------------------------------------
+
+@app.route("/api/orgaos/ranking")
+def orgaos_ranking():
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT o.razao_social AS orgao,
+                   o.cnpj,
+                   COUNT(DISTINCT c.numero_controle_pncp) AS total_contratos,
+                   COALESCE(SUM(c.valor_global), 0) AS valor_total,
+                   COUNT(DISTINCT a.id) AS total_alertas,
+                   COUNT(DISTINCT CASE WHEN a.severidade='alta' THEN a.id END) AS alertas_alta,
+                   COUNT(DISTINCT CASE WHEN a.tipo='outlier_valor' THEN a.id END) AS outliers,
+                   COUNT(DISTINCT CASE WHEN a.tipo LIKE 'sem_licitacao%' THEN a.id END) AS sem_licitacao,
+                   COUNT(DISTINCT CASE WHEN a.tipo='concentracao_fornecedor' THEN a.id END) AS concentracao,
+                   COUNT(DISTINCT CASE WHEN a.tipo='fracionamento_ap' THEN a.id END) AS fracionamento
+            FROM orgaos o
+            LEFT JOIN contratos c ON c.orgao_cnpj = o.cnpj
+            LEFT JOIN alertas a ON a.numero_controle_pncp = c.numero_controle_pncp
+            GROUP BY o.cnpj
+            ORDER BY total_alertas DESC
+        """).fetchall()
+        return jsonify({"items": [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/orgaos/<cnpj>/contratos")
+def orgaos_contratos(cnpj: str):
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT c.numero_controle_pncp, c.objeto, c.valor_global,
+                   c.data_assinatura, f.razao_social AS fornecedor,
+                   COUNT(a.id) AS alertas
+            FROM contratos c
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN alertas a ON a.numero_controle_pncp = c.numero_controle_pncp
+            WHERE c.orgao_cnpj = ?
+            GROUP BY c.numero_controle_pncp
+            ORDER BY alertas DESC, c.valor_global DESC
+            LIMIT 50
+        """, (cnpj,)).fetchall()
+        return jsonify({"items": [dict(r) for r in rows]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

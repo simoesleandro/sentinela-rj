@@ -24,6 +24,7 @@
     <button class="tab-btn" data-tab="alertas">Alertas</button>
     <button class="tab-btn" data-tab="timeline">Linha do Tempo</button>
     <button class="tab-btn" data-tab="fornecedores">Fornecedores</button>
+    <button class="tab-btn" data-tab="orgaos">Órgãos</button>
     <button class="tab-btn" data-tab="sobre">Sobre</button>
   </nav>
 
@@ -148,6 +149,38 @@
             </tr>
           </thead>
           <tbody id="fornecedores-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section 6: Órgãos -->
+    <section id="tab-orgaos" class="tab-section">
+      <div id="orgaos-cards" class="kpi-grid"></div>
+      <div class="charts-grid">
+        <div class="chart-box">
+          <h3 class="chart-title">Top órgãos por alertas</h3>
+          <canvas id="chart-orgaos-alertas"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3 class="chart-title">Top órgãos por valor contratado</h3>
+          <canvas id="chart-orgaos-valor"></canvas>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="orgaos-table">
+          <thead>
+            <tr>
+              <th>Órgão</th>
+              <th>Contratos</th>
+              <th>Valor Total</th>
+              <th>Alertas</th>
+              <th>Risco Alto</th>
+              <th>Sem Licitação</th>
+              <th>Fracionamento</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="orgaos-tbody"></tbody>
         </table>
       </div>
     </section>

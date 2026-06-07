@@ -1033,3 +1033,9 @@ th.sort-active {
 }
 
 .tour-skip:hover { color: #a3a3a3; }
+
+/* ─── Órgãos count cells ─── */
+.count-red    { color: #ef4444; font-weight: 600; }
+.count-orange { color: #f97316; font-weight: 600; }
+.count-green  { color: #22c55e; font-weight: 600; }
+.count-gray   { color: #737373; }
