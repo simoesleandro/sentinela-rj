@@ -371,9 +371,10 @@ async function loadAlertas() {
         const countBadge = grupo.ocorrencias > 1
           ? `<span class="badge-count">${grupo.ocorrencias} contratos</span>`
           : `<span class="badge-count badge-count-single">1 contrato</span>`;
-        const analisBtn = grupo.narrativa_ia
-          ? `<button class="btn-page btn-analise" data-grupo="${grupo.grupo_id}" style="font-size:0.75rem">Ver análise</button>`
-          : '';
+        const firstId = grupo.alertas[0]?.id ?? '';
+        const analisBtn = grupo.narrativa_ia && firstId !== ''
+          ? `<button class="btn-ver-analise" data-id="${firstId}">Ver análise</button>`
+          : '<span style="color:var(--muted)">—</span>';
         const gid = grupo.grupo_id;
 
         html.push(`
@@ -391,20 +392,40 @@ async function loadAlertas() {
         const tipoColor = TIPO_COLORS[grupo.tipo] || '#6b7280';
         grupo.alertas.forEach(a => {
           const pncpLink = a.numero_controle_pncp
-            ? `<a href="https://pncp.gov.br/app/contratos/${a.numero_controle_pncp}" target="_blank" rel="noopener" class="detail-link" style="font-size:0.75rem;padding:0.2rem 0.5rem">PNCP ↗</a>`
+            ? `<a href="https://pncp.gov.br/app/contratos/${a.numero_controle_pncp}" target="_blank" rel="noopener" class="btn-pncp">PNCP ↗</a>`
             : '';
           html.push(`
             <tr class="row-detail" data-grupo="${gid}">
               <td colspan="7">
-                <div class="detail-row-inner" style="border-left:3px solid ${tipoColor}">
-                  <span class="detail-col-objeto">${truncate(a.objeto || '—', 60)}</span>
-                  <span class="detail-col-valor">${formatCurrency(a.valor_referencia)}</span>
-                  <span class="detail-col-data">${formatDate(a.data_assinatura)}</span>
-                  <span class="detail-col-orgao">${truncate(a.orgao || '—', 30)}</span>
-                  <span class="detail-col-actions">
+                <div class="detail-inner" style="border-left-color:${tipoColor}">
+                  <div class="detail-objeto">
+                    <span class="detail-label">Objeto</span>
+                    <span class="detail-value">
+                      <span class="obj-preview">${truncate(a.objeto || '—', 80)}</span>
+                      ${a.objeto && a.objeto.length > 80 ? `
+                        <span class="obj-full" hidden>${a.objeto}</span>
+                        <button class="btn-expand-obj" onclick="toggleObj(this)">Ver mais</button>
+                      ` : ''}
+                    </span>
+                  </div>
+                  <div class="detail-meta">
+                    <div class="detail-item">
+                      <span class="detail-label">Valor</span>
+                      <span class="detail-value" style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_referencia)}</span>
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label">Data</span>
+                      <span class="detail-value" style="white-space:nowrap">${formatDate(a.data_assinatura)}</span>
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label">Órgão</span>
+                      <span class="detail-value">${truncate(a.orgao || '—', 40)}</span>
+                    </div>
+                  </div>
+                  <div class="detail-actions">
                     ${pncpLink}
-                    <button class="btn-page btn-ver-detalhes" data-id="${a.id}" style="font-size:0.75rem;padding:0.2rem 0.5rem">Ver detalhes</button>
-                  </span>
+                    <button class="btn-ver-detalhes" data-id="${a.id}">Ver detalhes</button>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -424,16 +445,13 @@ async function loadAlertas() {
           });
         };
         tr.addEventListener('click', e => {
-          if (e.target.classList.contains('btn-analise') || e.target.classList.contains('btn-ver-detalhes')) return;
+          if (e.target.classList.contains('btn-ver-analise') || e.target.classList.contains('btn-ver-detalhes')) return;
           expandToggle();
         });
       });
 
-      tbody.querySelectorAll('.btn-analise').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const grupo = d.items.find(g => g.grupo_id === btn.dataset.grupo);
-          if (grupo?.alertas[0]) openDetail(grupo.alertas[0].id);
-        });
+      tbody.querySelectorAll('.btn-ver-analise').forEach(btn => {
+        btn.addEventListener('click', () => openDetail(parseInt(btn.dataset.id, 10)));
       });
 
       tbody.querySelectorAll('.btn-ver-detalhes').forEach(btn => {
@@ -551,6 +569,7 @@ async function openDetail(id) {
       ${narrativa}
       <div class="detail-actions">
         ${pncpLink}
+        ${d.fornecedor_ni ? `<a href="/fornecedor/${d.fornecedor_ni}" target="_self" class="detail-link">Ver página do fornecedor →</a>` : ''}
         <button id="share-btn" class="btn-page" onclick="shareAlert(${id})" style="font-size:0.8rem">🔗 Copiar link</button>
       </div>
     `;
@@ -718,13 +737,15 @@ async function loadFornecedores() {
 
     const tbody = document.getElementById('fornecedores-tbody');
     tbody.innerHTML = sortedItems.map(r => {
-      const nome = (r.fornecedor || 'N/I').replace(/'/g, '&#39;');
       const riskCell = r.risk_score != null
         ? `<span class="badge-risk" style="background:${r.risk_color}20;color:${r.risk_color};border:1px solid ${r.risk_color}40">${r.risk_score} ${r.risk_label}</span>`
         : '—';
+      const link = r.fornecedor_ni
+        ? `<a href="/fornecedor/${r.fornecedor_ni}" target="_self" class="fornecedor-link">${r.fornecedor || 'N/I'}</a>`
+        : (r.fornecedor || 'N/I');
       return `
         <tr>
-          <td><button class="fornecedor-link" data-nome="${nome}">${r.fornecedor || 'N/I'}</button></td>
+          <td>${link}</td>
           <td>${(r.total_contratos || 0).toLocaleString('pt-BR')}</td>
           <td>${formatCurrency(r.valor_total)}</td>
           <td>${r.alertas || 0}</td>
@@ -732,10 +753,6 @@ async function loadFornecedores() {
         </tr>
       `;
     }).join('');
-
-    tbody.querySelectorAll('.fornecedor-link').forEach(btn => {
-      btn.addEventListener('click', () => filterByFornecedor(btn.dataset.nome));
-    });
 
   } catch (e) {
     showError('chart-fornecedores', e.message);
@@ -753,6 +770,228 @@ function filterByFornecedor(nome) {
     state.alertasPage = 1;
     loadAlertas();
   }
+}
+
+function toggleObj(btn) {
+  const wrap    = btn.closest('.detail-value');
+  const preview = wrap.querySelector('.obj-preview');
+  const full    = wrap.querySelector('.obj-full');
+  const expanded = !full.hidden;
+  preview.hidden = !expanded;
+  full.hidden    = expanded;
+  btn.textContent = expanded ? 'Ver mais' : 'Ver menos';
+}
+
+// ─── Tour ──────────────────────────────────────────────────────────────────
+
+const TOUR_STEPS = [
+  {
+    title: 'Bem-vindo ao Sentinela RJ',
+    text: 'Este sistema monitora contratos públicos do Rio de Janeiro e detecta automaticamente padrões suspeitos. Vamos mostrar como usar?',
+    element: null,
+    tab: null,
+  },
+  {
+    title: 'Visão geral dos dados',
+    text: 'Aqui você vê quantos contratos foram analisados, o valor total movimentado e quantas anomalias foram detectadas.',
+    element: '#kpi-cards',
+    tab: 'visao-geral',
+  },
+  {
+    title: 'Dados abertos para verificação',
+    text: 'Baixe todos os dados em CSV para verificar por conta própria. Os mesmos dados que usamos para detectar as anomalias.',
+    element: '.download-bar',
+    tab: 'visao-geral',
+  },
+  {
+    title: 'Filtre os alertas',
+    text: 'Filtre por tipo de anomalia, severidade, ano ou nome/CNPJ do fornecedor. Clique em qualquer linha para ver detalhes completos do contrato.',
+    element: '.filter-bar',
+    tab: 'alertas',
+  },
+  {
+    title: 'Linha do tempo',
+    text: 'Acompanhe a evolução dos contratos ao longo do tempo. Compare diferentes anos para identificar padrões sazonais ou picos suspeitos.',
+    element: '.timeline-controls',
+    tab: 'timeline',
+  },
+  {
+    title: 'Ranking de fornecedores',
+    text: 'Veja quais empresas concentram mais contratos suspeitos. Clique no nome de qualquer fornecedor para ver o dossiê completo.',
+    element: '#chart-fornecedores',
+    tab: 'fornecedores',
+  },
+  {
+    title: 'Pronto para explorar!',
+    text: 'Use o botão ? no canto inferior direito a qualquer momento para rever este guia.',
+    element: null,
+    tab: null,
+  },
+];
+
+let _tourStep   = 0;
+let _tourActive = false;
+
+function _initTour() {
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="tour-backdrop"></div>
+    <svg id="tour-overlay" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <mask id="tour-mask">
+          <rect width="100%" height="100%" fill="white"/>
+          <rect id="tour-highlight-hole" fill="black" rx="6" x="0" y="0" width="0" height="0"/>
+        </mask>
+      </defs>
+      <rect width="100%" height="100%" fill="rgba(0,0,0,0.78)" mask="url(#tour-mask)"/>
+    </svg>
+    <div id="tour-card">
+      <div class="tour-step-count"></div>
+      <h3 class="tour-title"></h3>
+      <p class="tour-text"></p>
+      <div class="tour-footer">
+        <div class="tour-nav">
+          <button id="tour-prev" class="tour-btn-nav">← Anterior</button>
+          <button id="tour-next" class="tour-btn-nav tour-btn-primary">Próximo →</button>
+        </div>
+        <button id="tour-skip" class="tour-skip">Pular tour</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('tour-prev').addEventListener('click', () => {
+    if (_tourStep > 0) _showTourStep(_tourStep - 1);
+  });
+
+  document.getElementById('tour-next').addEventListener('click', () => {
+    if (_tourStep < TOUR_STEPS.length - 1) {
+      _showTourStep(_tourStep + 1);
+    } else {
+      endTour();
+    }
+  });
+
+  document.getElementById('tour-skip').addEventListener('click', endTour);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && _tourActive) endTour();
+  });
+}
+
+function _fadeIn(el) {
+  if (!el) return;
+  if (el.style.display !== 'block') {
+    el.style.opacity = '0';
+    el.style.display = 'block';
+  }
+  requestAnimationFrame(() => { el.style.opacity = '1'; });
+}
+
+function _fadeOut(el) {
+  if (!el || el.style.display === 'none') return;
+  el.style.opacity = '0';
+  setTimeout(() => { if (el.style.opacity === '0') el.style.display = 'none'; }, 320);
+}
+
+async function _showTourStep(index) {
+  _tourStep = index;
+  const step     = TOUR_STEPS[index];
+  const overlay  = document.getElementById('tour-overlay');
+  const backdrop = document.getElementById('tour-backdrop');
+  const card     = document.getElementById('tour-card');
+  const hole     = document.getElementById('tour-highlight-hole');
+
+  // Fade out card before switching
+  card.style.opacity   = '0';
+  card.style.transform = 'translateY(8px)';
+  await new Promise(r => setTimeout(r, 200));
+
+  // Switch tab if needed — hide overlay immediately to avoid sliding across tabs
+  if (step.tab) {
+    overlay.style.opacity = '0';
+    document.querySelector(`[data-tab="${step.tab}"]`)?.click();
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  // Update card content
+  document.querySelector('.tour-step-count').textContent = `Passo ${index + 1} de ${TOUR_STEPS.length}`;
+  document.querySelector('.tour-title').textContent       = step.title;
+  document.querySelector('.tour-text').textContent        = step.text;
+  document.getElementById('tour-prev').disabled           = index === 0;
+  document.getElementById('tour-next').textContent        =
+    index === TOUR_STEPS.length - 1 ? 'Começar a explorar' : 'Próximo →';
+
+  if (step.element) {
+    const el = document.querySelector(step.element);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      await new Promise(r => setTimeout(r, 150));
+
+      const rect = el.getBoundingClientRect();
+      const pad  = 8;
+
+      // Set via style so CSS transitions on x/y/width/height animate the hole
+      hole.style.x      = (rect.left   - pad) + 'px';
+      hole.style.y      = (rect.top    - pad) + 'px';
+      hole.style.width  = (rect.width  + pad * 2) + 'px';
+      hole.style.height = (rect.height + pad * 2) + 'px';
+
+      _fadeIn(overlay);
+      _fadeIn(backdrop);
+
+      const vw    = window.innerWidth;
+      const vh    = window.innerHeight;
+      const cardW = 300;
+      const cardH = card.offsetHeight || 200;
+
+      let top  = rect.bottom + 16;
+      if (top + cardH > vh - 16) top = rect.top - cardH - 16;
+      if (top < 16) top = 16;
+
+      let left = rect.left + rect.width / 2 - cardW / 2;
+      left = Math.max(16, Math.min(left, vw - cardW - 16));
+
+      card.style.top  = top  + 'px';
+      card.style.left = left + 'px';
+    }
+  } else {
+    _fadeOut(overlay);
+    _fadeIn(backdrop);
+
+    const vw    = window.innerWidth;
+    const vh    = window.innerHeight;
+    const cardW = card.offsetWidth  || 300;
+    const cardH = card.offsetHeight || 200;
+    card.style.top  = Math.round(vh / 2 - cardH / 2) + 'px';
+    card.style.left = Math.round(vw / 2 - cardW / 2) + 'px';
+  }
+
+  // Fade in card (double rAF ensures layout is settled before transition starts)
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    card.style.opacity   = '1';
+    card.style.transform = 'translateY(0)';
+  }));
+}
+
+function startTour() {
+  if (!document.getElementById('tour-card')) _initTour();
+  _tourActive = true;
+  const card = document.getElementById('tour-card');
+  card.style.opacity   = '0';
+  card.style.transform = 'translateY(8px)';
+  card.style.display   = 'block';
+  _showTourStep(0);
+}
+
+function endTour() {
+  _tourActive = false;
+  const card    = document.getElementById('tour-card');
+  const overlay = document.getElementById('tour-overlay');
+  const back    = document.getElementById('tour-backdrop');
+  if (card) { card.style.opacity = '0'; card.style.transform = 'translateY(8px)'; }
+  _fadeOut(overlay);
+  _fadeOut(back);
+  setTimeout(() => { if (card) card.style.display = 'none'; }, 320);
+  localStorage.setItem('sentinela_tour_seen', '1');
 }
 
 // ─── Bootstrap ─────────────────────────────────────────────────────────────
@@ -819,4 +1058,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const alertaId = urlParams.get('alerta');
   if (alertaId) openDetail(parseInt(alertaId, 10));
+
+  // Auto-start tour on first visit
+  setTimeout(() => {
+    if (!localStorage.getItem('sentinela_tour_seen')) startTour();
+  }, 1200);
 });

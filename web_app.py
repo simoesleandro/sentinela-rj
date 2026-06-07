@@ -21,6 +21,10 @@ def get_db() -> sqlite3.Connection:
 def dashboard():
     return render_template('index.html')
 
+@app.route('/fornecedor/<fornecedor_ni>')
+def fornecedor_page(fornecedor_ni: str):
+    return render_template('fornecedor.html', ni=fornecedor_ni)
+
 @app.after_request
 def add_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -301,6 +305,7 @@ def alertas_detail(alert_id: int):
                    c.objeto, c.data_assinatura, c.data_vigencia_inicio,
                    c.data_vigencia_fim, c.valor_inicial, c.valor_global,
                    c.informacao_complementar, c.numero_contrato_empenho,
+                   c.fornecedor_ni,
                    f.razao_social AS fornecedor, f.tipo_pessoa,
                    o.razao_social AS orgao
             FROM alertas a
@@ -446,6 +451,154 @@ def fornecedores_ranking():
 
         items.sort(key=lambda x: x["risk_score"], reverse=True)
         return jsonify({"items": items})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Fornecedor — dossier
+# ---------------------------------------------------------------------------
+
+@app.route("/api/fornecedores/<fornecedor_ni>")
+def fornecedor_dossie(fornecedor_ni: str):
+    db = get_db()
+    try:
+        forn = db.execute(
+            "SELECT ni, razao_social, tipo_pessoa FROM fornecedores WHERE ni = ?",
+            (fornecedor_ni,),
+        ).fetchone()
+        if forn is None:
+            return jsonify({"error": "not found"}), 404
+
+        contratos_rows = db.execute(
+            """
+            SELECT c.numero_controle_pncp, c.objeto, c.valor_global,
+                   c.data_assinatura, c.data_vigencia_fim,
+                   c.categoria_processo_nome AS categoria,
+                   o.razao_social AS orgao,
+                   EXISTS(
+                     SELECT 1 FROM alertas a
+                     WHERE a.numero_controle_pncp = c.numero_controle_pncp
+                   ) AS tem_alerta
+            FROM contratos c
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            WHERE c.fornecedor_ni = ? AND c.valor_global > 0
+            ORDER BY c.data_assinatura DESC
+            """,
+            (fornecedor_ni,),
+        ).fetchall()
+        contratos = [dict(r) for r in contratos_rows]
+        for c in contratos:
+            c["tem_alerta"] = bool(c["tem_alerta"])
+
+        total_contratos = len(contratos)
+        valor_total = sum(c["valor_global"] or 0 for c in contratos)
+        valor_medio = valor_total / total_contratos if total_contratos else 0
+        datas = [c["data_assinatura"] for c in contratos if c["data_assinatura"]]
+
+        anomalias_rows = db.execute(
+            """
+            SELECT a.id, a.tipo, a.severidade, a.descricao, a.valor_referencia, a.narrativa_ia
+            FROM alertas a
+            JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            WHERE c.fornecedor_ni = ?
+            ORDER BY a.severidade DESC, a.valor_referencia DESC
+            """,
+            (fornecedor_ni,),
+        ).fetchall()
+        anomalias = [dict(r) for r in anomalias_rows]
+
+        severidades = [a["severidade"] for a in anomalias]
+        tipos_a = [a["tipo"] for a in anomalias]
+        risk_score = _calcular_score(len(anomalias), valor_total, severidades, tipos_a)
+        risk_label = (
+            "CRÍTICO" if risk_score >= 8 else
+            "ALTO"    if risk_score >= 6 else
+            "MÉDIO"   if risk_score >= 4 else
+            "BAIXO"
+        )
+        risk_color = (
+            "#ef4444" if risk_score >= 8 else
+            "#f97316" if risk_score >= 6 else
+            "#eab308" if risk_score >= 4 else
+            "#22c55e"
+        )
+
+        orgaos_rows = db.execute(
+            """
+            SELECT o.razao_social AS orgao, c.orgao_cnpj AS cnpj,
+                   COUNT(*) AS total_contratos,
+                   SUM(c.valor_global) AS valor_total
+            FROM contratos c
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            WHERE c.fornecedor_ni = ? AND c.valor_global > 0
+            GROUP BY c.orgao_cnpj
+            ORDER BY valor_total DESC
+            """,
+            (fornecedor_ni,),
+        ).fetchall()
+
+        relacionados_rows = db.execute(
+            """
+            SELECT f2.razao_social AS fornecedor, f2.ni,
+                   COUNT(*) AS contratos_comuns,
+                   SUM(c2.valor_global) AS valor_total,
+                   MAX(c2.objeto) AS objeto_comum
+            FROM alertas a1
+            JOIN alertas a2 ON a2.tipo = 'fracionamento_ap'
+              AND a2.numero_controle_pncp != a1.numero_controle_pncp
+              AND a2.descricao LIKE '%' || (
+                SELECT SUBSTR(a1.descricao, INSTR(a1.descricao, '—')+2, 60)
+              ) || '%'
+            JOIN contratos c2 ON c2.numero_controle_pncp = a2.numero_controle_pncp
+            JOIN fornecedores f2 ON f2.ni = c2.fornecedor_ni
+            WHERE a1.numero_controle_pncp IN (
+              SELECT numero_controle_pncp FROM contratos WHERE fornecedor_ni = ?
+            )
+            AND f2.ni != ?
+            GROUP BY f2.ni
+            LIMIT 10
+            """,
+            (fornecedor_ni, fornecedor_ni),
+        ).fetchall()
+
+        timeline_rows = db.execute(
+            """
+            SELECT strftime('%Y-%m', data_assinatura) AS periodo,
+                   COUNT(*) AS contratos,
+                   SUM(valor_global) AS valor
+            FROM contratos
+            WHERE fornecedor_ni = ? AND valor_global > 0 AND data_assinatura IS NOT NULL
+            GROUP BY periodo
+            ORDER BY periodo
+            """,
+            (fornecedor_ni,),
+        ).fetchall()
+
+        return jsonify({
+            "identidade": dict(forn),
+            "resumo": {
+                "total_contratos": total_contratos,
+                "valor_total": valor_total,
+                "valor_medio": valor_medio,
+                "primeiro_contrato": min(datas) if datas else None,
+                "ultimo_contrato": max(datas) if datas else None,
+                "risk_score": risk_score,
+                "risk_label": risk_label,
+                "risk_color": risk_color,
+            },
+            "contratos": contratos,
+            "anomalias": anomalias,
+            "orgaos_contratantes": [dict(r) for r in orgaos_rows],
+            "fornecedores_relacionados": [dict(r) for r in relacionados_rows],
+            "timeline": {
+                "labels": [r["periodo"] for r in timeline_rows],
+                "contratos": [r["contratos"] for r in timeline_rows],
+                "valor": [r["valor"] for r in timeline_rows],
+            },
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

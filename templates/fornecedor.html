@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fornecedor — Sentinela RJ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .forn-header {
+      padding: 1rem max(2rem, calc((100% - 1200px) / 2 + 2rem));
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .back-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--text); }
+    .forn-brand { font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; }
+
+    .forn-hero {
+      padding: 2.5rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+    .forn-nome {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin-bottom: 0.5rem;
+    }
+    .forn-cnpj {
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-family: monospace;
+      margin-bottom: 1rem;
+    }
+    .forn-risk-hero {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .risk-score-big {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .risk-label-big {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+
+    .forn-section {
+      margin-bottom: 2.5rem;
+    }
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .narrative-expand {
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.875rem 1rem;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: #d4d4d4;
+      margin-top: 0.5rem;
+    }
+    .btn-expand {
+      background: none;
+      border: none;
+      color: var(--blue);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+      padding: 0;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .alert-icon { color: var(--red); }
+
+    .contratos-link {
+      color: var(--blue);
+      text-decoration: none;
+      font-size: 0.8rem;
+    }
+    .contratos-link:hover { text-decoration: underline; }
+
+    .forn-empty {
+      color: var(--muted);
+      font-size: 0.875rem;
+      padding: 1.5rem;
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .tipo-pessoa-badge {
+      background: #262626;
+      color: var(--muted);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    #loading-state {
+      text-align: center;
+      padding: 4rem;
+      color: var(--muted);
+    }
+    #error-state {
+      display: none;
+      padding: 2rem;
+    }
+    #page-content {
+      display: none;
+    }
+    #anomalias-content .table-wrap,
+    #anomalias-content table,
+    #anomalias-content td,
+    #anomalias-content tr {
+      overflow: visible;
+    }
+    .objeto-expandable { font-size: 0.8rem; color: #d4d4d4; vertical-align: top; }
+    .objeto-full { display: block; margin-top: 4px; }
+    .btn-expand-objeto {
+      background: none;
+      border: none;
+      color: #3b82f6;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 0;
+      margin-left: 4px;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .relacionados-section table { table-layout: fixed; width: 100%; }
+    .relacionados-section th:nth-child(1),
+    .relacionados-section td:nth-child(1) { width: 20%; }
+    .relacionados-section th:nth-child(2),
+    .relacionados-section td:nth-child(2) { width: 55%; }
+    .relacionados-section th:nth-child(3),
+    .relacionados-section td:nth-child(3) { width: 10%; white-space: nowrap; text-align: center; }
+    .relacionados-section th:nth-child(4),
+    .relacionados-section td:nth-child(4) { width: 15%; white-space: nowrap; text-align: right; }
+  </style>
+</head>
+<body>
+  <header class="forn-header">
+    <a href="/dashboard" class="back-link">← Voltar ao Sentinela RJ</a>
+    <span class="forn-brand">Sentinela RJ</span>
+  </header>
+
+  <main>
+    <div id="loading-state" class="loading-msg" style="padding:4rem">Carregando perfil do fornecedor…</div>
+    <div id="error-state"></div>
+
+    <div id="page-content">
+      <!-- Hero -->
+      <section class="forn-hero">
+        <div id="forn-nome" class="forn-nome"></div>
+        <div id="forn-cnpj" class="forn-cnpj"></div>
+        <div id="forn-risk"></div>
+      </section>
+
+      <!-- KPI cards -->
+      <div id="forn-resumo" class="kpi-grid" style="margin-bottom:2.5rem"></div>
+
+      <!-- Timeline -->
+      <section class="forn-section">
+        <h2 class="section-title">Contratos por período</h2>
+        <div class="chart-box">
+          <canvas id="chart-timeline" height="80"></canvas>
+        </div>
+      </section>
+
+      <!-- Órgãos contratantes -->
+      <section class="forn-section">
+        <h2 class="section-title">Órgãos contratantes</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Órgão</th>
+                <th>Contratos</th>
+                <th>Valor Total</th>
+              </tr>
+            </thead>
+            <tbody id="orgaos-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Anomalias -->
+      <section class="forn-section">
+        <h2 class="section-title">Anomalias detectadas</h2>
+        <div id="anomalias-content"></div>
+      </section>
+
+      <!-- Todos os contratos -->
+      <section class="forn-section">
+        <h2 class="section-title">Todos os contratos</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Objeto</th>
+                <th>Valor</th>
+                <th>Data</th>
+                <th>Órgão</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="contratos-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Fornecedores relacionados -->
+      <section class="forn-section relacionados-section">
+        <h2 class="section-title">Fornecedores com contratos similares</h2>
+        <div id="relacionados-content"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    'use strict';
+
+    const TIPO_LABELS = {
+      outlier_valor: 'Outlier de valor',
+      concentracao_fornecedor: 'Concentração de fornecedor',
+      sem_licitacao_inexigibilidade: 'Inexigibilidade',
+      sem_licitacao_emergencia: 'Emergência',
+      sem_licitacao_dispensa: 'Dispensa',
+      fracionamento_ap: 'Fracionamento',
+    };
+
+    const TIPO_BADGE_CLASS = {
+      outlier_valor: 'red',
+      concentracao_fornecedor: 'orange',
+      sem_licitacao_inexigibilidade: 'purple',
+      sem_licitacao_emergencia: 'yellow',
+      sem_licitacao_dispensa: 'blue',
+      fracionamento_ap: 'green',
+    };
+
+    const TIPO_TOOLTIPS = {
+      outlier_valor: 'Contrato com valor muito acima da média histórica para o mesmo tipo de serviço. Pode indicar sobrepreço.',
+      concentracao_fornecedor: 'Empresa recebeu muitos contratos em pouco tempo do mesmo órgão. Pode indicar favorecimento.',
+      sem_licitacao_inexigibilidade: 'Contrato firmado sem licitação por alegação de fornecedor exclusivo. Precisa de justificativa sólida.',
+      sem_licitacao_emergencia: 'Contrato emergencial sem licitação. Emergências reais existem, mas o uso excessivo é suspeito.',
+      sem_licitacao_dispensa: 'Contrato dispensado de licitação por valor baixo ou outras condições legais.',
+      fracionamento_ap: 'Mesmo serviço dividido entre várias empresas por região. Pode ser tentativa de driblar o limite de licitação.',
+    };
+
+    function formatCNPJ(ni) {
+      if (!ni) return '—';
+      const d = String(ni).replace(/\D/g, '');
+      if (d.length !== 14) return ni;
+      return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12,14)}`;
+    }
+
+    function formatCurrency(val) {
+      if (val == null) return '—';
+      const n = parseFloat(val);
+      if (isNaN(n)) return '—';
+      if (n >= 1e9) return `R$ ${(n / 1e9).toFixed(2).replace('.', ',')} bi`;
+      if (n >= 1e6) return `R$ ${(n / 1e6).toFixed(1).replace('.', ',')} mi`;
+      return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatDate(str) {
+      if (!str) return '—';
+      const d = new Date(str.length === 10 ? str + 'T12:00:00' : str);
+      if (isNaN(d.getTime())) return str;
+      return d.toLocaleDateString('pt-BR');
+    }
+
+    function truncate(str, n) {
+      if (!str) return '—';
+      return str.length > n ? str.slice(0, n) + '…' : str;
+    }
+
+    function tipoBadge(tipo) {
+      const label = TIPO_LABELS[tipo] || tipo;
+      const cls = TIPO_BADGE_CLASS[tipo] || 'gray';
+      const tooltip = TIPO_TOOLTIPS[tipo];
+      if (tooltip) {
+        return `<span class="badge badge-${cls} tooltip-wrap">${label}<span class="tooltip-text">${tooltip}</span></span>`;
+      }
+      return `<span class="badge badge-${cls}">${label}</span>`;
+    }
+
+    function sevBadge(sev) {
+      const map = { alta: 'red', media: 'orange', baixa: 'gray' };
+      const cls = map[sev] || 'gray';
+      const label = sev ? sev.charAt(0).toUpperCase() + sev.slice(1) : '—';
+      return `<span class="badge badge-${cls}">${label}</span>`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function loadPage() {
+      const ni = window.location.pathname.split('/').pop();
+      if (!ni) { showError('NI não encontrado na URL.'); return; }
+
+      try {
+        const res = await fetch(`/api/fornecedores/${ni}`);
+        if (res.status === 404) { showError('Fornecedor não encontrado.'); return; }
+        if (!res.ok) throw new Error(res.statusText);
+        const d = await res.json();
+
+        document.title = `${d.identidade.razao_social} — Sentinela RJ`;
+        renderHero(d.identidade, d.resumo);
+        renderResumo(d.resumo);
+        renderTimeline(d.timeline);
+        renderOrgaos(d.orgaos_contratantes);
+        renderAnomalias(d.anomalias);
+        renderContratos(d.contratos);
+        renderRelacionados(d.fornecedores_relacionados);
+
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('page-content').style.display = 'block';
+      } catch (e) {
+        showError(`Erro ao carregar: ${e.message}`);
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loading-state').style.display = 'none';
+      const el = document.getElementById('error-state');
+      el.innerHTML = `<div class="error-msg">${msg}</div>`;
+      el.style.display = 'block';
+    }
+
+    function renderHero(id, resumo) {
+      document.getElementById('forn-nome').innerHTML =
+        escapeHtml(id.razao_social) +
+        (id.tipo_pessoa ? `<span class="tipo-pessoa-badge">${escapeHtml(id.tipo_pessoa)}</span>` : '');
+
+      document.getElementById('forn-cnpj').textContent = `CNPJ: ${formatCNPJ(id.ni)}`;
+
+      const color = resumo.risk_color;
+      document.getElementById('forn-risk').innerHTML = `
+        <div class="forn-risk-hero">
+          <span class="risk-score-big" style="color:${color}">${resumo.risk_score}</span>
+          <span class="risk-label-big" style="background:${color}20;color:${color};border:1px solid ${color}40">
+            ${escapeHtml(resumo.risk_label)}
+          </span>
+          <span style="color:var(--muted);font-size:0.8rem">risco de 10</span>
+        </div>`;
+    }
+
+    function renderResumo(r) {
+      document.getElementById('forn-resumo').innerHTML = `
+        <div class="kpi-card">
+          <div class="kpi-value">${(r.total_contratos || 0).toLocaleString('pt-BR')}</div>
+          <div class="kpi-label">Total de Contratos</div>
+        </div>
+        <div class="kpi-card highlight">
+          <div class="kpi-value" style="font-size:1.75rem">${formatCurrency(r.valor_total)}</div>
+          <div class="kpi-label">Valor Total</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" style="font-size:1.4rem">${formatDate(r.primeiro_contrato)}</div>
+          <div class="kpi-label">Primeiro Contrato</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" style="font-size:1.4rem">${formatDate(r.ultimo_contrato)}</div>
+          <div class="kpi-label">Último Contrato</div>
+        </div>`;
+    }
+
+    function renderTimeline(t) {
+      if (!t.labels.length) return;
+      new Chart(document.getElementById('chart-timeline'), {
+        type: 'line',
+        data: {
+          labels: t.labels,
+          datasets: [{
+            label: 'Contratos',
+            data: t.contratos,
+            borderColor: '#3b82f6',
+            backgroundColor: '#3b82f615',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+          }],
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#737373', font: { size: 10 }, maxRotation: 45 }, grid: { color: '#1f1f1f' } },
+            y: { ticks: { color: '#737373', font: { size: 11 } }, grid: { color: '#1f1f1f' } },
+          },
+        },
+      });
+    }
+
+    function renderOrgaos(orgaos) {
+      document.getElementById('orgaos-tbody').innerHTML = orgaos.map(o => `
+        <tr>
+          <td>${escapeHtml(o.orgao || '—')}</td>
+          <td>${(o.total_contratos || 0).toLocaleString('pt-BR')}</td>
+          <td>${formatCurrency(o.valor_total)}</td>
+        </tr>`).join('');
+    }
+
+    function renderAnomalias(anomalias) {
+      const el = document.getElementById('anomalias-content');
+      if (!anomalias.length) {
+        el.innerHTML = '<div class="forn-empty">Nenhuma anomalia detectada para este fornecedor.</div>';
+        return;
+      }
+      const rows = anomalias.map((a, i) => {
+        const narrativaHtml = a.narrativa_ia
+          ? `<div>
+               <button class="btn-expand" onclick="toggleNarrativa(${i})">▶ Ver narrativa IA</button>
+               <div id="narrativa-${i}" class="narrative-expand" style="display:none">${escapeHtml(a.narrativa_ia)}</div>
+             </div>`
+          : '';
+        return `
+          <tr>
+            <td>${tipoBadge(a.tipo)}</td>
+            <td>${sevBadge(a.severidade)}</td>
+            <td style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_referencia)}</td>
+            <td style="color:#d4d4d4;font-size:0.8rem">${escapeHtml(truncate(a.descricao, 120))}${narrativaHtml}</td>
+          </tr>`;
+      }).join('');
+
+      el.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Tipo</th><th>Severidade</th><th>Valor</th><th>Descrição</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    window.toggleNarrativa = function(i) {
+      const el = document.getElementById(`narrativa-${i}`);
+      const btn = el.previousElementSibling;
+      const hidden = el.style.display === 'none';
+      el.style.display = hidden ? 'block' : 'none';
+      btn.textContent = (hidden ? '▼' : '▶') + ' Ver narrativa IA';
+    };
+
+    function renderContratos(contratos) {
+      document.getElementById('contratos-tbody').innerHTML = contratos.map(c => {
+        const alerta = c.tem_alerta ? '<span class="alert-icon" title="Possui alerta">🚨</span> ' : '';
+        const pncpLink = c.numero_controle_pncp
+          ? `<a href="https://pncp.gov.br/app/contratos/${c.numero_controle_pncp}" target="_blank" rel="noopener" class="contratos-link">PNCP ↗</a>`
+          : '';
+        return `
+          <tr>
+            <td style="font-size:0.8rem;color:#d4d4d4">${alerta}${escapeHtml(truncate(c.objeto, 70))}</td>
+            <td style="white-space:nowrap;font-weight:500">${formatCurrency(c.valor_global)}</td>
+            <td style="white-space:nowrap;color:var(--muted)">${formatDate(c.data_assinatura)}</td>
+            <td style="font-size:0.8rem;color:var(--muted)">${escapeHtml(truncate(c.orgao, 30))}</td>
+            <td>${pncpLink}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    function renderRelacionados(rel) {
+      const el = document.getElementById('relacionados-content');
+      if (!rel.length) {
+        el.innerHTML = '<div class="forn-empty">Nenhum fornecedor relacionado identificado.</div>';
+        return;
+      }
+      const rows = rel.map(r => {
+        const obj = r.objeto_comum || '—';
+        const isLong = obj.length > 50;
+        return `
+          <tr>
+            <td><a href="/fornecedor/${r.ni}" target="_self" class="fornecedor-link">${escapeHtml(r.fornecedor || r.ni)}</a></td>
+            <td class="objeto-expandable">
+              <span class="objeto-preview">${escapeHtml(truncate(obj, 50))}</span>
+              ${isLong ? `<span class="objeto-full" hidden>${escapeHtml(obj)}</span><button class="btn-expand-objeto" onclick="toggleObjeto(this)">Ver mais</button>` : ''}
+            </td>
+            <td>${(r.contratos_comuns || 0).toLocaleString('pt-BR')}</td>
+            <td>${formatCurrency(r.valor_total)}</td>
+          </tr>`;
+      }).join('');
+
+      el.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Fornecedor</th><th>Objeto Comum</th><th>Contratos</th><th>Valor</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    function toggleObjeto(btn) {
+      const cell    = btn.closest('.objeto-expandable');
+      const preview = cell.querySelector('.objeto-preview');
+      const full    = cell.querySelector('.objeto-full');
+      const isExpanded = !full.hidden;
+      preview.hidden = !isExpanded;
+      full.hidden    = isExpanded;
+      btn.textContent = isExpanded ? 'Ver mais' : 'Ver menos';
+    }
+
+    loadPage();
+  </script>
+</body>
+</html>
