@@ -379,8 +379,7 @@ def _calcular_score(
     type_diversity = len(set(tipos))
     valor_factor = min(valor_total / 100_000_000, 3.0)
     raw = severity_sum + type_diversity + valor_factor
-    score = min(round(raw / (alertas_count + 1) * alertas_count, 1), 10.0)
-    return score
+    return min(round(raw, 1), 10.0)
 
 
 @app.route("/api/fornecedores/ranking")
