@@ -650,7 +650,10 @@ function renderTimeline() {
 
 async function loadFornecedores() {
   try {
-    const res = await fetch(`${BASE}/api/fornecedores/ranking?limit=15&orderby=${state.fornecedoresOrderby}`);
+    const q = (document.getElementById('filter-fornecedor-ranking')?.value || '').trim();
+    const params = new URLSearchParams({ limit: 15, orderby: state.fornecedoresOrderby });
+    if (q) params.set('q', q);
+    const res = await fetch(`${BASE}/api/fornecedores/ranking?${params}`);
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
 
@@ -767,6 +770,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.year-check').forEach(cb => {
     cb.addEventListener('change', renderTimeline);
   });
+
+  // Fornecedores search
+  const fornRankingEl = document.getElementById('filter-fornecedor-ranking');
+  if (fornRankingEl) {
+    const debouncedForn = debounce(() => loadFornecedores(), 300);
+    fornRankingEl.addEventListener('input', debouncedForn);
+  }
 
   // Fornecedores orderby toggle
   document.querySelectorAll('#fornecedores-toggle .toggle-btn').forEach(btn => {

@@ -7,7 +7,7 @@ from flask import Flask, jsonify, request, render_template
 
 from db.conexao import DB_PATH
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', template_folder='templates')
 
 
 def get_db() -> sqlite3.Connection:
@@ -195,8 +195,9 @@ def alertas_agrupados():
             conditions.append("strftime('%Y', c.data_assinatura) = ?")
             params.append(ano)
         if fornecedor:
-            conditions.append("f.razao_social LIKE ?")
-            params.append(f"%{fornecedor}%")
+            cnpj = fornecedor.replace(".", "").replace("/", "").replace("-", "")
+            conditions.append("(f.razao_social LIKE ? OR f.ni LIKE ?)")
+            params.extend([f"%{fornecedor}%", f"%{cnpj}%"])
         if valor_min is not None:
             conditions.append("a.valor_referencia >= ?")
             params.append(valor_min)
@@ -382,6 +383,16 @@ def fornecedores_ranking():
         limit = min(100, max(1, int(request.args.get("limit", 10))))
         orderby = request.args.get("orderby", "valor")
         order_col = "total_contratos" if orderby == "contratos" else "valor_total"
+        q = request.args.get("q", "").strip()
+
+        ranking_conditions = ["c.valor_global > 0"]
+        ranking_params: list = []
+        if q:
+            cnpj_q = q.replace(".", "").replace("/", "").replace("-", "")
+            ranking_conditions.append("(f.razao_social LIKE ? OR f.ni LIKE ?)")
+            ranking_params.extend([f"%{q}%", f"%{cnpj_q}%"])
+
+        ranking_where = "WHERE " + " AND ".join(ranking_conditions)
 
         rows = db.execute(
             f"""
@@ -393,12 +404,12 @@ def fornecedores_ranking():
             FROM contratos c
             LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
             LEFT JOIN alertas a ON a.numero_controle_pncp = c.numero_controle_pncp
-            WHERE c.valor_global > 0
+            {ranking_where}
             GROUP BY c.fornecedor_ni
             ORDER BY {order_col} DESC
             LIMIT ?
             """,
-            (limit,),
+            ranking_params + [limit],
         ).fetchall()
 
         items = []
