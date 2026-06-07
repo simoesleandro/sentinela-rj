@@ -829,7 +829,7 @@ async function loadOrgaos() {
     state.charts.orgaosAlertas = new Chart(document.getElementById('chart-orgaos-alertas'), {
       type: 'bar',
       data: {
-        labels: top10Alertas.map(r => truncate(r.orgao || '—', 28)),
+        labels: top10Alertas.map(r => truncate(r.orgao || '—', 30)),
         datasets: [{ data: top10Alertas.map(r => r.total_alertas), backgroundColor: '#ef4444', borderRadius: 4 }],
       },
       options: {
@@ -848,7 +848,7 @@ async function loadOrgaos() {
     state.charts.orgaosValor = new Chart(document.getElementById('chart-orgaos-valor'), {
       type: 'bar',
       data: {
-        labels: top10Valor.map(r => truncate(r.orgao || '—', 28)),
+        labels: top10Valor.map(r => truncate(r.orgao || '—', 30)),
         datasets: [{ data: top10Valor.map(r => r.valor_total), backgroundColor: '#3b82f6', borderRadius: 4 }],
       },
       options: {
@@ -882,12 +882,12 @@ async function loadOrgaos() {
           return `
             <tr>
               <td>${truncate(r.orgao || '—', 40)}</td>
-              <td>${(r.total_contratos || 0).toLocaleString('pt-BR')}</td>
+              <td style="white-space:nowrap">${(r.total_contratos || 0).toLocaleString('pt-BR')}</td>
               <td style="white-space:nowrap">${formatCurrency(r.valor_total)}</td>
-              <td>${alertasCell}</td>
-              <td>${altaCell}</td>
-              <td>${semLicCell}</td>
-              <td>${fracCell}</td>
+              <td style="white-space:nowrap">${alertasCell}</td>
+              <td style="white-space:nowrap">${altaCell}</td>
+              <td style="white-space:nowrap">${semLicCell}</td>
+              <td style="white-space:nowrap">${fracCell}</td>
               <td><button class="btn-ver-analise btn-ver-orgao" data-cnpj="${cnpjSafe}">Ver contratos</button></td>
             </tr>
           `;
@@ -933,7 +933,6 @@ async function openOrgaoDetail(cnpj, nome) {
           <td style="font-size:0.8rem;line-height:1.4">${truncate(c.objeto || '—', 60)}</td>
           <td style="white-space:nowrap;font-size:0.8rem">${formatCurrency(c.valor_global)}</td>
           <td style="white-space:nowrap;font-size:0.8rem;color:var(--muted)">${formatDate(c.data_assinatura)}</td>
-          <td style="font-size:0.8rem">${truncate(c.fornecedor || '—', 25)}</td>
           <td>${alertaBadge}</td>
         </tr>
       `;
@@ -951,12 +950,11 @@ async function openOrgaoDetail(cnpj, nome) {
               <th>Objeto</th>
               <th>Valor</th>
               <th>Data</th>
-              <th>Fornecedor</th>
               <th>Alertas</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem">Nenhum contrato encontrado.</td></tr>'}
+            ${rows || '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:1.5rem">Nenhum contrato encontrado.</td></tr>'}
           </tbody>
         </table>
       </div>

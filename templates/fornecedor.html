@@ -471,10 +471,10 @@
           : '';
 
         const desc = a.descricao || '';
-        const descHtml = `<span class="desc-preview">${escapeHtml(truncate(desc, 100))}</span>${desc.length > 100 ? `<span class="desc-full" hidden>${escapeHtml(desc)}</span><button class="btn-expand-desc" onclick="toggleDesc(this)">Ver mais</button>` : ''}`;
+        const descHtml = `<span class="desc-preview">${escapeHtml(truncate(desc, 200))}</span>${desc.length > 200 ? `<span class="desc-full" style="display:none">${escapeHtml(desc)}</span><button class="btn-expand-desc" onclick="toggleDesc(this)">Ver mais</button>` : ''}`;
 
         const valorCell = a.tipo === 'concentracao_fornecedor'
-          ? `<div style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_contrato)}</div>
+          ? `<div style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_grupo)}</div>
              <div class="valor-hint">contrato: ${formatCurrency(a.valor_contrato)} | grupo: ${formatCurrency(a.valor_grupo)}</div>`
           : `<span style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_grupo)}</span>`;
 
@@ -513,7 +513,7 @@
           ? `<a href="https://pncp.gov.br/app/contratos/${c.numero_controle_pncp}" target="_blank" rel="noopener" class="contratos-link">PNCP ↗</a>`
           : '';
         const obj = c.objeto || '';
-        const objHtml = `<span class="obj-preview">${escapeHtml(truncate(obj, 60))}</span>${obj.length > 60 ? `<span class="obj-full" hidden>${escapeHtml(obj)}</span><button class="btn-expand-obj" onclick="toggleObj(this)">Ver mais</button>` : ''}`;
+        const objHtml = `<span class="obj-preview">${escapeHtml(truncate(obj, 60))}</span>${obj.length > 60 ? `<span class="obj-full" style="display:none">${escapeHtml(obj)}</span><button class="btn-expand-obj" onclick="toggleObj(this)">Ver mais</button>` : ''}`;
         return `
           <tr>
             <td style="font-size:0.8rem;color:#d4d4d4">${alerta}${objHtml}</td>
@@ -539,7 +539,7 @@
             <td><a href="/fornecedor/${r.ni}" target="_self" class="fornecedor-link">${escapeHtml(r.fornecedor || r.ni)}</a></td>
             <td class="objeto-expandable">
               <span class="objeto-preview">${escapeHtml(truncate(obj, 50))}</span>
-              ${isLong ? `<span class="objeto-full" hidden>${escapeHtml(obj)}</span><button class="btn-expand-objeto" onclick="toggleObjeto(this)">Ver mais</button>` : ''}
+              ${isLong ? `<span class="objeto-full" style="display:none">${escapeHtml(obj)}</span><button class="btn-expand-objeto" onclick="toggleObjeto(this)">Ver mais</button>` : ''}
             </td>
             <td>${(r.contratos_comuns || 0).toLocaleString('pt-BR')}</td>
             <td>${formatCurrency(r.valor_total)}</td>
@@ -558,32 +558,32 @@
     }
 
     function toggleObj(btn) {
-      const wrap    = btn.closest('td');
+      const wrap = btn.closest('td');
       const preview = wrap.querySelector('.obj-preview');
-      const full    = wrap.querySelector('.obj-full');
-      const expanded = !full.hidden;
-      preview.hidden = !expanded;
-      full.hidden    = expanded;
-      btn.textContent = expanded ? 'Ver mais' : 'Ver menos';
+      const full = wrap.querySelector('.obj-full');
+      const isExpanded = full.style.display !== 'none' && full.style.display !== '';
+      preview.style.display = isExpanded ? '' : 'none';
+      full.style.display    = isExpanded ? 'none' : '';
+      btn.textContent = isExpanded ? 'Ver mais' : 'Ver menos';
     }
 
     function toggleDesc(btn) {
-      const wrap    = btn.closest('td');
+      const wrap = btn.closest('td');
       const preview = wrap.querySelector('.desc-preview');
-      const full    = wrap.querySelector('.desc-full');
-      const expanded = !full.hidden;
-      preview.hidden = !expanded;
-      full.hidden    = expanded;
-      btn.textContent = expanded ? 'Ver mais' : 'Ver menos';
+      const full = wrap.querySelector('.desc-full');
+      const isExpanded = full.style.display !== 'none' && full.style.display !== '';
+      preview.style.display = isExpanded ? '' : 'none';
+      full.style.display    = isExpanded ? 'none' : '';
+      btn.textContent = isExpanded ? 'Ver mais' : 'Ver menos';
     }
 
     function toggleObjeto(btn) {
-      const cell    = btn.closest('.objeto-expandable');
+      const cell = btn.closest('.objeto-expandable');
       const preview = cell.querySelector('.objeto-preview');
-      const full    = cell.querySelector('.objeto-full');
-      const isExpanded = !full.hidden;
-      preview.hidden = !isExpanded;
-      full.hidden    = isExpanded;
+      const full = cell.querySelector('.objeto-full');
+      const isExpanded = full.style.display !== 'none' && full.style.display !== '';
+      preview.style.display = isExpanded ? '' : 'none';
+      full.style.display    = isExpanded ? 'none' : '';
       btn.textContent = isExpanded ? 'Ver mais' : 'Ver menos';
     }
 
