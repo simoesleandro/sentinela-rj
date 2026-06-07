@@ -796,6 +796,87 @@ def export_alertas():
 
 
 # ---------------------------------------------------------------------------
+# Rede — sócios compartilhados
+# ---------------------------------------------------------------------------
+
+@app.route("/api/socios/compartilhados")
+def socios_compartilhados():
+    import json as _json
+    import re as _re
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT fc.fornecedor_ni,
+                   fc.socios,
+                   f.razao_social,
+                   COUNT(ct.numero_controle_pncp) AS total_contratos,
+                   SUM(ct.valor_global)            AS valor_total
+            FROM fornecedor_cadastro fc
+            JOIN fornecedores f  ON f.ni  = fc.fornecedor_ni
+            JOIN contratos ct    ON ct.fornecedor_ni = fc.fornecedor_ni
+            WHERE fc.socios IS NOT NULL
+              AND fc.socios != '[]'
+              AND ct.valor_global > 0
+            GROUP BY fc.fornecedor_ni
+        """).fetchall()
+
+        re_cnpj = _re.compile(r"^\d{14}$")
+        por_socio: dict[str, list[dict]] = {}
+
+        for r in rows:
+            try:
+                socios = _json.loads(r["socios"])
+            except (TypeError, _json.JSONDecodeError):
+                continue
+            for s in socios:
+                nome = (s.get("nome_socio") or "").strip()
+                if not nome or nome.lower() == "none" or len(nome) < 5:
+                    continue
+                doc = _re.sub(r"\D", "", s.get("cnpj_cpf_do_socio") or "")
+                if re_cnpj.match(doc):
+                    continue
+                por_socio.setdefault(nome, []).append({
+                    "ni": r["fornecedor_ni"],
+                    "razao_social": r["razao_social"] or r["fornecedor_ni"],
+                    "valor_total": r["valor_total"] or 0.0,
+                    "total_contratos": r["total_contratos"] or 0,
+                })
+
+        items = []
+        for nome_socio, fornecedores in por_socio.items():
+            vistos: set[str] = set()
+            forn_unicos = []
+            for f in fornecedores:
+                if f["ni"] not in vistos:
+                    vistos.add(f["ni"])
+                    forn_unicos.append(f)
+
+            if len(forn_unicos) < 2:
+                continue
+
+            valor_total = sum(f["valor_total"] for f in forn_unicos)
+            if valor_total < 1_000_000:
+                continue
+
+            total_contratos = sum(f["total_contratos"] for f in forn_unicos)
+            items.append({
+                "nome_socio": nome_socio,
+                "fornecedores": sorted(forn_unicos, key=lambda x: x["valor_total"], reverse=True),
+                "total_fornecedores": len(forn_unicos),
+                "total_contratos": total_contratos,
+                "valor_total": round(valor_total, 2),
+                "severidade": "alta" if valor_total >= 10_000_000 else "media",
+            })
+
+        items.sort(key=lambda x: x["valor_total"], reverse=True)
+        return jsonify({"items": items})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

@@ -25,6 +25,7 @@
     <button class="tab-btn" data-tab="timeline">Linha do Tempo</button>
     <button class="tab-btn" data-tab="fornecedores">Fornecedores</button>
     <button class="tab-btn" data-tab="orgaos">Órgãos</button>
+    <button class="tab-btn" data-tab="rede">Rede</button>
     <button class="tab-btn" data-tab="sobre">Sobre</button>
   </nav>
 
@@ -181,6 +182,28 @@
             </tr>
           </thead>
           <tbody id="orgaos-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section 7: Rede -->
+    <section id="tab-rede" class="tab-section">
+      <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:0.25rem">Sócios em múltiplas empresas contratadas</h2>
+      <p class="section-note" style="color:var(--muted);font-size:0.85rem;margin-bottom:1.5rem">
+        Pessoas físicas que aparecem como sócias em 2 ou mais fornecedores que receberam contratos da prefeitura
+      </p>
+      <div class="table-wrap">
+        <table id="rede-table">
+          <thead>
+            <tr>
+              <th>Sócio</th>
+              <th>Empresas</th>
+              <th>Contratos</th>
+              <th>Valor Total</th>
+              <th>Severidade</th>
+            </tr>
+          </thead>
+          <tbody id="rede-tbody"></tbody>
         </table>
       </div>
     </section>

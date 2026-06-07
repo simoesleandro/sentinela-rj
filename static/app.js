@@ -163,6 +163,9 @@ function loadTab(name) {
     case 'orgaos':
       loadOrgaos();
       break;
+    case 'rede':
+      loadRede();
+      break;
   }
 }
 
@@ -970,6 +973,65 @@ async function openOrgaoDetail(cnpj, nome) {
     `;
   } catch (e) {
     content.innerHTML = `<div class="error-msg">Erro ao carregar: ${e.message}</div>`;
+  }
+}
+
+// ─── Rede ──────────────────────────────────────────────────────────────────
+
+async function loadRede() {
+  const tbody = document.getElementById('rede-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Carregando…</td></tr>';
+
+  try {
+    const res = await fetch(`${BASE}/api/socios/compartilhados`);
+    if (!res.ok) throw new Error(res.statusText);
+    const d = await res.json();
+    const items = d.items || [];
+
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Nenhum sócio em comum encontrado.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = items.map((item, idx) => {
+      const sevBadge = item.severidade === 'alta'
+        ? '<span class="badge badge-red">Alta</span>'
+        : '<span class="badge badge-yellow">Média</span>';
+
+      const empresasHtml = item.fornecedores.map(f =>
+        `<div style="margin:0.2rem 0">
+          <a href="/fornecedor/${f.ni}" target="_self" class="fornecedor-link" style="font-size:0.82rem">${truncate(f.razao_social, 50)}</a>
+          <span style="color:var(--muted);font-size:0.78rem;margin-left:0.5rem">${formatCurrency(f.valor_total)}</span>
+        </div>`
+      ).join('');
+
+      const detailId = `rede-detail-${idx}`;
+      return `
+        <tr class="rede-row" data-detail="${detailId}" style="cursor:pointer">
+          <td style="font-weight:500">${item.nome_socio}</td>
+          <td style="white-space:nowrap">${item.total_fornecedores} empresa${item.total_fornecedores !== 1 ? 's' : ''}</td>
+          <td style="white-space:nowrap">${(item.total_contratos || 0).toLocaleString('pt-BR')}</td>
+          <td style="white-space:nowrap">${formatCurrency(item.valor_total)}</td>
+          <td>${sevBadge}</td>
+        </tr>
+        <tr id="${detailId}" class="rede-detail" style="display:none">
+          <td colspan="5" style="padding:0.75rem 1rem;background:#141414;border-top:none">
+            ${empresasHtml}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll('.rede-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const detailRow = document.getElementById(row.dataset.detail);
+        const isOpen = detailRow.style.display !== 'none';
+        detailRow.style.display = isOpen ? 'none' : 'table-row';
+      });
+    });
+
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:#ef4444;padding:1rem">Erro: ${e.message}</td></tr>`;
   }
 }
 

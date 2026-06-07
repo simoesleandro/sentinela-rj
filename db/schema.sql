@@ -127,6 +127,17 @@ CREATE TABLE IF NOT EXISTS fornecedor_cadastro (
     atualizado_em           TEXT
 );
 
+CREATE TABLE IF NOT EXISTS socios_compartilhados (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome_socio          TEXT NOT NULL,
+    fornecedores        TEXT NOT NULL,   -- JSON: lista de {ni, razao_social, valor_total}
+    total_fornecedores  INTEGER,
+    total_contratos     INTEGER,
+    valor_total         REAL,
+    detectado_em        TEXT DEFAULT (datetime('now')),
+    UNIQUE(nome_socio)
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_sancoes_fornecedor    ON fornecedor_sancoes(fornecedor_ni);
 CREATE INDEX IF NOT EXISTS idx_contratos_fornecedor  ON contratos(fornecedor_ni);
