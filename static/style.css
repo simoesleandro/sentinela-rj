@@ -27,7 +27,7 @@ body {
 
 /* ─── Header ─── */
 header {
-  padding: 1.5rem 2rem;
+  padding: 1.5rem max(2rem, calc((100% - 1200px) / 2 + 2rem));
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -50,7 +50,7 @@ header h1 {
 #main-nav {
   display: flex;
   border-bottom: 1px solid var(--border);
-  padding: 0 2rem;
+  padding: 0 max(2rem, calc((100% - 1200px) / 2 + 2rem));
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -85,7 +85,7 @@ header h1 {
 /* ─── Main content ─── */
 main {
   padding: 2rem;
-  max-width: 1300px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -663,6 +663,82 @@ tr:last-child td {
 
 .expand-btn:hover {
   color: var(--text);
+}
+
+/* ─── Tooltips ─── */
+.tooltip-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip-wrap .tooltip-text {
+  visibility: hidden;
+  background: #1a1a1a;
+  color: #fafafa;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  width: 260px;
+  position: absolute;
+  z-index: 300;
+  bottom: 130%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.tooltip-wrap:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ─── Download bar ─── */
+.download-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #171717;
+  border: 1px solid #262626;
+  border-radius: 8px;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+}
+
+.btn-download {
+  background: #262626;
+  color: #fafafa;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+}
+
+.btn-download:hover {
+  background: #333;
+}
+
+.download-hint {
+  color: #737373;
+  font-size: 0.75rem;
+}
+
+/* ─── Detail actions row ─── */
+.detail-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
 }
 
 /* ─── Sortable headers ─── */

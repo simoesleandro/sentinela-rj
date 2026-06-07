@@ -1,9 +1,11 @@
 """Flask REST API — Sentinela RJ (read-only dashboard)."""
+import csv
+import io
 import json
 import math
 import os
 import sqlite3
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, Response
 
 from db.conexao import DB_PATH
 
@@ -467,6 +469,90 @@ def anomalias_por_tipo():
             """
         ).fetchall()
         return jsonify({"items": [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Export — CSV downloads
+# ---------------------------------------------------------------------------
+
+@app.route("/api/export/contratos")
+def export_contratos():
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT c.numero_controle_pncp, c.objeto, c.categoria_processo_nome,
+                   c.valor_global, c.data_assinatura, c.data_vigencia_inicio,
+                   c.data_vigencia_fim, f.razao_social AS fornecedor,
+                   f.ni AS fornecedor_cnpj, o.razao_social AS orgao,
+                   c.orgao_cnpj, c.unidade_nome
+            FROM contratos c
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            WHERE c.valor_global > 0
+            ORDER BY c.data_assinatura DESC
+        """).fetchall()
+
+        fieldnames = [
+            "numero_controle_pncp", "objeto", "categoria_processo_nome",
+            "valor_global", "data_assinatura", "data_vigencia_inicio",
+            "data_vigencia_fim", "fornecedor", "fornecedor_cnpj",
+            "orgao", "orgao_cnpj", "unidade_nome",
+        ]
+        output = io.StringIO()
+        output.write('﻿')  # UTF-8 BOM for Excel
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore", delimiter=';')
+        writer.writeheader()
+        writer.writerows([dict(r) for r in rows])
+
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=sentinela_rj_contratos.csv"},
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/export/alertas")
+def export_alertas():
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT a.id, a.tipo, a.severidade, a.descricao, a.valor_referencia,
+                   a.metodologia, a.narrativa_ia, a.criado_em,
+                   f.razao_social AS fornecedor, f.ni AS fornecedor_cnpj,
+                   c.objeto, c.data_assinatura, c.valor_global,
+                   o.razao_social AS orgao
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            ORDER BY a.severidade DESC, a.valor_referencia DESC
+        """).fetchall()
+
+        fieldnames = [
+            "id", "tipo", "severidade", "descricao", "valor_referencia",
+            "metodologia", "narrativa_ia", "criado_em",
+            "fornecedor", "fornecedor_cnpj", "objeto",
+            "data_assinatura", "valor_global", "orgao",
+        ]
+        output = io.StringIO()
+        output.write('﻿')  # UTF-8 BOM for Excel
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore", delimiter=';')
+        writer.writeheader()
+        writer.writerows([dict(r) for r in rows])
+
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=sentinela_rj_alertas.csv"},
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

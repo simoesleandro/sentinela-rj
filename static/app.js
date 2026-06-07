@@ -35,6 +35,15 @@ const TIPO_BADGE_CLASS = {
   fracionamento_ap: 'green',
 };
 
+const TIPO_TOOLTIPS = {
+  outlier_valor: 'Contrato com valor muito acima da média histórica para o mesmo tipo de serviço. Pode indicar sobrepreço.',
+  concentracao_fornecedor: 'Empresa recebeu muitos contratos em pouco tempo do mesmo órgão. Pode indicar favorecimento.',
+  sem_licitacao_inexigibilidade: 'Contrato firmado sem licitação por alegação de fornecedor exclusivo. Precisa de justificativa sólida.',
+  sem_licitacao_emergencia: 'Contrato emergencial sem licitação. Emergências reais existem, mas o uso excessivo é suspeito.',
+  sem_licitacao_dispensa: 'Contrato dispensado de licitação por valor baixo ou outras condições legais.',
+  fracionamento_ap: 'Mesmo serviço dividido entre várias empresas por região. Pode ser tentativa de driblar o limite de licitação.',
+};
+
 const state = {
   currentTab: 'visao-geral',
   alertasPage: 1,
@@ -82,6 +91,10 @@ function truncate(str, n) {
 function tipoBadge(tipo) {
   const label = TIPO_LABELS[tipo] || tipo;
   const cls = TIPO_BADGE_CLASS[tipo] || 'gray';
+  const tooltip = TIPO_TOOLTIPS[tipo];
+  if (tooltip) {
+    return `<span class="badge badge-${cls} tooltip-wrap">${label}<span class="tooltip-text">${tooltip}</span></span>`;
+  }
   return `<span class="badge badge-${cls}">${label}</span>`;
 }
 
@@ -536,11 +549,25 @@ async function openDetail(id) {
       </div>
       ${complementar}
       ${narrativa}
-      ${pncpLink}
+      <div class="detail-actions">
+        ${pncpLink}
+        <button id="share-btn" class="btn-page" onclick="shareAlert(${id})" style="font-size:0.8rem">🔗 Copiar link</button>
+      </div>
     `;
   } catch (e) {
     content.innerHTML = `<div class="error-msg">Erro ao carregar: ${e.message}</div>`;
   }
+}
+
+function shareAlert(id) {
+  const url = window.location.origin + '/dashboard?alerta=' + id;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('share-btn');
+    if (btn) {
+      btn.textContent = '✓ Link copiado!';
+      setTimeout(() => { btn.textContent = '🔗 Copiar link'; }, 2000);
+    }
+  });
 }
 
 function closeDetail() {
@@ -787,4 +814,9 @@ document.addEventListener('DOMContentLoaded', () => {
       loadFornecedores();
     });
   });
+
+  // Open alert from share URL param
+  const urlParams = new URLSearchParams(window.location.search);
+  const alertaId = urlParams.get('alerta');
+  if (alertaId) openDetail(parseInt(alertaId, 10));
 });
