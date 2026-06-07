@@ -38,7 +38,8 @@ const TIPO_BADGE_CLASS = {
 const state = {
   currentTab: 'visao-geral',
   alertasPage: 1,
-  alertasFiltros: { tipo: '', severidade: '', ano: '', fornecedor: '' },
+  alertasFiltros: { tipo: '', severidade: '', ano: '', fornecedor: '', valorMin: '' },
+  alertasSort: { column: null, direction: 'desc' },
   charts: {},
   tabLoaded: {},
   timelineData: null,
@@ -306,6 +307,15 @@ function setupFilters() {
     });
     btnNext._bound = true;
   }
+
+  const valorMinEl = document.getElementById('filter-valor-min');
+  if (valorMinEl && !valorMinEl._bound) {
+    valorMinEl.addEventListener('input', () => {
+      state.alertasFiltros.valorMin = valorMinEl.value;
+      debouncedLoad();
+    });
+    valorMinEl._bound = true;
+  }
 }
 
 async function loadAlertas() {
@@ -319,6 +329,7 @@ async function loadAlertas() {
     if (f.severidade) params.set('severidade', f.severidade);
     if (f.ano)        params.set('ano',        f.ano);
     if (f.fornecedor) params.set('fornecedor', f.fornecedor);
+    if (f.valorMin)   params.set('valor_min',  f.valorMin);
 
     const res = await fetch(`${BASE}/api/alertas/agrupados?${params}`);
     if (!res.ok) throw new Error(res.statusText);
@@ -327,8 +338,23 @@ async function loadAlertas() {
     if (!d.items.length) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">Nenhuma anomalia encontrada.</td></tr>';
     } else {
+      const SEV_SORT_VAL = { alta: 3, media: 2, baixa: 1 };
+      const groups = [...d.items];
+      if (state.alertasSort.column) {
+        const dir = state.alertasSort.direction === 'asc' ? 1 : -1;
+        groups.sort((a, b) => {
+          switch (state.alertasSort.column) {
+            case 'valor':      return dir * ((a.valor_total || 0) - (b.valor_total || 0));
+            case 'severidade': return dir * ((SEV_SORT_VAL[a.severidade] || 0) - (SEV_SORT_VAL[b.severidade] || 0));
+            case 'data':       return dir * ((a.data_mais_recente || '').localeCompare(b.data_mais_recente || ''));
+            case 'fornecedor': return dir * (a.fornecedor || '').localeCompare(b.fornecedor || '');
+            case 'tipo':       return dir * (a.tipo || '').localeCompare(b.tipo || '');
+            default:           return 0;
+          }
+        });
+      }
       const html = [];
-      d.items.forEach(grupo => {
+      groups.forEach(grupo => {
         const countBadge = grupo.ocorrencias > 1
           ? `<span class="badge-count">${grupo.ocorrencias} contratos</span>`
           : `<span class="badge-count badge-count-single">1 contrato</span>`;
@@ -401,6 +427,28 @@ async function loadAlertas() {
         btn.addEventListener('click', () => openDetail(parseInt(btn.dataset.id, 10)));
       });
     }
+
+    const counter = document.getElementById('resultados-counter');
+    if (counter) {
+      if (d.total === 0) {
+        counter.textContent = '';
+      } else {
+        const x = (d.page - 1) * 20 + 1;
+        const y = Math.min(d.page * 20, d.total);
+        counter.textContent = `Mostrando ${x}–${y} de ${d.total} grupos`;
+      }
+    }
+
+    const SORT_BASE = { tipo: 'Tipo', severidade: 'Severidade', valor: 'Valor ▲▼', fornecedor: 'Fornecedor', data: 'Data ▲▼' };
+    document.querySelectorAll('#alertas-table th[data-sort]').forEach(th => {
+      const col = th.dataset.sort;
+      th.classList.toggle('sort-active', col === state.alertasSort.column);
+      if (col === state.alertasSort.column) {
+        th.textContent = SORT_BASE[col].replace(' ▲▼', '') + (state.alertasSort.direction === 'asc' ? ' ▲' : ' ▼');
+      } else {
+        th.textContent = SORT_BASE[col];
+      }
+    });
 
     const indicator = document.getElementById('page-indicator');
     if (indicator) indicator.textContent = `Página ${d.page} de ${Math.max(1, d.pages)}`;
@@ -698,6 +746,20 @@ document.addEventListener('DOMContentLoaded', () => {
       state.timelineGranularity = btn.dataset.granularity;
       state.timelineData = null;
       loadTimeline();
+    });
+  });
+
+  // Alertas sort headers
+  document.querySelectorAll('#alertas-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (state.alertasSort.column === col) {
+        state.alertasSort.direction = state.alertasSort.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.alertasSort.column = col;
+        state.alertasSort.direction = 'desc';
+      }
+      loadAlertas();
     });
   });
 

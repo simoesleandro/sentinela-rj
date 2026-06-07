@@ -665,6 +665,28 @@ tr:last-child td {
   color: var(--text);
 }
 
+/* ─── Sortable headers ─── */
+th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+}
+
+th[data-sort]:hover {
+  color: var(--text);
+}
+
+th.sort-active {
+  color: var(--red);
+}
+
+/* ─── Results counter ─── */
+.resultados-counter {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+  text-align: right;
+}
+
 .badge-risk {
   display: inline-block;
   border-radius: 4px;

@@ -175,6 +175,7 @@ def alertas_agrupados():
         severidade = request.args.get("severidade")
         ano = request.args.get("ano")
         fornecedor = request.args.get("fornecedor")
+        valor_min = request.args.get("valor_min", type=float)
 
         joins = """
             FROM alertas a
@@ -196,6 +197,9 @@ def alertas_agrupados():
         if fornecedor:
             conditions.append("f.razao_social LIKE ?")
             params.append(f"%{fornecedor}%")
+        if valor_min is not None:
+            conditions.append("a.valor_referencia >= ?")
+            params.append(valor_min)
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 

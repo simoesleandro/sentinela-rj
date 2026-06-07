@@ -68,17 +68,19 @@
           <option value="2026">2026</option>
         </select>
         <input id="filter-fornecedor" type="text" placeholder="Buscar fornecedor...">
+        <input type="number" id="filter-valor-min" placeholder="Valor mínimo (R$)" min="0" step="1000000">
       </div>
+      <div id="resultados-counter" class="resultados-counter"></div>
       <div id="alertas-table-wrap">
         <table id="alertas-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>Tipo</th>
-              <th>Severidade</th>
-              <th>Valor</th>
-              <th>Fornecedor</th>
-              <th>Data</th>
+              <th data-sort="tipo">Tipo</th>
+              <th data-sort="severidade">Severidade</th>
+              <th data-sort="valor">Valor ▲▼</th>
+              <th data-sort="fornecedor">Fornecedor</th>
+              <th data-sort="data">Data ▲▼</th>
               <th>Ações</th>
             </tr>
           </thead>
