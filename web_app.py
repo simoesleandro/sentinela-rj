@@ -835,6 +835,40 @@ def export_alertas():
 
 
 # ---------------------------------------------------------------------------
+# Grafo investigativo
+# ---------------------------------------------------------------------------
+
+@app.route("/api/grafo/fornecedor/<fornecedor_ni>")
+def grafo_fornecedor(fornecedor_ni: str):
+    from analise.grafo import GrafoNaoEncontradoError, montar_grafo_fornecedor
+
+    db = get_db()
+    try:
+        return jsonify(montar_grafo_fornecedor(db, fornecedor_ni))
+    except GrafoNaoEncontradoError:
+        return jsonify({"error": "not found"}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/grafo/alerta/<int:alerta_id>")
+def grafo_alerta(alerta_id: int):
+    from analise.grafo import GrafoNaoEncontradoError, montar_grafo_alerta
+
+    db = get_db()
+    try:
+        return jsonify(montar_grafo_alerta(db, alerta_id))
+    except GrafoNaoEncontradoError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Rede — sócios compartilhados
 # ---------------------------------------------------------------------------
 

@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js" defer></script>
 </head>
@@ -205,6 +206,16 @@
           </thead>
           <tbody id="rede-tbody"></tbody>
         </table>
+      </div>
+      <div id="grafo-panel" style="display:none;margin-top:1.5rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+          <h3 id="grafo-titulo" style="font-size:0.95rem;font-weight:600;margin:0">Grafo investigativo</h3>
+          <button type="button" id="grafo-fechar" class="btn-download" style="font-size:0.78rem">Fechar grafo</button>
+        </div>
+        <div id="grafo-network" style="height:420px;border:1px solid var(--border);border-radius:8px;background:#0a0a0a"></div>
+        <p class="section-note" style="margin-top:0.5rem;color:var(--muted);font-size:0.78rem">
+          Nós: órgão → contrato ← fornecedor ← sócio. Clique em uma empresa na tabela para explorar conexões.
+        </p>
       </div>
     </section>
 

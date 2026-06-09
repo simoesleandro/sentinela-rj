@@ -1002,6 +1002,7 @@ async function loadRede() {
         `<div style="margin:0.2rem 0">
           <a href="/fornecedor/${f.ni}" target="_self" class="fornecedor-link" style="font-size:0.82rem">${truncate(f.razao_social, 50)}</a>
           <span style="color:var(--muted);font-size:0.78rem;margin-left:0.5rem">${formatCurrency(f.valor_total)}</span>
+          <button type="button" class="btn-grafo" data-ni="${f.ni}" data-nome="${escapeHtml(truncate(f.razao_social, 40))}" style="margin-left:0.5rem;font-size:0.72rem;padding:2px 8px;border:1px solid var(--border);background:#111;color:var(--text);border-radius:4px;cursor:pointer">Grafo</button>
         </div>`
       ).join('');
 
@@ -1030,10 +1031,88 @@ async function loadRede() {
       });
     });
 
+    tbody.querySelectorAll('.btn-grafo').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        loadGrafoFornecedor(btn.dataset.ni, btn.dataset.nome);
+      });
+    });
+
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="5" style="color:#ef4444;padding:1rem">Erro: ${e.message}</td></tr>`;
   }
 }
+
+let _grafoNetwork = null;
+
+const _GRAFO_CORES = {
+  fornecedor: { background: '#7c3aed', border: '#a78bfa' },
+  orgao: { background: '#2563eb', border: '#60a5fa' },
+  contrato: { background: '#475569', border: '#94a3b8' },
+  socio: { background: '#ea580c', border: '#fb923c' },
+};
+
+async function loadGrafoFornecedor(ni, nome) {
+  const panel = document.getElementById('grafo-panel');
+  const container = document.getElementById('grafo-network');
+  const titulo = document.getElementById('grafo-titulo');
+  if (!panel || !container || typeof vis === 'undefined') return;
+
+  panel.style.display = 'block';
+  titulo.textContent = `Grafo — ${nome || ni}`;
+  container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted)">Carregando grafo…</div>';
+
+  try {
+    const res = await fetch(`${BASE}/api/grafo/fornecedor/${encodeURIComponent(ni)}`);
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    container.innerHTML = '';
+
+    const nodes = new vis.DataSet(
+      (data.nodes || []).map(n => ({
+        id: n.id,
+        label: truncate(n.label, 28),
+        title: n.label,
+        color: _GRAFO_CORES[n.tipo] || _GRAFO_CORES.contrato,
+        font: { color: '#f5f5f5', size: 12 },
+      }))
+    );
+    const edges = new vis.DataSet(
+      (data.edges || []).map(e => ({
+        from: e.from,
+        to: e.to,
+        label: e.label || '',
+        arrows: 'to',
+        color: { color: '#525252', highlight: '#a3a3a3' },
+        font: { color: '#737373', size: 10, strokeWidth: 0 },
+      }))
+    );
+
+    if (_grafoNetwork) {
+      _grafoNetwork.destroy();
+    }
+    _grafoNetwork = new vis.Network(
+      container,
+      { nodes, edges },
+      {
+        physics: { stabilization: { iterations: 120 } },
+        interaction: { hover: true, tooltipDelay: 120 },
+        layout: { improvedLayout: true },
+      }
+    );
+  } catch (e) {
+    container.innerHTML = `<div style="padding:1rem;color:#ef4444">Erro ao carregar grafo: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+document.getElementById('grafo-fechar')?.addEventListener('click', () => {
+  const panel = document.getElementById('grafo-panel');
+  if (panel) panel.style.display = 'none';
+  if (_grafoNetwork) {
+    _grafoNetwork.destroy();
+    _grafoNetwork = null;
+  }
+});
 
 // ─── Tour ──────────────────────────────────────────────────────────────────
 
