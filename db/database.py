@@ -115,12 +115,9 @@ def _montar_linhas(
 
 def _garantir_tabela_anomalias(conn: sqlite3.Connection) -> None:
     conn.execute(_DDL_ANOMALIAS.strip())
-    colunas = {row[1] for row in conn.execute("PRAGMA table_info(alertas)")}
-    if "narrativa_ia" not in colunas:
-        conn.execute("ALTER TABLE alertas ADD COLUMN narrativa_ia TEXT")
-    if "score" not in colunas:
-        conn.execute("ALTER TABLE alertas ADD COLUMN score REAL")
-    conn.commit()
+    from db.conexao import aplicar_migracoes
+
+    aplicar_migracoes(conn)
 
 
 def _executar_upsert(

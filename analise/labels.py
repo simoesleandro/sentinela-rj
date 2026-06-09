@@ -37,3 +37,15 @@ def label_severidade(severidade: str) -> str:
 
 def icon_severidade(severidade: str) -> str:
     return ICON_SEVERIDADE.get(severidade, "⚪")
+
+
+LABEL_STATUS: dict[str, str] = {
+    "aberto": "Aberto",
+    "investigando": "Investigando",
+    "confirmado": "Confirmado",
+    "descartado": "Descartado",
+}
+
+
+def label_status(status: str) -> str:
+    return LABEL_STATUS.get(status, status.replace("_", " ").title())

@@ -22,7 +22,7 @@
 
   <nav id="main-nav">
     <button class="tab-btn active" data-tab="visao-geral">Visão Geral</button>
-    <button class="tab-btn" data-tab="alertas">Alertas</button>
+    <button class="tab-btn" data-tab="alertas">Triagem</button>
     <button class="tab-btn" data-tab="timeline">Linha do Tempo</button>
     <button class="tab-btn" data-tab="fornecedores">Fornecedores</button>
     <button class="tab-btn" data-tab="orgaos">Órgãos</button>
@@ -52,9 +52,24 @@
       </div>
     </section>
 
-    <!-- Section 2: Alertas -->
+    <!-- Section 2: Alertas / Triagem -->
     <section id="tab-alertas" class="tab-section">
+      <div class="triagem-header">
+        <div>
+          <h2 class="section-heading">Triagem de Alertas</h2>
+          <p class="section-note">Fluxo: Aberto → Investigando → Confirmado ou Descartado</p>
+        </div>
+        <div id="triagem-resumo" class="triagem-resumo"></div>
+      </div>
       <div class="filter-bar">
+        <select id="filter-status">
+          <option value="fila" selected>Fila de triagem</option>
+          <option value="aberto">Abertos</option>
+          <option value="investigando">Investigando</option>
+          <option value="confirmado">Confirmados</option>
+          <option value="descartado">Descartados</option>
+          <option value="todos">Todos</option>
+        </select>
         <select id="filter-tipo">
           <option value="">Todos os tipos</option>
           <option value="outlier_valor">Outlier de valor</option>
@@ -87,6 +102,7 @@
               <th>#</th>
               <th data-sort="tipo">Tipo</th>
               <th data-sort="severidade">Severidade</th>
+              <th>Status</th>
               <th data-sort="valor">Valor ▲▼</th>
               <th data-sort="fornecedor">Fornecedor</th>
               <th data-sort="data">Data ▲▼</th>

@@ -81,8 +81,19 @@ CREATE TABLE IF NOT EXISTS alertas (
     valor_referencia    REAL,
     score               REAL,       -- risco normalizado 0.0-1.0 (AnomaliaResult.score)
     status              TEXT DEFAULT 'aberto',   -- aberto/investigando/confirmado/descartado
+    notas_triagem       TEXT,
+    status_atualizado_em TEXT,
     criado_em           TEXT DEFAULT (datetime('now')),
     narrativa_ia        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS alertas_historico (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    alerta_id           INTEGER NOT NULL REFERENCES alertas(id) ON DELETE CASCADE,
+    status_anterior     TEXT,
+    status_novo         TEXT NOT NULL,
+    nota                TEXT,
+    criado_em           TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS coletas_log (
@@ -148,3 +159,5 @@ CREATE INDEX IF NOT EXISTS idx_contratos_data_pub     ON contratos(data_publicac
 CREATE INDEX IF NOT EXISTS idx_contratos_cipi         ON contratos(identificador_cipi);
 CREATE INDEX IF NOT EXISTS idx_alertas_contrato       ON alertas(numero_controle_pncp);
 CREATE INDEX IF NOT EXISTS idx_alertas_tipo           ON alertas(tipo);
+CREATE INDEX IF NOT EXISTS idx_alertas_status         ON alertas(status);
+CREATE INDEX IF NOT EXISTS idx_alertas_historico      ON alertas_historico(alerta_id);

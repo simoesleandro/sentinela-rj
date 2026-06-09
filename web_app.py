@@ -1,4 +1,4 @@
-"""Flask REST API — Sentinela RJ (read-only dashboard)."""
+"""Flask REST API — Sentinela RJ dashboard + triagem de alertas."""
 import csv
 import io
 import json
@@ -7,14 +7,19 @@ import os
 import sqlite3
 from flask import Flask, jsonify, request, render_template, Response
 
-from db.conexao import DB_PATH
+from db.conexao import DB_PATH, aplicar_migracoes
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+_migracoes_aplicadas = False
 
 
 def get_db() -> sqlite3.Connection:
+    global _migracoes_aplicadas
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    if not _migracoes_aplicadas and DB_PATH.exists():
+        aplicar_migracoes(conn)
+        _migracoes_aplicadas = True
     return conn
 
 @app.route('/dashboard')
@@ -28,6 +33,8 @@ def fornecedor_page(fornecedor_ni: str):
 @app.after_request
 def add_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, PATCH, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return response
 
 
@@ -72,6 +79,9 @@ def stats():
         periodo_fim = db.execute(
             "SELECT MAX(data_assinatura) FROM contratos"
         ).fetchone()[0]
+        from db.triagem import resumo_status
+
+        triagem = resumo_status(db)
         return jsonify(
             {
                 "contratos_total": contratos_total,
@@ -82,6 +92,7 @@ def stats():
                 "ultima_coleta": ultima_coleta,
                 "periodo_inicio": periodo_inicio,
                 "periodo_fim": periodo_fim,
+                "triagem": triagem,
             }
         )
     except Exception as e:
@@ -165,11 +176,87 @@ def alertas_list():
 
 
 # ---------------------------------------------------------------------------
-# Alertas — grouped
+# Alertas — triagem (helpers + fila)
 # ---------------------------------------------------------------------------
 
-_SEV_PRIORITY = {'alta': 3, 'media': 2, 'baixa': 1}
+_SEV_PRIORITY = {"alta": 3, "media": 2, "baixa": 1}
+_STATUS_PRIORITY = {"aberto": 4, "investigando": 3, "confirmado": 2, "descartado": 1}
 
+
+def _aplicar_filtro_status(
+    conditions: list[str],
+    params: list,
+    status_param: str | None,
+) -> None:
+    from db.triagem import filtro_status_sql
+
+    if not status_param:
+        return
+    clause, filtro_params = filtro_status_sql(status_param)
+    if clause:
+        conditions.append(clause)
+        params.extend(filtro_params)
+
+
+@app.route("/api/alertas/triagem")
+def alertas_triagem():
+    from db.triagem import resumo_status
+
+    db = get_db()
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = min(100, max(1, int(request.args.get("per_page", 20))))
+        status = request.args.get("status", "fila")
+
+        base = """
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+        """
+        conditions: list[str] = []
+        params: list = []
+        _aplicar_filtro_status(conditions, params, status)
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        total = db.execute(f"SELECT COUNT(*) {base} {where}", params).fetchone()[0]
+        pages = math.ceil(total / per_page) if total else 0
+        offset = (page - 1) * per_page
+
+        rows = db.execute(
+            f"""
+            SELECT a.id, a.tipo, a.severidade, a.score, a.status,
+                   a.descricao, a.valor_referencia, a.notas_triagem,
+                   a.status_atualizado_em, a.narrativa_ia, a.numero_controle_pncp,
+                   f.razao_social AS fornecedor,
+                   c.objeto, c.data_assinatura,
+                   o.razao_social AS orgao
+            {base} {where}
+            ORDER BY CASE a.severidade
+                     WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END,
+                     a.score IS NULL, a.score DESC,
+                     a.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            params + [per_page, offset],
+        ).fetchall()
+
+        return jsonify({
+            "resumo": resumo_status(db),
+            "items": [dict(r) for r in rows],
+            "total": total,
+            "page": page,
+            "pages": pages,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Alertas — grouped
+# ---------------------------------------------------------------------------
 
 @app.route("/api/alertas/agrupados")
 def alertas_agrupados():
@@ -182,6 +269,7 @@ def alertas_agrupados():
         ano = request.args.get("ano")
         fornecedor = request.args.get("fornecedor")
         valor_min = request.args.get("valor_min", type=float)
+        status = request.args.get("status")
 
         joins = """
             FROM alertas a
@@ -190,6 +278,8 @@ def alertas_agrupados():
         """
         conditions: list[str] = []
         params: list = []
+
+        _aplicar_filtro_status(conditions, params, status)
 
         if tipo:
             conditions.append("a.tipo = ?")
@@ -241,9 +331,9 @@ def alertas_agrupados():
 
             alerts = db.execute(
                 f"""
-                SELECT a.id, a.severidade, a.descricao, a.valor_referencia, a.narrativa_ia,
-                       a.numero_controle_pncp, c.objeto, c.data_assinatura,
-                       o.razao_social AS orgao
+                SELECT a.id, a.severidade, a.status, a.descricao, a.valor_referencia,
+                       a.narrativa_ia, a.numero_controle_pncp, c.objeto,
+                       c.data_assinatura, o.razao_social AS orgao
                 FROM alertas a
                 LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
                 LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
@@ -254,7 +344,13 @@ def alertas_agrupados():
             ).fetchall()
 
             severidades = [a["severidade"] for a in alerts]
+            statuses = [a["status"] or "aberto" for a in alerts]
             max_sev = max(severidades, key=lambda s: _SEV_PRIORITY.get(s, 0), default="baixa")
+            max_status = max(
+                statuses,
+                key=lambda s: _STATUS_PRIORITY.get(s, 0),
+                default="aberto",
+            )
             valor_total = sum(a["valor_referencia"] or 0 for a in alerts)
             valor_max = max((a["valor_referencia"] or 0 for a in alerts), default=0)
             datas = [a["data_assinatura"] for a in alerts if a["data_assinatura"]]
@@ -265,6 +361,7 @@ def alertas_agrupados():
                 "fornecedor": gr["fornecedor_nome"] or fni,
                 "tipo": tp,
                 "severidade": max_sev,
+                "status": max_status,
                 "ocorrencias": len(alerts),
                 "valor_total": valor_total,
                 "valor_max": valor_max,
@@ -273,6 +370,7 @@ def alertas_agrupados():
                 "alertas": [
                     {
                         "id": a["id"],
+                        "status": a["status"] or "aberto",
                         "descricao": a["descricao"],
                         "valor_referencia": a["valor_referencia"],
                         "objeto": a["objeto"],
@@ -295,8 +393,41 @@ def alertas_agrupados():
 # Alertas — detail
 # ---------------------------------------------------------------------------
 
-@app.route("/api/alertas/<int:alert_id>")
+@app.route("/api/alertas/<int:alert_id>", methods=["GET", "PATCH", "OPTIONS"])
 def alertas_detail(alert_id: int):
+    if request.method == "OPTIONS":
+        return "", 204
+
+    if request.method == "PATCH":
+        from db.triagem import (
+            AlertaNaoEncontradoError,
+            TriagemError,
+            atualizar_status_alerta,
+        )
+
+        body = request.get_json(silent=True) or {}
+        status = body.get("status")
+        if not status:
+            return jsonify({"error": "Campo 'status' é obrigatório."}), 400
+
+        db = get_db()
+        try:
+            resultado = atualizar_status_alerta(
+                db,
+                alert_id,
+                status=str(status),
+                nota=body.get("nota"),
+            )
+            return jsonify(resultado)
+        except AlertaNaoEncontradoError:
+            return jsonify({"error": "not found"}), 404
+        except TriagemError as exc:
+            return jsonify({"error": str(exc)}), 422
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+        finally:
+            db.close()
+
     db = get_db()
     try:
         row = db.execute(
@@ -318,7 +449,13 @@ def alertas_detail(alert_id: int):
         ).fetchone()
         if row is None:
             return jsonify({"error": "not found"}), 404
-        return jsonify(dict(row))
+        from db.triagem import listar_historico, normalizar_status, status_permitidos
+
+        payload = dict(row)
+        payload["status"] = normalizar_status(payload.get("status"))
+        payload["historico"] = listar_historico(db, alert_id)
+        payload["transicoes_permitidas"] = status_permitidos(payload["status"])
+        return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

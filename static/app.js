@@ -26,6 +26,20 @@ const SEV_COLORS = {
   baixa: '#6b7280',
 };
 
+const STATUS_LABELS = {
+  aberto: 'Aberto',
+  investigando: 'Investigando',
+  confirmado: 'Confirmado',
+  descartado: 'Descartado',
+};
+
+const STATUS_BADGE_CLASS = {
+  aberto: 'status-aberto',
+  investigando: 'status-investigando',
+  confirmado: 'status-confirmado',
+  descartado: 'status-descartado',
+};
+
 const TIPO_BADGE_CLASS = {
   outlier_valor: 'red',
   concentracao_fornecedor: 'orange',
@@ -47,7 +61,7 @@ const TIPO_TOOLTIPS = {
 const state = {
   currentTab: 'visao-geral',
   alertasPage: 1,
-  alertasFiltros: { tipo: '', severidade: '', ano: '', fornecedor: '', valorMin: '' },
+  alertasFiltros: { status: 'fila', tipo: '', severidade: '', ano: '', fornecedor: '', valorMin: '' },
   alertasSort: { column: null, direction: 'desc' },
   charts: {},
   tabLoaded: {},
@@ -89,6 +103,14 @@ function truncate(str, n) {
   return str.length > n ? str.slice(0, n) + '…' : str;
 }
 
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function tipoBadge(tipo) {
   const label = TIPO_LABELS[tipo] || tipo;
   const cls = TIPO_BADGE_CLASS[tipo] || 'gray';
@@ -104,6 +126,40 @@ function sevBadge(sev) {
   const cls = map[sev] || 'gray';
   const label = sev ? sev.charAt(0).toUpperCase() + sev.slice(1) : '—';
   return `<span class="badge badge-${cls}">${label}</span>`;
+}
+
+function statusBadge(status) {
+  const st = status || 'aberto';
+  const cls = STATUS_BADGE_CLASS[st] || 'status-aberto';
+  const label = STATUS_LABELS[st] || st;
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function renderTriagemResumo(resumo) {
+  const el = document.getElementById('triagem-resumo');
+  if (!el || !resumo) return;
+  const chips = [
+    ['fila', 'Fila', resumo.fila, true],
+    ['aberto', 'Abertos', resumo.aberto, false],
+    ['investigando', 'Investigando', resumo.investigando, false],
+    ['confirmado', 'Confirmados', resumo.confirmado, false],
+    ['descartado', 'Descartados', resumo.descartado, false],
+  ];
+  el.innerHTML = chips.map(([key, label, n, primary]) => `
+    <button type="button" class="triagem-chip ${primary ? 'triagem-chip-primary' : ''} ${state.alertasFiltros.status === key ? 'active' : ''}" data-status="${key}">
+      <span class="triagem-chip-label">${label}</span>
+      <span class="triagem-chip-value">${(n || 0).toLocaleString('pt-BR')}</span>
+    </button>
+  `).join('');
+  el.querySelectorAll('.triagem-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.alertasFiltros.status = chip.dataset.status;
+      state.alertasPage = 1;
+      const sel = document.getElementById('filter-status');
+      if (sel) sel.value = chip.dataset.status;
+      loadAlertas();
+    });
+  });
 }
 
 function showError(containerId, msg) {
@@ -286,6 +342,17 @@ function setupFilters() {
     loadAlertas();
   }, 300);
 
+  const statusEl = document.getElementById('filter-status');
+  if (statusEl && !statusEl._bound) {
+    statusEl.value = state.alertasFiltros.status || 'fila';
+    statusEl.addEventListener('change', () => {
+      state.alertasFiltros.status = statusEl.value;
+      state.alertasPage = 1;
+      loadAlertas();
+    });
+    statusEl._bound = true;
+  }
+
   [
     ['filter-tipo',       'tipo'],
     ['filter-severidade', 'severidade'],
@@ -340,11 +407,12 @@ function setupFilters() {
 
 async function loadAlertas() {
   const tbody = document.getElementById('alertas-tbody');
-  tbody.innerHTML = '<tr><td colspan="7" class="loading-msg">Carregando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" class="loading-msg">Carregando…</td></tr>';
 
   try {
     const params = new URLSearchParams({ page: state.alertasPage, per_page: 20 });
     const f = state.alertasFiltros;
+    if (f.status)     params.set('status',     f.status);
     if (f.tipo)       params.set('tipo',       f.tipo);
     if (f.severidade) params.set('severidade', f.severidade);
     if (f.ano)        params.set('ano',        f.ano);
@@ -355,8 +423,14 @@ async function loadAlertas() {
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
 
+    const resumoRes = await fetch(`${BASE}/api/alertas/triagem?per_page=1&status=fila`);
+    if (resumoRes.ok) {
+      const triagem = await resumoRes.json();
+      renderTriagemResumo(triagem.resumo);
+    }
+
     if (!d.items.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">Nenhuma anomalia encontrada.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Nenhuma anomalia encontrada.</td></tr>';
     } else {
       const SEV_SORT_VAL = { alta: 3, media: 2, baixa: 1 };
       const groups = [...d.items];
@@ -389,6 +463,7 @@ async function loadAlertas() {
             <td><button class="expand-btn" data-grupo="${gid}">▶</button></td>
             <td>${tipoBadge(grupo.tipo)}</td>
             <td>${sevBadge(grupo.severidade)}</td>
+            <td>${statusBadge(grupo.status)}</td>
             <td style="white-space:nowrap;font-weight:500">${formatCurrency(grupo.valor_total)}</td>
             <td>${truncate(grupo.fornecedor || '—', 30)} ${countBadge}</td>
             <td style="white-space:nowrap;color:var(--muted)">${formatDate(grupo.data_mais_recente)}</td>
@@ -403,8 +478,14 @@ async function loadAlertas() {
             : '';
           html.push(`
             <tr class="row-detail" data-grupo="${gid}">
-              <td colspan="7">
+              <td colspan="8">
                 <div class="detail-inner" style="border-left-color:${tipoColor}">
+                  <div class="detail-meta" style="margin-bottom:0.5rem">
+                    <div class="detail-item">
+                      <span class="detail-label">Status</span>
+                      <span class="detail-value">${statusBadge(a.status)}</span>
+                    </div>
+                  </div>
                   <div class="detail-objeto">
                     <span class="detail-label">Objeto</span>
                     <span class="detail-value">
@@ -435,7 +516,7 @@ async function loadAlertas() {
                   </div>
                   <div class="detail-actions">
                     ${pncpLink}
-                    <button class="btn-ver-detalhes" data-id="${a.id}">Ver detalhes</button>
+                    <button class="btn-ver-detalhes" data-id="${a.id}">Triagem</button>
                   </div>
                 </div>
               </td>
@@ -501,7 +582,7 @@ async function loadAlertas() {
     if (btnNext) btnNext.disabled = d.page >= d.pages;
 
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="error-msg">Erro: ${e.message}</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="error-msg">Erro: ${e.message}</div></td></tr>`;
   }
 }
 
@@ -539,15 +620,48 @@ async function openDetail(id) {
     const narrativa = d.narrativa_ia
       ? `<div class="narrativa-block">
            <label>Narrativa IA</label>
-           <p>${d.narrativa_ia}</p>
+           <p>${escapeHtml(d.narrativa_ia)}</p>
          </div>`
       : '';
 
+    const transicoes = (d.transicoes_permitidas || []).map(st =>
+      `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
+    ).join('');
+
+    const historicoHtml = (d.historico || []).length
+      ? (d.historico || []).map(h => `
+          <li>
+            <span class="triage-hist-meta">${formatDate(h.criado_em)}</span>
+            ${statusBadge(h.status_anterior || '—')} → ${statusBadge(h.status_novo)}
+            ${h.nota ? `<span class="triage-hist-nota">${escapeHtml(h.nota)}</span>` : ''}
+          </li>
+        `).join('')
+      : '<li class="triage-hist-empty">Nenhuma movimentação registrada.</li>';
+
     content.innerHTML = `
-      <div class="detail-fornecedor">${d.fornecedor || 'Fornecedor não identificado'}</div>
+      <div class="detail-fornecedor">${escapeHtml(d.fornecedor || 'Fornecedor não identificado')}</div>
       <div class="detail-badges">
         ${tipoBadge(d.tipo)}
         ${sevBadge(d.severidade)}
+        ${statusBadge(d.status)}
+      </div>
+      <div class="triage-block">
+        <label class="section-title" style="margin-bottom:0.75rem">Triagem</label>
+        <div class="triage-form">
+          <label for="triage-status">Novo status</label>
+          <select id="triage-status">
+            <option value="${d.status}">${STATUS_LABELS[d.status] || d.status} (atual)</option>
+            ${transicoes}
+          </select>
+          <label for="triage-nota">Nota / histórico</label>
+          <textarea id="triage-nota" rows="3" placeholder="Observações da investigação…">${escapeHtml(d.notas_triagem || '')}</textarea>
+          <button type="button" id="triage-save" class="btn-page">Salvar triagem</button>
+          <div id="triage-erro" class="error-msg" style="display:none;margin-top:0.5rem"></div>
+        </div>
+        <div class="triage-historico">
+          <label>Histórico</label>
+          <ul>${historicoHtml}</ul>
+        </div>
       </div>
       <div class="detail-valor">${formatCurrency(d.valor_referencia)}</div>
       <div class="detail-grid">
@@ -584,8 +698,47 @@ async function openDetail(id) {
         <button id="share-btn" class="btn-page" onclick="shareAlert(${id})" style="font-size:0.8rem">🔗 Copiar link</button>
       </div>
     `;
+
+    document.getElementById('triage-save')?.addEventListener('click', () => {
+      salvarTriagem(id);
+    });
   } catch (e) {
     content.innerHTML = `<div class="error-msg">Erro ao carregar: ${e.message}</div>`;
+  }
+}
+
+async function salvarTriagem(alertaId) {
+  const statusEl = document.getElementById('triage-status');
+  const notaEl = document.getElementById('triage-nota');
+  const erroEl = document.getElementById('triage-erro');
+  const btn = document.getElementById('triage-save');
+  if (!statusEl || !btn) return;
+
+  const status = statusEl.value;
+  const nota = notaEl ? notaEl.value.trim() : '';
+  erroEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Salvando…';
+
+  try {
+    const res = await fetch(`${BASE}/api/alertas/${alertaId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, nota }),
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload.error || res.statusText);
+
+    await openDetail(alertaId);
+    if (state.currentTab === 'alertas') {
+      loadAlertas();
+    }
+  } catch (e) {
+    erroEl.textContent = e.message;
+    erroEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar triagem';
   }
 }
 
