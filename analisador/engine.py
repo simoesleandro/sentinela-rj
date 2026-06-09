@@ -80,11 +80,11 @@ def persistir_alertas(conn: sqlite3.Connection, anomalias: list[AnomaliaResult])
 
 def executar_e_persistir(
     conn: sqlite3.Connection,
-) -> tuple[list[AnomaliaResult], int, dict[str, int]]:
+) -> tuple[list[AnomaliaResult], int, dict[str, int], dict]:
     """Orquestração única: analisa e sincroniza alertas preservando triagem."""
     from db.alertas_sync import sincronizar_alertas
 
     resultados, contagens = _executar_detectores(conn)
     resumo = sincronizar_alertas(conn, resultados)
     n_sincronizados = resumo["inseridos"] + resumo["atualizados"]
-    return resultados, n_sincronizados, contagens
+    return resultados, n_sincronizados, contagens, resumo

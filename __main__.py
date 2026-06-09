@@ -162,7 +162,7 @@ def cmd_analisar(args) -> int:
     print()
     _info("Executando detectores...")
 
-    todas, n_inseridos, contagens = executar_e_persistir(conn)
+    todas, n_inseridos, contagens, _ = executar_e_persistir(conn)
     for nome, total in contagens.items():
         _ok(f"{nome:<14}{total:3d} anomalias")
 
@@ -476,6 +476,37 @@ def cmd_dossie(args) -> int:
     return 0
 
 
+# ── Sub-comando: pipeline ─────────────────────────────────────────────────────
+
+def cmd_pipeline(args) -> int:
+    from automacoes.pipeline import PipelineConfig, executar_pipeline, iniciar_scheduler
+
+    config = PipelineConfig.from_env()
+    if args.daemon:
+        _header("pipeline daemon")
+        iniciar_scheduler(config)
+        return 0
+
+    _header("pipeline")
+    t0 = time.perf_counter()
+    resultado = executar_pipeline(config)
+    print()
+    print(SEP)
+    print("  RESUMO DO PIPELINE")
+    print(SEP)
+    print(f"  Coletar     : {resultado.coletar.mensagem}")
+    print(f"  Enriquecer  : {resultado.enriquecer.mensagem}")
+    print(f"  Analisar    : {resultado.analisar.mensagem}")
+    print(f"  Investigar  : {resultado.investigar.mensagem}")
+    print(f"  Notificar   : {resultado.notificar.mensagem}")
+    print(f"  Novos alta  : {len(resultado.novos_alta)}")
+    print(f"  Tempo       : {_elapsed(t0)}")
+    if resultado.erros:
+        print(f"  Avisos      : {len(resultado.erros)}")
+    print()
+    return 0 if resultado.sucesso else 1
+
+
 # ── Parser e entry-point ──────────────────────────────────────────────────────
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -576,6 +607,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Zera tem_sancao e ultima_consulta_sancao antes de re-consultar tudo",
     )
 
+    # pipeline
+    pip = sub.add_parser(
+        "pipeline",
+        help="Esteira completa: coletar -> enriquecer -> analisar -> investigar -> Discord",
+    )
+    pip_grp = pip.add_mutually_exclusive_group(required=True)
+    pip_grp.add_argument(
+        "--once",
+        action="store_true",
+        help="Executa o pipeline uma vez (Task Scheduler)",
+    )
+    pip_grp.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Executa continuamente via APScheduler",
+    )
+
     return p
 
 
@@ -611,6 +659,7 @@ def main() -> None:
         "painel":      cmd_painel,
         "investigar":  cmd_investigar,
         "enriquecer":  cmd_enriquecer,
+        "pipeline":    cmd_pipeline,
     }
 
     try:

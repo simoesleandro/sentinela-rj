@@ -100,6 +100,8 @@ def sincronizar_alertas(
     existentes = _mapa_existentes(conn)
     novas_chaves: set[tuple[str | None, str]] = set()
     inseridos = atualizados = 0
+    ids_inseridos: list[int] = []
+    ids_inseridos_alta: list[int] = []
 
     for anomalia in anomalias:
         for pncp_id in anomalia.contratos or [None]:
@@ -110,7 +112,11 @@ def sincronizar_alertas(
                 _atualizar_alerta(conn, alerta_id, anomalia)
                 atualizados += 1
             else:
-                existentes[chave] = _inserir_alerta(conn, anomalia, pncp_id)
+                novo_id = _inserir_alerta(conn, anomalia, pncp_id)
+                existentes[chave] = novo_id
+                ids_inseridos.append(novo_id)
+                if anomalia.severidade == "alta":
+                    ids_inseridos_alta.append(novo_id)
                 inseridos += 1
 
     removidos = _remover_obsoletos(conn, existentes, novas_chaves)
@@ -120,4 +126,37 @@ def sincronizar_alertas(
         "atualizados": atualizados,
         "removidos": removidos,
         "total": len(novas_chaves),
+        "ids_inseridos": ids_inseridos,
+        "ids_inseridos_alta": ids_inseridos_alta,
     }
+
+
+def snapshot_ids_alta(conn: sqlite3.Connection) -> set[int]:
+    rows = conn.execute(
+        "SELECT id FROM alertas WHERE severidade = 'alta'"
+    ).fetchall()
+    return {int(r[0]) for r in rows}
+
+
+def carregar_alertas(
+    conn: sqlite3.Connection,
+    ids: list[int],
+) -> list[dict[str, Any]]:
+    if not ids:
+        return []
+    placeholders = ", ".join("?" * len(ids))
+    rows = conn.execute(
+        f"""
+        SELECT a.id, a.tipo, a.severidade, a.score, a.status,
+               a.descricao, a.valor_referencia, a.numero_controle_pncp,
+               a.narrativa_ia,
+               COALESCE(f.razao_social, '') AS fornecedor
+        FROM alertas a
+        LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+        LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+        WHERE a.id IN ({placeholders})
+        ORDER BY a.score DESC, a.id DESC
+        """,
+        ids,
+    ).fetchall()
+    return [dict(r) for r in rows]

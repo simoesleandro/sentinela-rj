@@ -91,6 +91,18 @@ Triagem de alertas: aba **Triagem** → `PATCH /api/alertas/{id}` com `{ "status
 python -m pytest
 ```
 
+### Pipeline agendado (monitoramento contínuo)
+
+```bash
+python -m automacoes.pipeline --once      # uma execucao (Task Scheduler)
+python __main__.py pipeline --once        # alias CLI
+python -m automacoes.pipeline --daemon    # APScheduler embutido
+```
+
+Esteira: **coletar → enriquecer → analisar → investigar (Top N Ollama) → Discord**.
+
+Logs em `logs/pipeline_YYYYMMDD.txt`. Agendar no Windows: `scripts\agendar.ps1`.
+
 ---
 
 ## Exemplos de output
