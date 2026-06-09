@@ -78,15 +78,13 @@ def persistir_alertas(conn: sqlite3.Connection, anomalias: list[AnomaliaResult])
     return resumo["inseridos"] + resumo["atualizados"]
 
 
-def executar_e_persistir(
+def _executar_watchlists_pos_sync(
     conn: sqlite3.Connection,
-) -> tuple[list[AnomaliaResult], int, dict[str, int], dict]:
-    """Orquestração única: analisa, watchlists e sincroniza alertas."""
-    from db.alertas_sync import sincronizar_alertas
-
-    resultados, contagens = _executar_detectores(conn)
-    resumo = sincronizar_alertas(conn, resultados, escopo_remocao="detectores")
-
+    resultados: list[AnomaliaResult],
+    contagens: dict[str, int],
+    resumo: dict,
+) -> None:
+    """Pós-sync dos detectores: cruza watchlists e mescla resumo de alertas."""
     from analisador.watchlists import executar_watchlists_e_persistir
 
     wl_matches, resumo_wl = executar_watchlists_e_persistir(conn)
@@ -104,6 +102,17 @@ def executar_e_persistir(
         "atualizados", 0
     )
     resumo["removidos"] = resumo.get("removidos", 0) + resumo_wl.get("removidos", 0)
+
+
+def executar_e_persistir(
+    conn: sqlite3.Connection,
+) -> tuple[list[AnomaliaResult], int, dict[str, int], dict]:
+    """Orquestração única: analisa, watchlists e sincroniza alertas."""
+    from db.alertas_sync import sincronizar_alertas
+
+    resultados, contagens = _executar_detectores(conn)
+    resumo = sincronizar_alertas(conn, resultados, escopo_remocao="detectores")
+    _executar_watchlists_pos_sync(conn, resultados, contagens, resumo)
 
     n_sincronizados = resumo["inseridos"] + resumo["atualizados"]
     return resultados, n_sincronizados, contagens, resumo

@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import sqlite3
+from unittest.mock import patch
 
 import pytest
 
 from analisador.engine import executar_e_persistir
 from analisador.watchlists import detectar, executar_watchlists_e_persistir
+from analise.labels import label_tipo
+from automacoes.pipeline import PipelineConfig, _etapa_analisar
 from db.conexao import SCHEMA_PATH, aplicar_migracoes
 from db.regras_alerta import criar_regra, filtrar_para_notificacao
 from db.watchlists import criar_watchlist, desativar_watchlist
@@ -81,7 +84,7 @@ def test_schema_watchlists_regras(conn: sqlite3.Connection) -> None:
         )
 
 
-def test_match_fornecedor(conn: sqlite3.Connection) -> None:
+def test_match_fornecedor_ni(conn: sqlite3.Connection) -> None:
     criar_watchlist(
         conn,
         rotulo="Monitorar Fornecedor A",
@@ -94,12 +97,23 @@ def test_match_fornecedor(conn: sqlite3.Connection) -> None:
     assert matches[0].metricas["watchlist_id"] == 1
 
 
-def test_match_orgao_palavra(conn: sqlite3.Connection) -> None:
+def test_match_apenas_orgao(conn: sqlite3.Connection) -> None:
     criar_watchlist(
         conn,
-        rotulo="Software no orgao",
+        rotulo="Todo orgao teste",
         orgao_cnpj="12345678000199",
-        palavra_chave_objeto="software",
+    )
+    matches = detectar(conn)
+    assert len(matches) == 2
+    pncps = {m.contratos[0] for m in matches}
+    assert pncps == {"PNCP-001", "PNCP-002"}
+
+
+def test_match_palavra_chave_case_insensitive(conn: sqlite3.Connection) -> None:
+    criar_watchlist(
+        conn,
+        rotulo="Keyword software",
+        palavra_chave_objeto="SOFTWARE",
     )
     matches = detectar(conn)
     assert len(matches) == 1
@@ -227,3 +241,24 @@ def test_remocao_obsoleto_watchlist(conn: sqlite3.Connection) -> None:
     assert conn.execute(
         "SELECT COUNT(*) FROM alertas WHERE tipo = 'watchlist_match'"
     ).fetchone()[0] == 0
+
+
+def test_label_watchlist_match() -> None:
+    assert label_tipo("watchlist_match") == "Match em Watchlist"
+
+
+def test_pipeline_filtrar_para_notificacao_ids_inseridos(
+    conn: sqlite3.Connection,
+) -> None:
+    criar_watchlist(conn, rotulo="Discord", fornecedor_ni="98765432000111")
+    criar_regra(conn, tipo="watchlist_match", severidade_min="media", valor_min=0)
+
+    config = PipelineConfig(skip_investigar=True, skip_notificar=True)
+
+    with patch("db.conexao.get_conn", return_value=conn):
+        etapa, novos = _etapa_analisar(config)
+
+    assert etapa.ok
+    assert etapa.metricas.get("ids_notificar")
+    assert len(novos) >= 1
+    assert all(a["tipo"] == "watchlist_match" for a in novos)
