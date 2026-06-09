@@ -9,7 +9,7 @@ alwaysApply: true
 
 ```
 PNCP → coletar → enriquecer (BrasilAPI) → analisar (6 detectores + watchlists)
-    → alertas_sync → [opcional] InvestigadorIA (Ollama) → narrativa_ia
+    → alertas_sync → [opcional] InvestigadorIA (Ollama → revisão Gemini) → narrativa_ia
     → regras_alerta (filtro Discord) → Flask SPA / CLI / relatórios
 ```
 
@@ -41,7 +41,7 @@ coletar → enriquecer → analisar → investigar → notificar (Discord)
 | `db/conexao.py` | `init_db()`, `aplicar_migracoes()` | Schema + migrações idempotentes |
 | `automacoes/pipeline.py` | `executar_pipeline()` | Fail-soft; dual-mode APScheduler |
 | `automacoes/utils/notificador.py` | `NotificadorAlertas` | Discord embeds + resumo pipeline |
-| `analise/motor_ia.py` | `InvestigadorIA` | Ollama `llama3.1` (padrão); fallback Gemini/Groq |
+| `analise/motor_ia.py` | `InvestigadorIA` | Ollama rascunho + revisão Gemini (se `GEMINI_API_KEY`); fallback Groq |
 | `analise/grafo.py` | `montar_grafo_fornecedor/alerta` | Rede fornecedor-órgão-sócios |
 | `relatorios/dossie.py` | `obter_dossie()` | Export investigativo MD/JSON por alerta |
 | `relatorios/builder.py` | narrativa IA | Auto-preenche `{NARRATIVA}` no relatório |
@@ -75,7 +75,8 @@ Match watchlist: critérios não-nulos em AND; várias linhas = vários alertas;
 | `OLLAMA_BASE_URL` | não | Padrão `http://localhost:11434` |
 | `OLLAMA_MODEL` | não | Padrão `llama3.1` |
 | `SENTINELA_IA_PROVIDER` | não | `ollama` (padrão), `gemini`, `groq` |
-| `GEMINI_API_KEY` | não* | Fallback IA |
+| `GEMINI_API_KEY` | não* | Revisão superior pós-Ollama; fallback se Ollama falhar |
+| `SENTINELA_IA_REVISAO_GEMINI` | não (true) | Auditoria Gemini do rascunho Llama |
 | `DISCORD_WEBHOOK_URL` | não** | Alertas pipeline + novos matches |
 | `PIPELINE_CRON` | não | Cron APScheduler (default seg 08:00) |
 | `PIPELINE_TIMEZONE` | não | Ex: `America/Sao_Paulo` |
