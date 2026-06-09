@@ -112,7 +112,15 @@ Repo: `https://github.com/simoesleandro/sentinela-rj.git`
 
 ## Pendências conhecidas
 
-- **Fase 3:** CEIS/CNEP ingestão, multi-município via env, backfill histórico, cross-ref Transparência RJ
+(nenhuma fase crítica pendente — evoluções futuras: UI watchlists, push remoto)
+
+## Fase 3 — concluída
+
+- `extrator/config_municipio.py` — `MUNICIPIO_IBGE`, `MUNICIPIO_ESFERA`, `MUNICIPIO_NOME`
+- `extrator/backfill.py` + CLI `backfill`
+- `extrator/sancoes_ingestao.py` + CLI `sancoes` (CSV CEIS/CNEP)
+- `extrator/transparencia_rj.py` + CLI `transparencia` (cross-ref empenhos)
+- Tabelas `transparencia_rj_lancamentos`, `transparencia_rj_cruzamentos`
 
 ## UI Flask (Fase 0 — concluída)
 

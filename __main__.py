@@ -134,10 +134,106 @@ def cmd_coletar(args) -> int:
     print("  RESUMO DA COLETA")
     print(SEP)
     print(f"  Brutos varridos : {sumario['brutos_varridos']}")
-    print(f"  Salvos (Rio/mun): {sumario['salvos_rio']}")
+    print(f"  Salvos (municipio): {sumario.get('salvos_municipio', sumario['salvos_rio'])}")
     if sumario["paginas_falhas"]:
         _warn(f"Paginas com falha: {len(sumario['paginas_falhas'])} (ver log acima)")
     print(f"  Tempo total     : {_elapsed(t0)}")
+    print()
+    return 0
+
+
+# ── Sub-comando: backfill ────────────────────────────────────────────────────
+
+def cmd_backfill(args) -> int:
+    import os
+    from extrator.backfill import executar_backfill
+    from extrator.config_municipio import rotulo_filtro
+
+    di = args.data_ini or os.getenv("BACKFILL_DATA_INICIO", "20220101")
+    df = args.data_fim or date.today().strftime("%Y%m%d")
+
+    _header(f"backfill  {di} -> {df}")
+    _info(f"Filtro: {rotulo_filtro()}")
+    t0 = time.perf_counter()
+
+    try:
+        resumo = executar_backfill(di, df)
+    except Exception as exc:
+        _warn(f"Erro no backfill: {exc}")
+        return 1
+
+    print()
+    print(SEP)
+    print("  RESUMO DO BACKFILL")
+    print(SEP)
+    print(f"  Janelas mensais   : {resumo['janelas']}")
+    print(f"  Brutos varridos   : {resumo['brutos_varridos']}")
+    print(f"  Salvos municipio  : {resumo['salvos_municipio']}")
+    if resumo["paginas_falhas"]:
+        _warn(f"Paginas com falha: {len(resumo['paginas_falhas'])}")
+    print(f"  Tempo total       : {_elapsed(t0)}")
+    print()
+    return 0
+
+
+# ── Sub-comando: sancoes (CEIS/CNEP) ─────────────────────────────────────────
+
+def cmd_sancoes(args) -> int:
+    from db.conexao import get_conn, DB_PATH
+    from extrator.sancoes_ingestao import ingestir_ceis_cnp
+
+    _header("sancoes — ingestao CEIS/CNEP")
+
+    if not DB_PATH.exists():
+        _warn(f"Banco nao encontrado: {DB_PATH}")
+        return 1
+
+    conn = get_conn(row_factory=True)
+    try:
+        resumo = ingestir_ceis_cnp(conn)
+    except Exception as exc:
+        _warn(f"Erro na ingestao: {exc}")
+        return 1
+    finally:
+        conn.close()
+
+    for fonte, dados in resumo.items():
+        if dados.get("erro"):
+            _warn(f"{fonte.upper()}: {dados['erro']}")
+        else:
+            _ok(f"{fonte.upper()}: {dados.get('inseridos', 0)} registros")
+    print()
+    return 0
+
+
+# ── Sub-comando: transparencia ───────────────────────────────────────────────
+
+def cmd_transparencia(args) -> int:
+    from db.conexao import get_conn, DB_PATH
+    from extrator.transparencia_rj import executar_transparencia_rj
+
+    _header("transparencia — cross-ref empenhos RJ")
+
+    if not DB_PATH.exists():
+        _warn(f"Banco nao encontrado: {DB_PATH}")
+        return 1
+
+    conn = get_conn(row_factory=True)
+    try:
+        resumo = executar_transparencia_rj(conn)
+    except FileNotFoundError as exc:
+        _warn(str(exc))
+        return 1
+    except Exception as exc:
+        _warn(f"Erro: {exc}")
+        return 1
+    finally:
+        conn.close()
+
+    ing = resumo["ingestao"]
+    cruz = resumo["cruzamento"]
+    _ok(f"Empenhos ingeridos: {ing.get('inseridos', 0)}")
+    _ok(f"Cruzamentos PNCP x Transparencia: {cruz.get('cruzamentos', 0)}")
     print()
     return 0
 
@@ -528,6 +624,28 @@ def _build_parser() -> argparse.ArgumentParser:
                      help="Data final (padrao: hoje)")
 
     # analisar
+    col.add_argument("data_fim", nargs="?", help="Data final AAAAMMDD")
+
+    # backfill
+    bf = sub.add_parser(
+        "backfill",
+        help="Coleta historica PNCP em janelas mensais (multi-municipio via env)",
+    )
+    bf.add_argument("data_ini", nargs="?", help="Data inicial AAAAMMDD (env BACKFILL_DATA_INICIO)")
+    bf.add_argument("data_fim", nargs="?", help="Data final AAAAMMDD (padrao: hoje)")
+
+    # sancoes
+    sub.add_parser(
+        "sancoes",
+        help="Ingere CSV CEIS/CNEP (SANCOES_*_URL ou data/raw/sancoes/)",
+    )
+
+    # transparencia
+    sub.add_parser(
+        "transparencia",
+        help="Ingere empenhos Transparencia RJ e cruza com contratos PNCP",
+    )
+
     sub.add_parser("analisar",
                    help="Detecta anomalias e salva alertas no banco")
 
@@ -599,7 +717,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # enriquecer
     enr = sub.add_parser(
         "enriquecer",
-        help="Enriquece fornecedores com dados de sancoes (CEIS/CNEP)",
+        help="Enriquece fornecedores via BrasilAPI (cadastro + sync CEIS/CNEP)",
     )
     enr.add_argument(
         "--reset",
@@ -652,6 +770,9 @@ def main() -> None:
     dispatch = {
         "status":    cmd_status,
         "coletar":   cmd_coletar,
+        "backfill":  cmd_backfill,
+        "sancoes":   cmd_sancoes,
+        "transparencia": cmd_transparencia,
         "analisar":  cmd_analisar,
         "relatorio": cmd_relatorio,
         "dossie":    cmd_dossie,

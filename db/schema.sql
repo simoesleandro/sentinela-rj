@@ -175,6 +175,27 @@ CREATE TABLE IF NOT EXISTS regras_alerta (
     criado_em           TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS transparencia_rj_lancamentos (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    fornecedor_ni       TEXT NOT NULL,
+    valor               REAL,
+    data_lancamento     TEXT,
+    descricao           TEXT,
+    orgao               TEXT,
+    documento           TEXT,
+    coletado_em         TEXT DEFAULT (datetime('now')),
+    UNIQUE(fornecedor_ni, data_lancamento, valor, documento)
+);
+
+CREATE TABLE IF NOT EXISTS transparencia_rj_cruzamentos (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_controle_pncp    TEXT REFERENCES contratos(numero_controle_pncp),
+    lancamento_id           INTEGER REFERENCES transparencia_rj_lancamentos(id),
+    score                   REAL,
+    detectado_em            TEXT DEFAULT (datetime('now')),
+    UNIQUE(numero_controle_pncp, lancamento_id)
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_sancoes_fornecedor    ON fornecedor_sancoes(fornecedor_ni);
 CREATE INDEX IF NOT EXISTS idx_contratos_fornecedor  ON contratos(fornecedor_ni);
@@ -191,3 +212,5 @@ CREATE INDEX IF NOT EXISTS idx_watchlists_fornecedor  ON watchlists(fornecedor_n
 CREATE INDEX IF NOT EXISTS idx_watchlists_orgao       ON watchlists(orgao_cnpj);
 CREATE INDEX IF NOT EXISTS idx_regras_alerta_ativo    ON regras_alerta(ativo);
 CREATE INDEX IF NOT EXISTS idx_regras_alerta_tipo     ON regras_alerta(tipo);
+CREATE INDEX IF NOT EXISTS idx_transp_rj_fornecedor   ON transparencia_rj_lancamentos(fornecedor_ni);
+CREATE INDEX IF NOT EXISTS idx_transp_rj_cruz_pncp    ON transparencia_rj_cruzamentos(numero_controle_pncp);

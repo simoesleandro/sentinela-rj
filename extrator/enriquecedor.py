@@ -109,20 +109,22 @@ class Enriquecedor:
         conn.execute(
             """
             UPDATE fornecedores
-               SET tem_sancao             = ?,
-                   ultima_consulta_sancao = datetime('now'),
+               SET ultima_consulta_sancao = datetime('now'),
                    capital_social         = ?,
                    data_inicio_atividade  = ?
              WHERE ni = ?
             """,
             (
-                0 if ativo else 1,
                 dados.get("capital_social"),
                 dados.get("data_inicio_atividade"),
                 fornecedor_ni,
             ),
         )
         conn.commit()
+
+        from extrator.sancoes_ingestao import sincronizar_tem_sancao
+
+        sincronizar_tem_sancao(conn)
 
         return {
             "encontrado": True,

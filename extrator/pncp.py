@@ -14,6 +14,7 @@ Uso:
     python -m extrator.pncp                  # ultimos 3 meses (default)
     python -m extrator.pncp 20250101 20251231  # intervalo custom (AAAAMMDD)
 """
+import os
 import sys
 import json
 import time
@@ -22,13 +23,11 @@ from datetime import date, timedelta
 import requests
 
 from db.conexao import init_db
+from extrator.config_municipio import municipio_esfera, municipio_ibge, rotulo_filtro
 
-BASE = "https://pncp.gov.br/api/consulta/v1"
-TIMEOUT = 60
-TAM_PAGINA = 500  # maximo permitido pelo PNCP
-
-RIO_IBGE = "3304557"
-ESFERA_MUNICIPAL = "M"
+BASE = os.getenv("PNCP_BASE_URL", "https://pncp.gov.br/api/consulta/v1").strip()
+TIMEOUT = int(os.getenv("PNCP_TIMEOUT", "60"))
+TAM_PAGINA = int(os.getenv("PNCP_TAM_PAGINA", "500"))
 
 
 # ----------------------------- HTTP resiliente -----------------------------
@@ -133,10 +132,12 @@ def _insert_contrato(conn, d):
     )
 
 
-def _e_do_municipio_do_rio(d):
+def _e_do_municipio_alvo(d):
     uni = d.get("unidadeOrgao") or {}
     o = d.get("orgaoEntidade") or {}
-    return (uni.get("codigoIbge") == RIO_IBGE) and (o.get("esferaId") == ESFERA_MUNICIPAL)
+    return (uni.get("codigoIbge") == municipio_ibge()) and (
+        o.get("esferaId") == municipio_esfera()
+    )
 
 
 # ----------------------------- Coleta -----------------------------
@@ -172,16 +173,16 @@ def _coletar_janela(conn, data_inicial, data_final):
 
         lote = j["data"]
         brutos += len(lote)
-        do_rio = [d for d in lote if _e_do_municipio_do_rio(d)]
-        for d in do_rio:
+        do_municipio = [d for d in lote if _e_do_municipio_alvo(d)]
+        for d in do_municipio:
             _upsert_orgao(conn, d.get("orgaoEntidade"), d.get("unidadeOrgao"))
             _upsert_fornecedor(conn, d)
             _insert_contrato(conn, d)
             salvos += 1
         conn.commit()
 
-        if pagina % 50 == 0 or do_rio:
-            print(f"  pag {pagina}/{total_paginas} | do Rio {len(do_rio)} | acumulado janela {salvos}")
+        if pagina % 50 == 0 or do_municipio:
+            print(f"  pag {pagina}/{total_paginas} | municipio {len(do_municipio)} | acumulado janela {salvos}")
         pagina += 1
         time.sleep(0.3)
 
@@ -212,7 +213,7 @@ def coletar(data_inicial: str, data_final: str) -> dict:
     """Ponto de entrada público. Retorna sumário da coleta."""
     conn = init_db()
     print(f"Coletando contratos PNCP de {data_inicial} a {data_final}")
-    print(f"Filtro: municipio IBGE {RIO_IBGE} (Rio) + esfera '{ESFERA_MUNICIPAL}' (Municipal)")
+    print(f"Filtro: {rotulo_filtro()}")
 
     iniciado = time.strftime("%Y-%m-%d %H:%M:%S")
     janelas = _janelas_mensais(data_inicial, data_final)
@@ -228,7 +229,7 @@ def coletar(data_inicial: str, data_final: str) -> dict:
         todas_falhas += [f"{di}:{pg}" for pg in falhas]
 
     finalizado = time.strftime("%Y-%m-%d %H:%M:%S")
-    obs = "filtro municipio Rio + esfera municipal"
+    obs = f"filtro {rotulo_filtro()}"
     if todas_falhas:
         obs += f" | paginas_falhas={len(todas_falhas)}"
     conn.execute(
@@ -245,10 +246,11 @@ def coletar(data_inicial: str, data_final: str) -> dict:
         "data_final": data_final,
         "brutos_varridos": tot_brutos,
         "salvos_rio": tot_salvos,
+        "salvos_municipio": tot_salvos,
         "paginas_falhas": todas_falhas,
     }
     print(f"\n=== Coleta concluida ===")
-    print(f"Brutos varridos: {tot_brutos} | Salvos (Rio/municipal): {tot_salvos}")
+    print(f"Brutos varridos: {tot_brutos} | Salvos (municipio alvo): {tot_salvos}")
     if todas_falhas:
         print(f"Paginas que falharam: {todas_falhas}")
     return sumario

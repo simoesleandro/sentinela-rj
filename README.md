@@ -282,7 +282,7 @@ sentinela/
 - [x] Sync incremental de alertas (preserva triagem e narrativa IA)
 - [x] Pipeline agendado (`coletar → enriquecer → analisar → investigar → notificar`)
 - [x] Watchlists e alertas Discord
-- [ ] Multi-município via env + backfill histórico + CEIS/CNEP
+- [x] Multi-município via env + backfill histórico + CEIS/CNEP + Transparência RJ
 
 ---
 
@@ -291,7 +291,7 @@ sentinela/
 **PNCP — Portal Nacional de Contratações Públicas**
 `GET https://pncp.gov.br/api/consulta/v1/contratos`
 
-Filtros aplicados: `municipio_ibge = 3304557` (Rio de Janeiro) + `esfera_id = M` (Municipal).
+Filtros aplicados via env: `MUNICIPIO_IBGE` (padrão `3304557` — Rio de Janeiro) + `MUNICIPIO_ESFERA=M` (Municipal).
 A API é pública e não requer autenticação.
 
 ---
