@@ -309,7 +309,7 @@ def cmd_painel(_args) -> int:
 
 # ── Sub-comando: investigar ─────────────────────────────────────────────────
 
-def cmd_investigar(_args) -> int:
+def cmd_investigar(args) -> int:
     from db.conexao import DB_PATH
     from db.database import GerenciadorBanco
     from analise.motor_ia import InvestigadorIA
@@ -322,6 +322,7 @@ def cmd_investigar(_args) -> int:
         print()
         return 1
 
+    limite = getattr(args, "limite", 10)
     t0 = time.perf_counter()
     gerenciador = GerenciadorBanco(db_path=DB_PATH)
 
@@ -332,7 +333,7 @@ def cmd_investigar(_args) -> int:
         print()
         return 1
 
-    pendentes = gerenciador.listar_anomalias_sem_narrativa(limite=10)
+    pendentes = gerenciador.listar_anomalias_sem_narrativa(limite=limite)
     if not pendentes:
         _info("Nenhuma anomalia pendente de narrativa IA.")
         print()
@@ -366,6 +367,27 @@ def cmd_investigar(_args) -> int:
     print(f"  Tempo       : {_elapsed(t0)}")
     print()
     return 0 if sucesso == len(pendentes) else 1
+
+
+# ── Sub-comando: publicar ─────────────────────────────────────────────────────
+
+def cmd_publicar(args) -> int:
+    _header("publicar")
+    print()
+    _info("Etapa 1/3 — analisar")
+    if cmd_analisar(args) != 0:
+        return 1
+
+    print()
+    _info("Etapa 2/3 — investigar (narrativas IA)")
+    inv_args = argparse.Namespace(limite=args.limite_ia)
+    rc_inv = cmd_investigar(inv_args)
+    if rc_inv != 0:
+        _warn("Investigacao parcial ou falhou; relatorio sera gerado mesmo assim.")
+
+    print()
+    _info("Etapa 3/3 — relatorio")
+    return cmd_relatorio(args)
 
 
 # ── Sub-comando: relatorio ────────────────────────────────────────────────────
@@ -516,9 +538,31 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_parser("painel", help="Gera painel HTML estatico de controle")
 
     # investigar
-    sub.add_parser(
+    inv = sub.add_parser(
         "investigar",
         help="Gera narrativas IA via Ollama local (ollama pull llama3.1)",
+    )
+    inv.add_argument(
+        "--limite",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Maximo de alertas a processar por execucao (padrao: 10)",
+    )
+
+    # publicar
+    pub = sub.add_parser(
+        "publicar",
+        help="Pipeline completo: analisar + investigar + relatorio",
+    )
+    pub.add_argument("--dir", metavar="DIR",
+                     help="Diretorio de saida do relatorio (padrao: relatorios/)")
+    pub.add_argument(
+        "--limite-ia",
+        type=int,
+        default=50,
+        metavar="N",
+        help="Maximo de narrativas IA na etapa investigar (padrao: 50)",
     )
 
     # enriquecer
@@ -563,6 +607,7 @@ def main() -> None:
         "analisar":  cmd_analisar,
         "relatorio": cmd_relatorio,
         "dossie":    cmd_dossie,
+        "publicar":  cmd_publicar,
         "painel":      cmd_painel,
         "investigar":  cmd_investigar,
         "enriquecer":  cmd_enriquecer,

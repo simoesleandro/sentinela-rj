@@ -13,22 +13,20 @@ from pathlib import Path
 
 from db.conexao import get_conn
 from analisador.engine import AnomaliaResult, analisar
+from analise.labels import icon_severidade, label_tipo
 
 DIR_RELATORIOS = Path(__file__).resolve().parent
 
-_SEV_ICON = {"alta": "🔴", "media": "🟡", "baixa": "🟢"}
-
-_TIPO_LABEL = {
-    "outlier_valor":                 "Outlier de valor",
-    "concentracao_fornecedor":       "Concentração de fornecedor",
-    "sem_licitacao_inexigibilidade": "Inexigibilidade",
-    "sem_licitacao_emergencia":      "Emergência",
-    "sem_licitacao_dispensa":        "Dispensa",
-}
+_PLACEHOLDER_NARRATIVA = (
+    "> **{NARRATIVA}** — *Substituir pela análise contextual:*  ",
+    "> *histórico da empresa/fornecedor, decisões judiciais relacionadas,*  ",
+    "> *comparativos de mercado, contexto político/administrativo,*  ",
+    "> *documentação adicional identificada nas fontes secundárias.*",
+)
 
 
 def _label(tipo: str) -> str:
-    return _TIPO_LABEL.get(tipo, tipo)
+    return label_tipo(tipo)
 
 
 # ── Consultas ao banco ────────────────────────────────────────────────────────
@@ -63,6 +61,40 @@ def _sumario_db(conn) -> dict:
     row["ultima_coleta"] = dict(ultima) if (ultima and ultima["finalizado_em"]) else None
 
     return row
+
+
+def _carregar_narrativas(conn) -> dict[tuple[str, str | None], str]:
+    rows = conn.execute(
+        """
+        SELECT tipo, numero_controle_pncp, narrativa_ia
+        FROM alertas
+        WHERE narrativa_ia IS NOT NULL AND TRIM(narrativa_ia) != ''
+        """
+    ).fetchall()
+    return {
+        (str(r["tipo"]), r["numero_controle_pncp"]): str(r["narrativa_ia"]).strip()
+        for r in rows
+    }
+
+
+def _buscar_narrativa(
+    anomalia: AnomaliaResult,
+    indice: dict[tuple[str, str | None], str],
+) -> str | None:
+    for pncp in anomalia.contratos or [None]:
+        texto = indice.get((anomalia.tipo, pncp))
+        if texto:
+            return texto
+    return None
+
+
+def _bloco_narrativa(texto: str | None) -> str:
+    if not texto:
+        return "\n".join(_PLACEHOLDER_NARRATIVA)
+    linhas = ["> **Análise IA:**", ">"]
+    for paragrafo in texto.splitlines():
+        linhas.append(f"> {paragrafo}" if paragrafo else ">")
+    return "\n".join(linhas)
 
 
 # ── Helpers de formatação ─────────────────────────────────────────────────────
@@ -146,7 +178,7 @@ def _tabela_geral(anomalias: list[AnomaliaResult]) -> str:
         "|---|------:|------|------|--------|",
     ]
     for i, a in enumerate(anomalias, 1):
-        icon  = _SEV_ICON.get(a.severidade, "⚪")
+        icon  = icon_severidade(a.severidade)
         label = _label(a.tipo)
         linhas.append(
             f"| {i} | {a.score:.3f} | {icon} | {label} | {a.titulo[:70]} |"
@@ -154,8 +186,12 @@ def _tabela_geral(anomalias: list[AnomaliaResult]) -> str:
     return "\n".join(linhas)
 
 
-def _secao_anomalia(n: int, a: AnomaliaResult) -> str:
-    icon  = _SEV_ICON.get(a.severidade, "⚪")
+def _secao_anomalia(
+    n: int,
+    a: AnomaliaResult,
+    narrativa: str | None = None,
+) -> str:
+    icon  = icon_severidade(a.severidade)
     label = _label(a.tipo)
 
     linhas = [
@@ -184,10 +220,7 @@ def _secao_anomalia(n: int, a: AnomaliaResult) -> str:
     linhas += [
         f"**Metodologia:** {a.metodologia}",
         "",
-        "> **{NARRATIVA}** — *Substituir pela análise contextual:*  ",
-        "> *histórico da empresa/fornecedor, decisões judiciais relacionadas,*  ",
-        "> *comparativos de mercado, contexto político/administrativo,*  ",
-        "> *documentação adicional identificada nas fontes secundárias.*",
+        _bloco_narrativa(narrativa),
         "",
         "---",
         "",
@@ -273,6 +306,12 @@ def gerar(conn, dir_saida: Path | None = None) -> Path:
     n_alta = sum(1 for a in anomalias if a.severidade == "alta")
     print(f"  {len(anomalias)} anomalias | {n_alta} alta prioridade")
 
+    narrativas = _carregar_narrativas(conn)
+    n_narrativas = sum(
+        1 for a in anomalias if _buscar_narrativa(a, narrativas)
+    )
+    print(f"  {n_narrativas} anomalias com narrativa IA no banco")
+
     destacadas = [a for a in anomalias if a.score >= 0.70]
     print(f"Gerando relatorio ({len(destacadas)} com score >= 0.70)...")
 
@@ -288,7 +327,8 @@ def gerar(conn, dir_saida: Path | None = None) -> Path:
 
     if destacadas:
         for i, a in enumerate(destacadas, 1):
-            partes.append(_secao_anomalia(i, a))
+            narrativa = _buscar_narrativa(a, narrativas)
+            partes.append(_secao_anomalia(i, a, narrativa))
     else:
         partes.append("*Nenhuma anomalia com score ≥ 0,70 no período analisado.*\n")
 
