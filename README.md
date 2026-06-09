@@ -278,11 +278,11 @@ sentinela/
 
 ## Roadmap
 
-- [x] Dashboard Flask com triagem, dossiê e grafo investigativo
+- [x] Dashboard Flask com triagem, dossiê, grafo e narrativa IA on-demand
 - [x] Sync incremental de alertas (preserva triagem e narrativa IA)
-- [ ] Pipeline agendado (`coletar → enriquecer → analisar → investigar → notificar`)
-- [ ] Watchlists e alertas Discord
-- [ ] Multi-município via env + backfill histórico
+- [x] Pipeline agendado (`coletar → enriquecer → analisar → investigar → notificar`)
+- [x] Watchlists e alertas Discord
+- [ ] Multi-município via env + backfill histórico + CEIS/CNEP
 
 ---
 

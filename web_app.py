@@ -462,6 +462,57 @@ def alertas_detail(alert_id: int):
         db.close()
 
 
+@app.route("/api/alertas/<int:alert_id>/investigar", methods=["POST", "OPTIONS"])
+def alertas_investigar(alert_id: int):
+    if request.method == "OPTIONS":
+        return "", 204
+
+    from analise.motor_ia import InvestigadorIA
+    from db.conexao import DB_PATH
+    from db.database import GerenciadorBanco
+
+    db = get_db()
+    try:
+        row = db.execute(
+            """
+            SELECT a.id, a.tipo, a.severidade, a.descricao, a.metodologia,
+                   a.valor_referencia, a.numero_controle_pncp, a.status,
+                   COALESCE(c.objeto, '') AS objeto,
+                   COALESCE(c.valor_global, 0) AS valor_global,
+                   COALESCE(f.razao_social, '') AS fornecedor
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            WHERE a.id = ?
+            """,
+            (alert_id,),
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "not found"}), 404
+
+        try:
+            investigador = InvestigadorIA()
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 503
+
+        payload = dict(row)
+        narrativa = investigador.investigar_anomalia(payload)
+        GerenciadorBanco(db_path=DB_PATH).atualizar_narrativa_anomalia(
+            alert_id, narrativa
+        )
+        return jsonify({
+            "id": alert_id,
+            "narrativa_ia": narrativa,
+            "chars": len(narrativa),
+        })
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 422
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
+
+
 # ---------------------------------------------------------------------------
 # Dossiê investigativo
 # ---------------------------------------------------------------------------
@@ -497,6 +548,11 @@ def dossie_api(alerta_id: int):
         return Response(
             renderizar_markdown(dados),
             mimetype="text/markdown; charset=utf-8",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="dossie-alerta-{alerta_id}.md"'
+                ),
+            },
         )
     return jsonify(serializar_json(dados))
 

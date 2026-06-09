@@ -859,6 +859,94 @@ tr:last-child td {
   font-size: 0.75rem;
 }
 
+/* ─── Investigação IA (painel de detalhe) ─── */
+.investigation-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0.75rem;
+  padding: 0.75rem;
+  background: #18181b;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.btn-investigar {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-investigar:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn-investigar:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.btn-acao-principal {
+  background: #27272a;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-acao-principal:hover {
+  background: #3f3f46;
+  border-color: #52525b;
+}
+
+.btn-dossie {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-dossie:hover:not(:disabled) {
+  background: #27272a;
+}
+
+.investigacao-status {
+  font-size: 0.78rem;
+  color: var(--muted);
+  flex: 1 1 100%;
+}
+
+.investigacao-status.investigacao-loading {
+  color: #a1a1aa;
+}
+
+.investigacao-status.investigacao-ok {
+  color: #22c55e;
+}
+
+.investigacao-status.investigacao-erro {
+  color: #ef4444;
+}
+
+.narrativa-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
 /* ─── Detail actions row ─── */
 .detail-actions {
   display: flex;

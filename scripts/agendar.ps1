@@ -1,27 +1,22 @@
-# Sentinela RJ — Agendamento de tarefas no Windows Task Scheduler
-# Execute como Administrador para registrar as tarefas
+# Script de Agendamento Limpo - Sentinela Pipeline
+$TaskName = "SentinelaPipeline"
+$BatPath = "C:\Users\Leand\OneDrive\Desktop\Sentinela\scripts\pipeline.bat"
 
-$ProjectRoot = "C:\Users\Leand\OneDrive\Desktop\Sentinela"
-$PipelineBat = Join-Path $ProjectRoot "scripts\pipeline.bat"
-$RunAs = "LEANDROCASA\Leand"
+Write-Host "Registering Windows Task: $TaskName..." -ForegroundColor Cyan
 
-Write-Host "Registrando tarefas do Sentinela RJ..." -ForegroundColor Cyan
+# Remove a tarefa antiga se ela ja existir para evitar conflito
+Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
-# Tarefa unica — SentinelaPipeline (toda segunda-feira 08:00)
-cmd /c "schtasks /create /tn `"SentinelaPipeline`" /tr `"$PipelineBat`" /sc WEEKLY /d MON /st 08:00 /ru `"$RunAs`" /it /rl LIMITED /f"
+# Configura a acao para rodar o nosso arquivo .bat centralizado
+$Action = New-ScheduledTaskAction -Execute $BatPath
 
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "[OK] SentinelaPipeline agendada para toda segunda-feira as 08:00" -ForegroundColor Green
-    Write-Host "     Esteira: coletar -> enriquecer -> analisar -> investigar -> Discord" -ForegroundColor DarkGray
-} else {
-    Write-Host "[ERRO] Falha ao criar SentinelaPipeline" -ForegroundColor Red
-}
+# Configura o disparador para Toda Segunda-Feira as 08:00
+$Trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At 08:00
 
-Write-Host ""
-Write-Host "Tarefas legadas (opcional — desativar se usar SentinelaPipeline):" -ForegroundColor Yellow
-Write-Host "  schtasks /delete /tn SentinelaColeta /f"
-Write-Host "  schtasks /delete /tn SentinelaInvestiga /f"
-Write-Host ""
-Write-Host "Verificar:" -ForegroundColor Cyan
-Write-Host "  schtasks /query /tn SentinelaPipeline /fo LIST"
-Write-Host "  type $ProjectRoot\logs\pipeline_*.txt"
+# Configura as definicoes para permitir execucao sob demanda e em background
+$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+
+# Registra a tarefa nativamente no Windows
+Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Description "Pipeline centralizado do Sentinela RJ - Coleta, Analise, IA e Discord"
+
+Write-Host "Success! Task $TaskName registered successfully to run every Monday at 08:00." -ForegroundColor Green

@@ -8,73 +8,119 @@ alwaysApply: true
 ## Fluxo ponta a ponta
 
 ```
-PNCP/Extrator → SQLite (sentinela_rj.db) → Analisador (outliers/concentração/licitação)
-    → alertas → [opcional] InvestigadorIA (Gemini) → narrativa_ia
-    → Painéis: Streamlit (app.py) | Reflex (sentinela_web/) | HTML estático (painel_html)
+PNCP → coletar → enriquecer (BrasilAPI) → analisar (6 detectores + watchlists)
+    → alertas_sync → [opcional] InvestigadorIA (Ollama) → narrativa_ia
+    → regras_alerta (filtro Discord) → Flask SPA / CLI / relatórios
+```
+
+**Pipeline agendado** (`automacoes/pipeline.py`):
+```
+coletar → enriquecer → analisar → investigar → notificar (Discord)
 ```
 
 ## Entrypoints
 
 | Comando | Arquivo | Função |
 |---------|---------|--------|
-| `python __main__.py status\|coletar\|analisar\|relatorio` | `__main__.py` | CLI principal PNCP |
-| `python __main__.py painel` | `__main__.py` → `relatorios/painel_html.py` | Gera `data/painel_controle.html` |
-| `python __main__.py investigar` | `__main__.py` → `analise/motor_ia.py` | Laudos IA em lote (Ollama llama3.1 local) |
-| `streamlit run app.py` | `app.py` | Dashboard Threat Intelligence (Streamlit, design tokens) |
-| `reflex run` | `sentinela_web/sentinela_web.py` + `rxconfig.py` | Dashboard alternativo Reflex |
+| `python __main__.py status\|coletar\|analisar\|relatorio\|dossie\|publicar\|investigar\|enriquecer\|pipeline` | `__main__.py` | CLI principal PNCP |
+| `python -m automacoes.pipeline --once\|--daemon` | `automacoes/pipeline.py` | Esteira agendada (APScheduler + cron) |
+| `scripts/pipeline.bat` + `scripts/agendar.ps1` | Windows | Task Scheduler segundas 08:00 |
+| `python web_app.py` / `waitress` | `web_app.py` | **UI canônica** Flask SPA + REST API (porta 5055) |
+| ~~Streamlit/Reflex~~ | removidos | Ver `DEPRECATED.md` |
 
-## Módulos-chave desta sessão
+## Módulos-chave
 
-| Arquivo | Responsabilidade |
-|---------|------------------|
-| `db/database.py` | `GerenciadorBanco` nativo `sqlite3`; `salvar_despesas(list[dict])`; `listar_anomalias_sem_narrativa`; `atualizar_narrativa_anomalia`; coluna `narrativa_ia` em `alertas` |
-| `analise/motor_ia.py` | `InvestigadorIA` — Ollama `llama3.1` (padrão); fallback Gemini/Groq |
-| `analise/transformador.py` | Sem pandas; IQR + Z-score; saída JSON/CSV |
-| `app.py` | Streamlit: sidebar com `st.button` (menu), métricas design tokens (`#18181b`), Plotly paleta `["#4f46e5","#06b6d4","#334155"]`, investigação IA on-demand |
-| `sentinela_web/sentinela_web.py` | Reflex: `SentinelaState` + sqlite3, tema `rx.theme(dark, crimson)`, páginas Visão Geral / Investigação / Logs |
-| `relatorios/painel_html.py` | `GeradorPainelHTML` — Chart.js, métricas SQLite → HTML estático |
-| `rxconfig.py` | Config Reflex (`app_name="sentinela_web"`) |
-| `.streamlit/config.toml` | Tema dark nativo Streamlit (complementar ao CSS injetado) |
+| Arquivo | Classe/Função | Responsabilidade |
+|---------|---------------|------------------|
+| `analisador/engine.py` | `executar_e_persistir()` | Orquestra 6 detectores + watchlists pós-sync |
+| `analisador/watchlists.py` | `detectar()`, `executar_watchlists_e_persistir()` | Detector `watchlist_match` case-insensitive |
+| `db/alertas_sync.py` | `sincronizar_alertas()` | Upsert incremental; chave `(pncp, tipo, watchlist_id)`; escopos `detectores`/`watchlist` |
+| `db/watchlists.py` | CRUD | Tabela `watchlists` (fornecedor, órgão, palavra-chave) |
+| `db/regras_alerta.py` | `filtrar_para_notificacao()` | Filtro OR de regras; fallback sem regras = só `alta` |
+| `db/triagem.py` | `atualizar_status_alerta()` | Workflow aberto→investigando→confirmado/descartado |
+| `db/conexao.py` | `init_db()`, `aplicar_migracoes()` | Schema + migrações idempotentes |
+| `automacoes/pipeline.py` | `executar_pipeline()` | Fail-soft; dual-mode APScheduler |
+| `automacoes/utils/notificador.py` | `NotificadorAlertas` | Discord embeds + resumo pipeline |
+| `analise/motor_ia.py` | `InvestigadorIA` | Ollama `llama3.1` (padrão); fallback Gemini/Groq |
+| `analise/grafo.py` | `montar_grafo_fornecedor/alerta` | Rede fornecedor-órgão-sócios |
+| `relatorios/dossie.py` | `obter_dossie()` | Export investigativo MD/JSON por alerta |
+| `relatorios/builder.py` | narrativa IA | Auto-preenche `{NARRATIVA}` no relatório |
+| `web_app.py` | REST | `/api/alertas`, `/api/triagem`, `/api/watchlists`, `/api/regras-alerta`, `/api/grafo`, `/api/dossie` |
 
-## Design Tokens — `app.py` (Streamlit)
+## Detectores (6 + watchlist)
 
-- **Métricas:** fundo `#18181b`, borda `1px solid #27272a`, radius `8px`; label uppercase `0.8rem` `#a1a1aa`; valor monospace `2rem` `700` `white-space: nowrap`; sem bordas neon
-- **Sidebar nav:** `st.button` em `st.container`, transparente → hover `#27272a`, ativo `#27272a` via `type="primary"`
-- **Plotly:** `plotly_dark`, `paper_bgcolor='rgba(0,0,0,0)'`, `showgrid=False`, `showlegend=False`, `coloraxis_showscale=False`
-- **Tabela:** `st.dataframe` com CSS escuro `#18181b` / bordas `#27272a`
+| Detector | Tipo(s) |
+|----------|---------|
+| `outliers` | `outlier_valor` |
+| `concentracao` | `concentracao_fornecedor` |
+| `licitacao` | `sem_licitacao_*` |
+| `fracionamento` | `fracionamento_ap` |
+| `sancoes` | `empresa_inativa`, `capital_social_baixo`, `empresa_jovem_contrato_grande` |
+| `socios` | `socio_compartilhado` |
+| `watchlists` (pós-processamento) | `watchlist_match` |
+
+## Schema — tabelas novas (Fase 2.2)
+
+```sql
+watchlists (id, fornecedor_ni, orgao_cnpj, palavra_chave_objeto, rotulo, ativo, criado_em)
+regras_alerta (id, tipo, severidade_min, valor_min, ativo, criado_em)
+```
+
+Match watchlist: critérios não-nulos em AND; várias linhas = vários alertas; dedup por `(pncp, watchlist_match, watchlist_id)`.
 
 ## Variáveis de ambiente
 
 | Variável | Obrigatória | Uso |
 |----------|-------------|-----|
-| `GEMINI_API_KEY` | não* | Fallback IA se Ollama falhar ou `SENTINELA_IA_PROVIDER=gemini` |
 | `OLLAMA_BASE_URL` | não | Padrão `http://localhost:11434` |
 | `OLLAMA_MODEL` | não | Padrão `llama3.1` |
 | `SENTINELA_IA_PROVIDER` | não | `ollama` (padrão), `gemini`, `groq` |
-| `DB_PATH` / `DATABASE_URL` | não | Override do SQLite (default: `data/sentinela_rj.db`) |
-| `.env` | não | Carregado nativamente em `__main__.py` e `app.py` |
+| `GEMINI_API_KEY` | não* | Fallback IA |
+| `DISCORD_WEBHOOK_URL` | não** | Alertas pipeline + novos matches |
+| `PIPELINE_CRON` | não | Cron APScheduler (default seg 08:00) |
+| `PIPELINE_TIMEZONE` | não | Ex: `America/Sao_Paulo` |
+| `PIPELINE_SKIP_INVESTIGAR` / `SKIP_NOTIFICAR` / `SKIP_ENRIQUECER` | não | Etapas opcionais |
+| `DB_PATH` | não | Default `data/sentinela_rj.db` |
 
-\* Necessária apenas para funcionalidades de IA.
-
-## Dependências (`requirements.txt`)
-
-`requests`, `reflex`, `streamlit`, `pandas`, `plotly`, `google-generativeai`
+\* Necessária para IA se provider=gemini. \*\* Necessária para Discord.
 
 ## Convenções de código
 
 - **Type hints** (`from __future__ import annotations`)
 - **Fail-fast** em entradas e env vars críticas
-- **Orquestração única:** `analisador/engine.py` — `analisar()`, `executar_e_persistir()`, `score` persistido em `alertas`
-- **Funções ≤ 25 linhas** quando possível
-- **Logging nativo** — `INFO` estados, `ERROR` falhas
+- **Orquestração única:** `analisador/engine.py` — `executar_e_persistir()` inclui watchlists
+- **Funções ≤ 25 linhas** quando possível; helpers `_nome`
+- **Logging nativo** — `INFO` estados, `ERROR` falhas; pipeline usa `[pipeline]`
+- **Testes:** `pytest`; SQLite `:memory:` + `SCHEMA_PATH` + `aplicar_migracoes`
 
-## Git (histórico recente local)
+## Git (pushado para origin/main)
 
-- `4bf5b28` — refactor DB/tests para sqlite3 nativo
-- `de79004` — transformador sem pandas (statistics)
-- `1aa27e7` — fix UI Streamlit (width stretch, sidebar)
-- **Pendente:** commit com IA Gemini, painéis Streamlit+Reflex, CLI painel/investigar, design tokens
+Repo: `https://github.com/simoesleandro/sentinela-rj.git`
+
+| Commit | Entrega |
+|--------|---------|
+| `114d382` | **Fase 2.2** — watchlists, regras_alerta, detector, API CRUD, testes |
+| `286c4a7` | Pipeline agendado PNCP + Discord + APScheduler |
+| `a5bd63a` | Hygiene: sync incremental, testes detectores |
+| `1e15c67` | Triagem: PATCH status + histórico + UI Flask |
+| `16655a0` | Grafo: API + vis-network |
+| `c885614` | Builder narrativa IA + comando `publicar` |
+| `bc68618` | Dossiê investigativo CLI/API/MD |
+| `fcf369a` | Foundation: engine unificado, score, Ollama default |
+
+**Suite:** 40 testes passando (`pytest`).
+
+## Pendências conhecidas
+
+- **Fase 3:** CEIS/CNEP ingestão, multi-município via env, backfill histórico, cross-ref Transparência RJ
+
+## UI Flask (Fase 0 — concluída)
+
+- SPA canônica: `web_app.py` + `static/app.js` + `templates/index.html`
+- Narrativa IA on-demand: `POST /api/alertas/<id>/investigar` (botão «Investigar com Llama»)
+- Export dossiê: `GET /api/dossie/<id>?formato=md` (botão «Exportar Dossiê»)
+- Legados removidos: `app.py`, `sentinela_web/`, `rxconfig.py`
 
 ## Artefatos a NÃO versionar
 
-- `data/*.db`, `.env`, `backend.zip`, `frontend.zip`, `.web/`, `reflex.lock/` (gerado pelo Reflex)
+- `data/*.db`, `.env`, `backend.zip`, `frontend.zip`, `.web/`, `reflex.lock/`

@@ -9,6 +9,7 @@ const TIPO_LABELS = {
   sem_licitacao_emergencia: 'Emergência',
   sem_licitacao_dispensa: 'Dispensa',
   fracionamento_ap: 'Fracionamento',
+  watchlist_match: 'Match em Watchlist',
 };
 
 const TIPO_COLORS = {
@@ -453,8 +454,8 @@ async function loadAlertas() {
           ? `<span class="badge-count">${grupo.ocorrencias} contratos</span>`
           : `<span class="badge-count badge-count-single">1 contrato</span>`;
         const firstId = grupo.alertas[0]?.id ?? '';
-        const analisBtn = grupo.narrativa_ia && firstId !== ''
-          ? `<button class="btn-ver-analise" data-id="${firstId}">Ver análise</button>`
+        const analisBtn = firstId !== ''
+          ? `<button class="btn-ver-detalhes btn-acao-principal" data-id="${firstId}" title="Abrir triagem, narrativa IA e dossiê">Detalhes</button>`
           : '<span style="color:var(--muted)">—</span>';
         const gid = grupo.grupo_id;
 
@@ -516,7 +517,7 @@ async function loadAlertas() {
                   </div>
                   <div class="detail-actions">
                     ${pncpLink}
-                    <button class="btn-ver-detalhes" data-id="${a.id}">Triagem</button>
+                    <button class="btn-ver-detalhes btn-acao-principal" data-id="${a.id}">Detalhes e IA</button>
                   </div>
                 </div>
               </td>
@@ -537,17 +538,16 @@ async function loadAlertas() {
           });
         };
         tr.addEventListener('click', e => {
-          if (e.target.classList.contains('btn-ver-analise') || e.target.classList.contains('btn-ver-detalhes')) return;
+          if (e.target.closest('.btn-ver-detalhes, .btn-ver-analise, .btn-acao-principal')) return;
           expandToggle();
         });
       });
 
-      tbody.querySelectorAll('.btn-ver-analise').forEach(btn => {
-        btn.addEventListener('click', () => openDetail(parseInt(btn.dataset.id, 10)));
-      });
-
-      tbody.querySelectorAll('.btn-ver-detalhes').forEach(btn => {
-        btn.addEventListener('click', () => openDetail(parseInt(btn.dataset.id, 10)));
+      tbody.querySelectorAll('.btn-ver-analise, .btn-ver-detalhes, .btn-acao-principal').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          openDetail(parseInt(btn.dataset.id, 10));
+        });
       });
     }
 
@@ -617,12 +617,11 @@ async function openDetail(id) {
          </div>`
       : '';
 
-    const narrativa = d.narrativa_ia
-      ? `<div class="narrativa-block">
-           <label>Narrativa IA</label>
-           <p>${escapeHtml(d.narrativa_ia)}</p>
-         </div>`
-      : '';
+    const temNarrativa = Boolean(d.narrativa_ia && String(d.narrativa_ia).trim());
+    const narrativaHtml = temNarrativa
+      ? `<p id="narrativa-texto">${escapeHtml(d.narrativa_ia)}</p>`
+      : `<p id="narrativa-texto" class="narrativa-empty">Nenhuma narrativa gerada ainda. Use o botão abaixo para investigar com Llama (Ollama local).</p>`;
+    const btnIaLabel = temNarrativa ? 'Regenerar com Llama' : 'Investigar com Llama';
 
     const transicoes = (d.transicoes_permitidas || []).map(st =>
       `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
@@ -691,7 +690,19 @@ async function openDetail(id) {
         <p>${d.descricao || '—'}</p>
       </div>
       ${complementar}
-      ${narrativa}
+      <div class="investigation-toolbar">
+        <button type="button" id="btn-investigar-ia" class="btn-investigar" title="Gera narrativa investigativa via Ollama (llama3.1)">
+          🦙 ${btnIaLabel}
+        </button>
+        <button type="button" id="btn-export-dossie" class="btn-dossie" title="Baixa dossiê Markdown deste alerta">
+          📄 Exportar Dossiê
+        </button>
+        <span id="investigacao-status" class="investigacao-status" aria-live="polite"></span>
+      </div>
+      <div id="narrativa-container" class="narrativa-block">
+        <label>Narrativa IA</label>
+        ${narrativaHtml}
+      </div>
       <div class="detail-actions">
         ${pncpLink}
         ${d.fornecedor_ni ? `<a href="/fornecedor/${d.fornecedor_ni}" target="_self" class="detail-link">Ver página do fornecedor →</a>` : ''}
@@ -702,8 +713,91 @@ async function openDetail(id) {
     document.getElementById('triage-save')?.addEventListener('click', () => {
       salvarTriagem(id);
     });
+    document.getElementById('btn-investigar-ia')?.addEventListener('click', () => {
+      investigarComLlama(id);
+    });
+    document.getElementById('btn-export-dossie')?.addEventListener('click', () => {
+      exportarDossie(id);
+    });
   } catch (e) {
     content.innerHTML = `<div class="error-msg">Erro ao carregar: ${e.message}</div>`;
+  }
+}
+
+async function investigarComLlama(alertaId) {
+  const btn = document.getElementById('btn-investigar-ia');
+  const statusEl = document.getElementById('investigacao-status');
+  const textoEl = document.getElementById('narrativa-texto');
+  if (!btn || !statusEl || !textoEl) return;
+
+  btn.disabled = true;
+  statusEl.textContent = 'Gerando narrativa IA… (pode levar até 2 min)';
+  statusEl.className = 'investigacao-status investigacao-loading';
+
+  try {
+    const res = await fetch(`${BASE}/api/alertas/${alertaId}/investigar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload.error || res.statusText);
+
+    textoEl.textContent = payload.narrativa_ia || '';
+    textoEl.classList.remove('narrativa-empty');
+    btn.textContent = '🦙 Regenerar com Llama';
+    statusEl.textContent = `Narrativa salva (${payload.chars || 0} caracteres).`;
+    statusEl.className = 'investigacao-status investigacao-ok';
+
+    if (state.currentTab === 'alertas') {
+      loadAlertas();
+    }
+  } catch (e) {
+    statusEl.textContent = e.message;
+    statusEl.className = 'investigacao-status investigacao-erro';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function exportarDossie(alertaId) {
+  const btn = document.getElementById('btn-export-dossie');
+  const statusEl = document.getElementById('investigacao-status');
+  if (btn) btn.disabled = true;
+  if (statusEl) {
+    statusEl.textContent = 'Preparando dossiê…';
+    statusEl.className = 'investigacao-status investigacao-loading';
+  }
+
+  try {
+    const res = await fetch(`${BASE}/api/dossie/${alertaId}?formato=md`);
+    if (!res.ok) {
+      let msg = res.statusText;
+      try {
+        const err = await res.json();
+        msg = err.error || msg;
+      } catch (_) { /* resposta não-JSON */ }
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dossie-alerta-${alertaId}.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    if (statusEl) {
+      statusEl.textContent = 'Dossiê exportado.';
+      statusEl.className = 'investigacao-status investigacao-ok';
+    }
+  } catch (e) {
+    if (statusEl) {
+      statusEl.textContent = e.message;
+      statusEl.className = 'investigacao-status investigacao-erro';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
