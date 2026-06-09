@@ -313,8 +313,6 @@ class SentinelaState(rx.State):
         try:
             if alvo is None:
                 raise ValueError(f"Anomalia {id_anomalia} não encontrada.")
-            if not os.environ.get("GEMINI_API_KEY", "").strip():
-                raise ValueError("GEMINI_API_KEY não definida. Configure no arquivo .env.")
             from analise.motor_ia import InvestigadorIA
             from db.database import GerenciadorBanco
 

@@ -26,6 +26,7 @@ def init_db() -> sqlite3.Connection:
         "ALTER TABLE fornecedores ADD COLUMN ultima_consulta_sancao TEXT",
         "ALTER TABLE fornecedores ADD COLUMN capital_social REAL",
         "ALTER TABLE fornecedores ADD COLUMN data_inicio_atividade TEXT",
+        "ALTER TABLE alertas ADD COLUMN score REAL",
     ]:
         try:
             conn.execute(stmt)

@@ -146,8 +146,7 @@ def cmd_coletar(args) -> int:
 
 def cmd_analisar(args) -> int:
     from db.conexao import get_conn, DB_PATH
-    from analisador import outliers, concentracao, licitacao, fracionamento, sancoes, socios
-    from analisador.engine import persistir_alertas
+    from analisador.engine import executar_e_persistir
 
     _header("analisar")
 
@@ -163,35 +162,14 @@ def cmd_analisar(args) -> int:
     print()
     _info("Executando detectores...")
 
-    r_out  = outliers.detectar(conn)
-    _ok(f"outliers      {len(r_out):3d} anomalias")
-
-    r_conc = concentracao.detectar(conn)
-    _ok(f"concentracao  {len(r_conc):3d} anomalias")
-
-    r_lic  = licitacao.detectar(conn)
-    _ok(f"licitacao     {len(r_lic):3d} anomalias")
-
-    r_frac = fracionamento.detectar(conn)
-    _ok(f"fracionamento {len(r_frac):3d} anomalias")
-
-    r_sanc = sancoes.detectar(conn)
-    _ok(f"sancoes       {len(r_sanc):3d} anomalias")
-
-    r_socios = socios.detectar(conn)
-    _ok(f"socios        {len(r_socios):3d} anomalias")
-
-    todas = sorted(r_out + r_conc + r_lic + r_frac + r_sanc + r_socios, key=lambda a: a.score, reverse=True)
-
-    # Limpa alertas anteriores e persiste os novos
-    conn.execute("DELETE FROM alertas")
-    n_inseridos = persistir_alertas(conn, todas)
+    todas, n_inseridos, contagens = executar_e_persistir(conn)
+    for nome, total in contagens.items():
+        _ok(f"{nome:<14}{total:3d} anomalias")
 
     conn.close()
 
-    # Contagens por severidade e tipo
-    por_sev  = Counter(a.severidade for a in todas)
-    por_tipo = Counter(a.tipo       for a in todas)
+    por_sev = Counter(a.severidade for a in todas)
+    por_tipo = Counter(a.tipo for a in todas)
 
     print()
     print(SEP)
@@ -344,11 +322,6 @@ def cmd_investigar(_args) -> int:
         print()
         return 1
 
-    if not os.environ.get("GEMINI_API_KEY", "").strip():
-        _warn("GEMINI_API_KEY nao definida no ambiente.")
-        print()
-        return 1
-
     t0 = time.perf_counter()
     gerenciador = GerenciadorBanco(db_path=DB_PATH)
 
@@ -467,7 +440,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # investigar
     sub.add_parser(
         "investigar",
-        help="Gera narrativas IA via Gemini (requer GEMINI_API_KEY)",
+        help="Gera narrativas IA via Ollama local (ollama pull llama3.1)",
     )
 
     # enriquecer

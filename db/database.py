@@ -118,6 +118,8 @@ def _garantir_tabela_anomalias(conn: sqlite3.Connection) -> None:
     colunas = {row[1] for row in conn.execute("PRAGMA table_info(alertas)")}
     if "narrativa_ia" not in colunas:
         conn.execute("ALTER TABLE alertas ADD COLUMN narrativa_ia TEXT")
+    if "score" not in colunas:
+        conn.execute("ALTER TABLE alertas ADD COLUMN score REAL")
     conn.commit()
 
 

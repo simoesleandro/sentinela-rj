@@ -384,10 +384,7 @@ def _render_card_anomalia(linha: pd.Series) -> None:
             st.markdown("**▸ Veredito IA**")
             st.info(str(linha["narrativa_ia"]))
         elif st.button("🧠 Investigar com IA", key=f"btn_{id_anomalia}", type="primary"):
-            if not os.environ.get("GEMINI_API_KEY", "").strip():
-                st.error("GEMINI_API_KEY não definida. Configure no arquivo .env.")
-            else:
-                _executar_investigacao_ia(id_anomalia, linha)
+            _executar_investigacao_ia(id_anomalia, linha)
 
 
 def _pagina_visao_geral(df: pd.DataFrame) -> None:

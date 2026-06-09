@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS alertas (
     descricao           TEXT,
     metodologia         TEXT,
     valor_referencia    REAL,
+    score               REAL,       -- risco normalizado 0.0-1.0 (AnomaliaResult.score)
     status              TEXT DEFAULT 'aberto',   -- aberto/investigando/confirmado/descartado
     criado_em           TEXT DEFAULT (datetime('now')),
     narrativa_ia        TEXT
