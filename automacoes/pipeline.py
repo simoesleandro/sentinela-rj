@@ -184,22 +184,25 @@ def _etapa_analisar(config: PipelineConfig) -> tuple[EtapaResult, list[dict[str,
     from analisador.engine import executar_e_persistir
     from db.alertas_sync import carregar_alertas
     from db.conexao import get_conn
+    from db.regras_alerta import filtrar_para_notificacao
 
     conn = get_conn(row_factory=True)
     try:
         _, _, contagens, resumo = executar_e_persistir(conn)
-        ids_novos = resumo.get("ids_inseridos_alta") or []
-        novos = carregar_alertas(conn, ids_novos)
+        ids_novos = resumo.get("ids_inseridos") or []
+        ids_notificar = filtrar_para_notificacao(conn, ids_novos)
+        novos = carregar_alertas(conn, ids_notificar)
         msg = (
             f"inseridos={resumo.get('inseridos', 0)} "
             f"atualizados={resumo.get('atualizados', 0)} "
-            f"removidos={resumo.get('removidos', 0)}"
+            f"removidos={resumo.get('removidos', 0)} "
+            f"notificar={len(ids_notificar)}"
         )
         logger.info("[pipeline] analisar OK — %s", msg)
         etapa = EtapaResult(
             True,
             msg,
-            metricas={**resumo, "contagens": contagens},
+            metricas={**resumo, "contagens": contagens, "ids_notificar": ids_notificar},
         )
         return etapa, novos
     except Exception as exc:

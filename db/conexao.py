@@ -21,6 +21,38 @@ _MIGRACOES_DDL = [
     """,
     "CREATE INDEX IF NOT EXISTS idx_alertas_historico ON alertas_historico(alerta_id)",
     "CREATE INDEX IF NOT EXISTS idx_alertas_status ON alertas(status)",
+    """
+    CREATE TABLE IF NOT EXISTS watchlists (
+        id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+        fornecedor_ni           TEXT REFERENCES fornecedores(ni),
+        orgao_cnpj              TEXT REFERENCES orgaos(cnpj),
+        palavra_chave_objeto    TEXT,
+        rotulo                  TEXT NOT NULL,
+        ativo                   INTEGER NOT NULL DEFAULT 1,
+        criado_em               TEXT DEFAULT (datetime('now')),
+        CHECK (
+            fornecedor_ni IS NOT NULL
+            OR orgao_cnpj IS NOT NULL
+            OR (palavra_chave_objeto IS NOT NULL AND TRIM(palavra_chave_objeto) != '')
+        )
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_watchlists_ativo ON watchlists(ativo)",
+    "CREATE INDEX IF NOT EXISTS idx_watchlists_fornecedor ON watchlists(fornecedor_ni)",
+    "CREATE INDEX IF NOT EXISTS idx_watchlists_orgao ON watchlists(orgao_cnpj)",
+    """
+    CREATE TABLE IF NOT EXISTS regras_alerta (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo                TEXT,
+        severidade_min      TEXT NOT NULL DEFAULT 'media'
+            CHECK (severidade_min IN ('baixa', 'media', 'alta')),
+        valor_min           REAL NOT NULL DEFAULT 0,
+        ativo               INTEGER NOT NULL DEFAULT 1,
+        criado_em           TEXT DEFAULT (datetime('now'))
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_regras_alerta_ativo ON regras_alerta(ativo)",
+    "CREATE INDEX IF NOT EXISTS idx_regras_alerta_tipo ON regras_alerta(tipo)",
 ]
 
 _MIGRACOES_COLUNAS = [

@@ -81,10 +81,29 @@ def persistir_alertas(conn: sqlite3.Connection, anomalias: list[AnomaliaResult])
 def executar_e_persistir(
     conn: sqlite3.Connection,
 ) -> tuple[list[AnomaliaResult], int, dict[str, int], dict]:
-    """Orquestração única: analisa e sincroniza alertas preservando triagem."""
+    """Orquestração única: analisa, watchlists e sincroniza alertas."""
     from db.alertas_sync import sincronizar_alertas
 
     resultados, contagens = _executar_detectores(conn)
-    resumo = sincronizar_alertas(conn, resultados)
+    resumo = sincronizar_alertas(conn, resultados, escopo_remocao="detectores")
+
+    from analisador.watchlists import executar_watchlists_e_persistir
+
+    wl_matches, resumo_wl = executar_watchlists_e_persistir(conn)
+    resultados.extend(wl_matches)
+    contagens["watchlists"] = len(wl_matches)
+    resumo["watchlist"] = resumo_wl
+    resumo["ids_inseridos"] = list(resumo.get("ids_inseridos", [])) + list(
+        resumo_wl.get("ids_inseridos", [])
+    )
+    resumo["ids_inseridos_alta"] = list(resumo.get("ids_inseridos_alta", [])) + list(
+        resumo_wl.get("ids_inseridos_alta", [])
+    )
+    resumo["inseridos"] = resumo.get("inseridos", 0) + resumo_wl.get("inseridos", 0)
+    resumo["atualizados"] = resumo.get("atualizados", 0) + resumo_wl.get(
+        "atualizados", 0
+    )
+    resumo["removidos"] = resumo.get("removidos", 0) + resumo_wl.get("removidos", 0)
+
     n_sincronizados = resumo["inseridos"] + resumo["atualizados"]
     return resultados, n_sincronizados, contagens, resumo
