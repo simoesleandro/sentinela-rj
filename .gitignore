@@ -11,6 +11,8 @@ data/*.db-wal
 # Ignora apenas os gerados pelo builder (relatorio_YYYY-MM-DD.md).
 # Relatórios de investigação manuais (ex: sentinela_rj_relatorio_01.md) SÃO versionados.
 relatorios/relatorio_*.md
+data/processed/
+logs/*.txt
 
 # ── Variáveis de ambiente ─────────────────────────────────────────────────────
 .env

@@ -11,9 +11,7 @@
 
 ## O que é
 
-O Sentinela RJ coleta contratos publicados no [Portal Nacional de Contratações Públicas (PNCP)](https://pncp.gov.br), filtra os do município do Rio de Janeiro e aplica três tipos de análise estatística para detectar padrões suspeitos: outliers de valor, concentração atípica de fornecedor e contratos sem licitação competitiva.
-
-O resultado é um relatório Markdown estruturado com score de risco por anomalia, métricas de suporte e placeholders para narrativa investigativa.
+O Sentinela RJ coleta contratos publicados no [Portal Nacional de Contratações Públicas (PNCP)](https://pncp.gov.br), filtra os do município do Rio de Janeiro e aplica seis detectores estatísticos e cadastrais. O painel Flask (`/dashboard`) concentra triagem de alertas, dossiês, grafo investigativo e exportações.
 
 **Caso de uso real:** na base de 328 contratos coletados (mar/2023–mai/2026, R$ 1,24 bilhão), o sistema identificou automaticamente a suspensão judicial do contrato de R$ 315,9 milhões da MJRE Construtora (13 desvios-padrão acima da média da categoria), a inexigibilidade de R$ 45 milhões do Bonus Track Entretenimento e a concentração de R$ 86,4 milhões em 4 contratos para a Construtora Entre os Rios em 30 dias.
 
@@ -22,59 +20,32 @@ O resultado é um relatório Markdown estruturado com score de risco por anomali
 ## Arquitetura
 
 ```
-  [PNCP API]
-  pncp.gov.br/api/consulta/v1
-       |
-       |  HTTP com retry/backoff
-       v
-  +--------------------+
-  |  extrator/         |  Filtra: IBGE 3304557 (Rio) + esfera Municipal
-  |  pncp.py           |  Pagina em janelas mensais de ate 500 registros
-  +--------+-----------+
-           |
-           |  SQLite upsert
-           v
-  +--------------------+
-  |  data/             |  contratos   fornecedores   orgaos
-  |  sentinela_rj.db   |  alertas     coletas_log
-  +--------+-----------+
-           |
-           v
-  +-------------------------------------------+
-  |  analisador/                              |
-  |                                           |
-  |  outliers.py      IQR + Z-score/categ.   |
-  |  concentracao.py  janela deslizante 90d  |
-  |  licitacao.py     regex art. 74 / 75     |
-  |                                           |
-  |  engine.py  ->  list[AnomaliaResult]      |
-  +--------+----------------------------------+
-           |
-           v
-  +--------------------+
-  |  relatorios/       |  relatorio_YYYY-MM-DD.md
-  |  builder.py        |  (Markdown com {NARRATIVA} placeholders)
-  +--------------------+
-
-  __main__.py  -  CLI unificado
-  status | coletar | analisar | relatorio
+PNCP API → extrator/pncp.py → data/sentinela_rj.db
+                                    ↓
+              analisador/engine.py (6 detectores + sync de alertas)
+                                    ↓
+         alertas + triagem + narrativa_ia (Ollama/Gemini/Groq)
+                                    ↓
+    web_app.py (Flask)  |  relatorios/builder.py  |  relatorios/dossie.py
+    /dashboard          |  CLI publicar           |  PATCH triagem
 ```
+
+**Detectores:** outliers, concentração, licitação, fracionamento, sanções, sócios compartilhados.
 
 ---
 
 ## Stack
 
-| Camada | Tecnologia | Motivo |
-|--------|-----------|--------|
-| Linguagem | Python 3.10+ | `statistics.quantiles`, `dataclasses`, `match` |
-| Banco | SQLite via `sqlite3` (stdlib) | Zero dependências externas, auditável, portátil |
-| HTTP | `requests` | Retry/backoff manual para API instável do PNCP |
-| Análise | `statistics` (stdlib) | IQR, Z-score — sem Pandas, sem NumPy |
-| Regex | `re` (stdlib) | Detecção de modalidade de contratação |
-| CLI | `argparse` (stdlib) | Sub-comandos sem frameworks externos |
-| Relatório | Markdown gerado em string | Abre em qualquer editor, commit-friendly |
+| Camada | Tecnologia |
+|--------|-----------|
+| Core | Python 3.10+, SQLite, `requests` |
+| Análise | `statistics`, regex — sem Pandas no pipeline |
+| UI canônica | Flask + SPA estática (`web_app.py`) |
+| IA | Ollama `llama3.1` (padrão), fallback Gemini/Groq |
+| CLI | `python __main__.py` |
+| Testes | `pytest` |
 
-**Dependência externa única:** `requests` (para o extrator).
+Dashboards Streamlit/Reflex estão **deprecados** — ver [DEPRECATED.md](DEPRECATED.md).
 
 ---
 
@@ -83,50 +54,42 @@ O resultado é um relatório Markdown estruturado com score de risco por anomali
 ```bash
 git clone https://github.com/simoesleandro/sentinela-rj
 cd sentinela-rj
-pip install requests
+pip install -r requirements-web.txt   # core + Flask
+cp .env.example .env                  # opcional
 ```
-
-Não há outros pacotes. O banco SQLite é criado automaticamente na primeira coleta.
 
 ---
 
 ## Uso
 
-Todos os comandos são executados a partir da raiz do projeto.
-
-### `status` — visão geral do banco
+### CLI
 
 ```bash
 python __main__.py status
+python __main__.py coletar [data_ini data_fim]
+python __main__.py analisar              # sync incremental — preserva triagem
+python __main__.py investigar [--limite N]
+python __main__.py relatorio [--dir DIR]
+python __main__.py dossie --alerta ID [--formato md|json] [--gerar-ia]
+python __main__.py publicar [--dir DIR] [--limite-ia N]
+python __main__.py enriquecer [--reset]
+python __main__.py painel
 ```
 
-Mostra quantos contratos estão no banco, período coberto, data da última coleta e número de alertas ativos.
-
-### `coletar` — busca contratos no PNCP
+### Dashboard Flask
 
 ```bash
-python __main__.py coletar                    # últimos 90 dias (padrão)
-python __main__.py coletar 20230101 20261231  # intervalo customizado (AAAAMMDD)
+python web_app.py
+# → http://localhost:5055/dashboard
 ```
 
-Varre a API do PNCP pagina a pagina, filtra pelo município do Rio (IBGE 3304557) e esfera municipal, e faz upsert no banco. Tolera falhas de página isoladas sem perder o restante da coleta.
+Triagem de alertas: aba **Triagem** → `PATCH /api/alertas/{id}` com `{ "status", "nota" }`.
 
-### `analisar` — detecta anomalias e salva alertas
+### Testes
 
 ```bash
-python __main__.py analisar
+python -m pytest
 ```
-
-Executa os três detectores, persiste os resultados na tabela `alertas` e imprime o resumo com top anomalias por score.
-
-### `relatorio` — gera Markdown investigativo
-
-```bash
-python __main__.py relatorio               # salva em relatorios/
-python __main__.py relatorio --dir /saida  # diretório customizado
-```
-
-Gera `relatorio_YYYY-MM-DD.md` com tabela completa de anomalias, seções detalhadas para score ≥ 0,70 (com placeholders `{NARRATIVA}`) e próximos passos dinâmicos baseados nos tipos encontrados.
 
 ---
 
@@ -281,12 +244,20 @@ sentinela/
 ├── extrator/
 │   └── pncp.py            # Coleta paginada com retry/backoff
 ├── analisador/
-│   ├── engine.py          # AnomaliaResult (dataclass) + analisar() + persistir_alertas()
+│   ├── engine.py          # Orquestração + sync incremental de alertas
 │   ├── outliers.py        # Detector IQR por categoria
 │   ├── concentracao.py    # Detector janela deslizante
-│   └── licitacao.py       # Detector regex modalidade
+│   ├── licitacao.py       # Detector regex modalidade
+│   ├── fracionamento.py   # Fracionamento por AP
+│   ├── sancoes.py         # Empresas inativas / sanções
+│   └── socios.py          # Sócios compartilhados
+├── db/
+│   ├── alertas_sync.py    # Preserva triagem na re-análise
+│   └── triagem.py         # Workflow de status + histórico
 ├── relatorios/
-│   └── builder.py         # Gerador de relatório Markdown
+│   ├── builder.py         # Relatório Markdown
+│   └── dossie.py          # Dossiê por alerta
+├── web_app.py             # Flask — UI canônica
 └── data/
     └── sentinela_rj.db    # SQLite — não versionado (.gitignore)
 ```
@@ -295,11 +266,11 @@ sentinela/
 
 ## Roadmap
 
-- [ ] `main.py` com agendamento automático (coleta + análise semanal)
-- [ ] Detector de fracionamento por Área de Planejamento (padrão "Asfalto Fatiado")
-- [ ] Cruzamento com Portal da Transparência da Prefeitura (empenhos realizados)
-- [ ] Série histórica 2019–2022 para comparação entre gestões
-- [ ] Exportação para CSV/JSON para integração com ferramentas de visualização
+- [x] Dashboard Flask com triagem, dossiê e grafo investigativo
+- [x] Sync incremental de alertas (preserva triagem e narrativa IA)
+- [ ] Pipeline agendado (`coletar → enriquecer → analisar → investigar → notificar`)
+- [ ] Watchlists e alertas Discord
+- [ ] Multi-município via env + backfill histórico
 
 ---
 

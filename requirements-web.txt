@@ -1,2 +1,4 @@
+# UI canônica — Flask SPA + API REST
+-r requirements.txt
 Flask>=3.0.0
 waitress>=3.0.0

@@ -1,0 +1,8 @@
+# Dependências opcionais — dashboards legados (não recomendado)
+-r requirements.txt
+streamlit>=1.32.0
+reflex>=0.6.0
+pandas>=2.0.0
+plotly>=5.18.0
+google-generativeai>=0.8.0
+groq>=0.9.0

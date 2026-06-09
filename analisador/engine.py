@@ -71,35 +71,20 @@ def analisar(conn: sqlite3.Connection) -> list[AnomaliaResult]:
 
 
 def persistir_alertas(conn: sqlite3.Connection, anomalias: list[AnomaliaResult]) -> int:
-    """Grava anomalias na tabela alertas (um row por contrato por anomalia)."""
-    salvos = 0
-    for a in anomalias:
-        for pncp_id in (a.contratos or [None]):
-            conn.execute(
-                """INSERT INTO alertas
-                       (numero_controle_pncp, tipo, severidade, score,
-                        descricao, metodologia, valor_referencia)
-                   VALUES (?,?,?,?,?,?,?)""",
-                (
-                    pncp_id,
-                    a.tipo,
-                    a.severidade,
-                    a.score,
-                    a.descricao,
-                    a.metodologia,
-                    a.valor_referencia,
-                ),
-            )
-            salvos += 1
-    conn.commit()
-    return salvos
+    """Grava anomalias na tabela alertas (compatível com chamadas legadas)."""
+    from db.alertas_sync import sincronizar_alertas
+
+    resumo = sincronizar_alertas(conn, anomalias)
+    return resumo["inseridos"] + resumo["atualizados"]
 
 
 def executar_e_persistir(
     conn: sqlite3.Connection,
 ) -> tuple[list[AnomaliaResult], int, dict[str, int]]:
-    """Orquestração única: analisa, limpa alertas anteriores e persiste."""
+    """Orquestração única: analisa e sincroniza alertas preservando triagem."""
+    from db.alertas_sync import sincronizar_alertas
+
     resultados, contagens = _executar_detectores(conn)
-    conn.execute("DELETE FROM alertas")
-    n_inseridos = persistir_alertas(conn, resultados)
-    return resultados, n_inseridos, contagens
+    resumo = sincronizar_alertas(conn, resultados)
+    n_sincronizados = resumo["inseridos"] + resumo["atualizados"]
+    return resultados, n_sincronizados, contagens
