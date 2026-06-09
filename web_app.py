@@ -326,6 +326,45 @@ def alertas_detail(alert_id: int):
 
 
 # ---------------------------------------------------------------------------
+# Dossiê investigativo
+# ---------------------------------------------------------------------------
+
+@app.route("/api/dossie/<int:alerta_id>")
+def dossie_api(alerta_id: int):
+    from relatorios.dossie import (
+        DossieNaoEncontradoError,
+        obter_dossie,
+        renderizar_markdown,
+        serializar_json,
+    )
+
+    formato = request.args.get("formato", "json").strip().lower()
+    gerar_ia = request.args.get("gerar_ia", "false").strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    db = get_db()
+    try:
+        dados = obter_dossie(db, alerta_id, gerar_ia=gerar_ia, db_path=DB_PATH)
+    except DossieNaoEncontradoError:
+        return jsonify({"error": "not found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
+
+    if formato == "md":
+        return Response(
+            renderizar_markdown(dados),
+            mimetype="text/markdown; charset=utf-8",
+        )
+    return jsonify(serializar_json(dados))
+
+
+# ---------------------------------------------------------------------------
 # Timeline
 # ---------------------------------------------------------------------------
 

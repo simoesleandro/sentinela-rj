@@ -405,6 +405,55 @@ def cmd_relatorio(args) -> int:
     return 0
 
 
+# ── Sub-comando: dossie ───────────────────────────────────────────────────────
+
+def cmd_dossie(args) -> int:
+    from db.conexao import get_conn, DB_PATH
+    from relatorios.dossie import DossieNaoEncontradoError, exportar_dossie
+
+    _header("dossie")
+
+    if not DB_PATH.exists():
+        _warn(f"Banco nao encontrado: {DB_PATH}")
+        print()
+        return 1
+
+    dir_saida = Path(args.dir) if args.dir else None
+    t0 = time.perf_counter()
+    conn = get_conn(row_factory=True)
+    try:
+        caminho = exportar_dossie(
+            conn,
+            args.alerta,
+            dir_saida,
+            gerar_ia=args.gerar_ia,
+            formato=args.formato,
+            db_path=DB_PATH,
+        )
+    except DossieNaoEncontradoError as exc:
+        _warn(str(exc))
+        print()
+        return 1
+    except ValueError as exc:
+        _warn(f"Falha na geracao de narrativa IA: {exc}")
+        print()
+        return 1
+    finally:
+        conn.close()
+
+    n_linhas = sum(1 for _ in caminho.open(encoding="utf-8"))
+    print()
+    print(SEP)
+    print("  RESUMO DO DOSSIE")
+    print(SEP)
+    print(f"  Alerta  : {args.alerta}")
+    print(f"  Arquivo : {caminho}")
+    print(f"  Tamanho : {caminho.stat().st_size:,} bytes  |  {n_linhas} linhas")
+    print(f"  Tempo   : {_elapsed(t0)}")
+    print()
+    return 0
+
+
 # ── Parser e entry-point ──────────────────────────────────────────────────────
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -433,6 +482,35 @@ def _build_parser() -> argparse.ArgumentParser:
     rel = sub.add_parser("relatorio", help="Gera relatorio Markdown de anomalias")
     rel.add_argument("--dir", metavar="DIR",
                      help="Diretorio de saida (padrao: relatorios/)")
+
+    # dossie
+    dos = sub.add_parser(
+        "dossie",
+        help="Exporta dossiê investigativo consolidado de um alerta",
+    )
+    dos.add_argument(
+        "--alerta",
+        type=int,
+        required=True,
+        metavar="ID",
+        help="ID do alerta na tabela alertas",
+    )
+    dos.add_argument(
+        "--formato",
+        choices=("md", "json"),
+        default="md",
+        help="Formato de exportacao (padrao: md)",
+    )
+    dos.add_argument(
+        "--dir",
+        metavar="DIR",
+        help="Diretorio de saida (padrao: relatorios/)",
+    )
+    dos.add_argument(
+        "--gerar-ia",
+        action="store_true",
+        help="Gera narrativa via Ollama se narrativa_ia estiver vazia",
+    )
 
     # painel
     sub.add_parser("painel", help="Gera painel HTML estatico de controle")
@@ -484,6 +562,7 @@ def main() -> None:
         "coletar":   cmd_coletar,
         "analisar":  cmd_analisar,
         "relatorio": cmd_relatorio,
+        "dossie":    cmd_dossie,
         "painel":      cmd_painel,
         "investigar":  cmd_investigar,
         "enriquecer":  cmd_enriquecer,
