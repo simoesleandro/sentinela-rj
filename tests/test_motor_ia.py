@@ -55,6 +55,8 @@ def test_investigar_aplica_revisao_gemini(
     prompt_revisao = mock_gemini.call_args[0][0]
     assert "evasão fiscal" in prompt_revisao
     assert "Dados factuais" in prompt_revisao
+    assert "[Recomendação de Veredito]" in prompt_revisao
+    assert "Investigando" in prompt_revisao
 
 
 def test_investigar_sem_chave_usa_fluxo_simples(
