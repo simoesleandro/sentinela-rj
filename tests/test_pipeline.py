@@ -170,3 +170,45 @@ def test_notificar_respeita_limite(monkeypatch: pytest.MonkeyPatch) -> None:
     enviados = notificador.enviar_novos_alertas(alertas, max_embeds=3)
     assert enviados == 3
     assert chamadas == 3
+
+
+def test_investigar_aguarda_cooldown_apos_gemini(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from automacoes.pipeline import _etapa_investigar
+
+    config = PipelineConfig(investigar_limite=2, ia_intervalo_s=0)
+    anomalias = [{"id": 1}, {"id": 2}]
+
+    class _InvestigadorFake:
+        def __init__(self, prompt_revisao_extra: str | None = None) -> None:
+            self._gemini = True
+
+        @property
+        def gemini_utilizado(self) -> bool:
+            return self._gemini
+
+        def investigar_anomalia(self, anomalia: dict) -> str:
+            return f"narrativa-{anomalia['id']}"
+
+    class _GerenciadorFake:
+        def __init__(self, db_path) -> None:
+            pass
+
+        def listar_anomalias_sem_narrativa(self, limite: int) -> list:
+            return anomalias[:limite]
+
+        def atualizar_narrativa_anomalia(self, id_anomalia: int, narrativa: str) -> None:
+            pass
+
+    monkeypatch.setattr("analise.motor_ia.InvestigadorIA", _InvestigadorFake)
+    monkeypatch.setattr("db.database.GerenciadorBanco", _GerenciadorFake)
+    db_fake = MagicMock()
+    db_fake.exists.return_value = True
+    monkeypatch.setattr("db.conexao.DB_PATH", db_fake)
+
+    with patch("automacoes.pipeline._aguardar_rate_limit_gemini") as mock_cooldown:
+        resultado = _etapa_investigar(config)
+
+    assert resultado.ok
+    assert mock_cooldown.call_count == 2

@@ -47,9 +47,11 @@ def test_investigar_aplica_revisao_gemini(
     with patch("analise.motor_ia._call_ollama", return_value=rascunho) as mock_ollama, patch(
         "analise.motor_ia._call_gemini", return_value=revisado
     ) as mock_gemini:
-        texto = InvestigadorIA().investigar_anomalia(anomalia)
+        investigador = InvestigadorIA()
+        texto = investigador.investigar_anomalia(anomalia)
 
     assert texto == revisado
+    assert investigador.gemini_utilizado is True
     mock_ollama.assert_called_once()
     mock_gemini.assert_called_once()
     prompt_revisao = mock_gemini.call_args[0][0]
@@ -65,10 +67,15 @@ def test_investigar_sem_chave_usa_fluxo_simples(
 ) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
-    with patch("analise.motor_ia._gerar_narrativa", return_value="Narrativa direta") as mock_gen:
-        texto = InvestigadorIA().investigar_anomalia(anomalia)
+    with patch(
+        "analise.motor_ia._gerar_narrativa_com_rastreio",
+        return_value=("Narrativa direta", False),
+    ) as mock_gen:
+        investigador = InvestigadorIA()
+        texto = investigador.investigar_anomalia(anomalia)
 
     assert texto == "Narrativa direta"
+    assert investigador.gemini_utilizado is False
     mock_gen.assert_called_once()
 
 
@@ -86,3 +93,20 @@ def test_revisao_falha_retorna_rascunho(
         texto = InvestigadorIA().investigar_anomalia(anomalia)
 
     assert texto == rascunho
+
+
+def test_pipeline_prompt_extra_incluido_na_revisao(
+    monkeypatch: pytest.MonkeyPatch,
+    anomalia: dict,
+) -> None:
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    extra = "MODO LOTE — seja direto"
+
+    with patch("analise.motor_ia._call_ollama", return_value="rascunho"), patch(
+        "analise.motor_ia._call_gemini", return_value="revisado"
+    ) as mock_gemini:
+        InvestigadorIA(prompt_revisao_extra=extra).investigar_anomalia(anomalia)
+
+    prompt_revisao = mock_gemini.call_args[0][0]
+    assert extra in prompt_revisao
+    assert "primeiras frases" in prompt_revisao.lower()

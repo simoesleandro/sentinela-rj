@@ -20,6 +20,17 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 LOG_DIR = ROOT / "logs"
 
+_GEMINI_COOLDOWN_S = 4.0
+_MSG_GEMINI_COOLDOWN = (
+    "    [Sentinela-IA] Resposta processada. Aguardando 4s (Rate Limiting Prevention)..."
+)
+_PROMPT_REFINO_GEMINI_LOTE = (
+    "MODO LOTE (pipeline agendado):\n"
+    "- Abra com o padrão do alerta nas 2 primeiras frases (tipo, ator, valor, risco).\n"
+    "- Máximo 4–6 frases no corpo; zero enrolação, zero prefácio, zero repetir o JSON.\n"
+    "- Diga o que checar primeiro; linguagem de auditor, não de acusação."
+)
+
 
 def _env_bool(nome: str, padrao: bool = False) -> bool:
     raw = os.getenv(nome, "").strip().lower()
@@ -110,6 +121,11 @@ def _configurar_logging() -> Path:
         force=True,
     )
     return log_path
+
+
+def _aguardar_rate_limit_gemini() -> None:
+    logger.info(_MSG_GEMINI_COOLDOWN)
+    time.sleep(_GEMINI_COOLDOWN_S)
 
 
 def _janela_coleta(config: PipelineConfig) -> tuple[str, str]:
@@ -224,7 +240,9 @@ def _etapa_investigar(config: PipelineConfig) -> EtapaResult:
         return EtapaResult(False, "banco ausente", erro="DB não encontrado")
 
     try:
-        investigador = InvestigadorIA()
+        investigador = InvestigadorIA(
+            prompt_revisao_extra=_PROMPT_REFINO_GEMINI_LOTE,
+        )
     except ValueError as exc:
         logger.warning("[pipeline] investigar indisponivel: %s", exc)
         return EtapaResult(False, "IA indisponivel", erro=str(exc))
@@ -237,12 +255,20 @@ def _etapa_investigar(config: PipelineConfig) -> EtapaResult:
         return EtapaResult(True, "nenhuma narrativa pendente")
 
     sucesso = 0
-    for anomalia in pendentes:
+    for indice, anomalia in enumerate(pendentes, start=1):
         id_anomalia = int(anomalia["id"])
         try:
+            logger.info(
+                "[pipeline] investigar id=%s (%d/%d)",
+                id_anomalia,
+                indice,
+                len(pendentes),
+            )
             narrativa = investigador.investigar_anomalia(anomalia)
             gerenciador.atualizar_narrativa_anomalia(id_anomalia, narrativa)
             sucesso += 1
+            if investigador.gemini_utilizado:
+                _aguardar_rate_limit_gemini()
             time.sleep(config.ia_intervalo_s)
         except Exception as exc:
             logger.warning("[pipeline] investigar id=%s: %s", id_anomalia, exc)
