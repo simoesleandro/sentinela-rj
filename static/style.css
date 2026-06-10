@@ -566,6 +566,55 @@ tr:last-child td {
   color: #d4d4d4;
 }
 
+.veredito-ia-block {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
+
+.veredito-ia-block label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--blue);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.veredito-status-sugerido {
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.veredito-justificativa {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #a3a3a3;
+  margin-bottom: 0.75rem;
+}
+
+.btn-aplicar-veredito {
+  padding: 0.45rem 0.875rem;
+  background: #1e3a5f;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  color: #93c5fd;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-aplicar-veredito:hover:not(:disabled) {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.btn-aplicar-veredito:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .detail-link {
   display: inline-block;
   margin-top: 0.5rem;

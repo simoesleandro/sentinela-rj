@@ -6,6 +6,9 @@ import math
 import os
 import sqlite3
 from flask import Flask, jsonify, request, render_template, Response
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from db.conexao import DB_PATH, aplicar_migracoes
 
@@ -467,7 +470,7 @@ def alertas_investigar(alert_id: int):
     if request.method == "OPTIONS":
         return "", 204
 
-    from analise.motor_ia import InvestigadorIA
+    from analise.motor_ia import InvestigadorIA, _revisao_gemini_disponivel
     from db.conexao import DB_PATH
     from db.database import GerenciadorBanco
 
@@ -504,6 +507,7 @@ def alertas_investigar(alert_id: int):
             "id": alert_id,
             "narrativa_ia": narrativa,
             "chars": len(narrativa),
+            "revisao_gemini": _revisao_gemini_disponivel(),
         })
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 422

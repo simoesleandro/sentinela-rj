@@ -112,6 +112,65 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+const VEREDITO_MARKER = '[Recomendação de Veredito]';
+
+function parseVereditoIa(narrativa) {
+  const texto = String(narrativa || '').trim();
+  if (!texto) return { corpo: '', veredito: null, statusSugerido: null, justificativa: null };
+
+  const idx = texto.indexOf(VEREDITO_MARKER);
+  if (idx === -1) {
+    return { corpo: texto, veredito: null, statusSugerido: null, justificativa: null };
+  }
+
+  const corpo = texto.slice(0, idx).trim();
+  const veredito = texto.slice(idx).trim();
+  const statusMatch = veredito.match(
+    /Status sugerido:\s*(Aberto|Investigando|Confirmado|Descartado)/i
+  );
+  const statusSugerido = statusMatch ? statusMatch[1].toLowerCase() : null;
+  const justMatch = veredito.match(/Justificativa:\s*(.+)/is);
+  const justificativa = justMatch ? justMatch[1].trim() : null;
+
+  return { corpo, veredito, statusSugerido, justificativa };
+}
+
+function renderNarrativaVereditoHtml(narrativa) {
+  const { corpo, veredito, statusSugerido, justificativa } = parseVereditoIa(narrativa);
+  const corpoHtml = corpo
+    ? `<p id="narrativa-texto">${escapeHtml(corpo)}</p>`
+    : `<p id="narrativa-texto" class="narrativa-empty">Sem parágrafo principal.</p>`;
+
+  if (!veredito) {
+    return {
+      html: corpoHtml,
+      temVeredito: false,
+      statusSugerido: null,
+      justificativa: null,
+    };
+  }
+
+  const statusLabel = statusSugerido
+    ? (STATUS_LABELS[statusSugerido] || statusSugerido)
+    : '—';
+  const vereditoBlock = `
+    <div id="veredito-ia-block" class="veredito-ia-block">
+      <label>Recomendação de veredito (Gemini)</label>
+      <p class="veredito-status-sugerido">Status sugerido: <strong>${escapeHtml(statusLabel)}</strong></p>
+      ${justificativa ? `<p class="veredito-justificativa">${escapeHtml(justificativa)}</p>` : ''}
+      ${statusSugerido
+        ? `<button type="button" id="btn-aplicar-veredito" class="btn-aplicar-veredito">Aplicar status sugerido</button>`
+        : ''}
+    </div>`;
+
+  return {
+    html: corpoHtml + vereditoBlock,
+    temVeredito: true,
+    statusSugerido,
+    justificativa,
+  };
+}
+
 function tipoBadge(tipo) {
   const label = TIPO_LABELS[tipo] || tipo;
   const cls = TIPO_BADGE_CLASS[tipo] || 'gray';
@@ -618,10 +677,14 @@ async function openDetail(id) {
       : '';
 
     const temNarrativa = Boolean(d.narrativa_ia && String(d.narrativa_ia).trim());
-    const narrativaHtml = temNarrativa
-      ? `<p id="narrativa-texto">${escapeHtml(d.narrativa_ia)}</p>`
-      : `<p id="narrativa-texto" class="narrativa-empty">Nenhuma narrativa gerada ainda. Use o botão abaixo para investigar com Llama (Ollama local).</p>`;
-    const btnIaLabel = temNarrativa ? 'Regenerar com Llama' : 'Investigar com Llama';
+    const narrativaParts = temNarrativa
+      ? renderNarrativaVereditoHtml(d.narrativa_ia)
+      : {
+          html: '<p id="narrativa-texto" class="narrativa-empty">Nenhuma narrativa gerada ainda. O Llama gera o rascunho; o veredito vem da revisão Gemini (requer GEMINI_API_KEY no .env).</p>',
+          temVeredito: false,
+          statusSugerido: null,
+        };
+    const btnIaLabel = temNarrativa ? 'Regenerar narrativa' : 'Investigar com IA';
 
     const transicoes = (d.transicoes_permitidas || []).map(st =>
       `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
@@ -691,7 +754,7 @@ async function openDetail(id) {
       </div>
       ${complementar}
       <div class="investigation-toolbar">
-        <button type="button" id="btn-investigar-ia" class="btn-investigar" title="Gera narrativa investigativa via Ollama (llama3.1)">
+        <button type="button" id="btn-investigar-ia" class="btn-investigar" title="Llama (Ollama) gera rascunho; Gemini revisa e sugere veredito se GEMINI_API_KEY estiver configurada">
           🦙 ${btnIaLabel}
         </button>
         <button type="button" id="btn-export-dossie" class="btn-dossie" title="Baixa dossiê Markdown deste alerta">
@@ -701,7 +764,7 @@ async function openDetail(id) {
       </div>
       <div id="narrativa-container" class="narrativa-block">
         <label>Narrativa IA</label>
-        ${narrativaHtml}
+        ${narrativaParts.html}
       </div>
       <div class="detail-actions">
         ${pncpLink}
@@ -716,6 +779,9 @@ async function openDetail(id) {
     document.getElementById('btn-investigar-ia')?.addEventListener('click', () => {
       investigarComLlama(id);
     });
+    document.getElementById('btn-aplicar-veredito')?.addEventListener('click', () => {
+      aplicarVereditoSugerido(id, narrativaParts.statusSugerido, narrativaParts.justificativa);
+    });
     document.getElementById('btn-export-dossie')?.addEventListener('click', () => {
       exportarDossie(id);
     });
@@ -727,11 +793,11 @@ async function openDetail(id) {
 async function investigarComLlama(alertaId) {
   const btn = document.getElementById('btn-investigar-ia');
   const statusEl = document.getElementById('investigacao-status');
-  const textoEl = document.getElementById('narrativa-texto');
-  if (!btn || !statusEl || !textoEl) return;
+  const container = document.getElementById('narrativa-container');
+  if (!btn || !statusEl || !container) return;
 
   btn.disabled = true;
-  statusEl.textContent = 'Gerando narrativa IA… (pode levar até 2 min)';
+  statusEl.textContent = 'Gerando narrativa IA… (Llama + revisão Gemini; pode levar até 2 min)';
   statusEl.className = 'investigacao-status investigacao-loading';
 
   try {
@@ -742,10 +808,23 @@ async function investigarComLlama(alertaId) {
     const payload = await res.json();
     if (!res.ok) throw new Error(payload.error || res.statusText);
 
-    textoEl.textContent = payload.narrativa_ia || '';
-    textoEl.classList.remove('narrativa-empty');
-    btn.textContent = '🦙 Regenerar com Llama';
-    statusEl.textContent = `Narrativa salva (${payload.chars || 0} caracteres).`;
+    const narrativaParts = renderNarrativaVereditoHtml(payload.narrativa_ia || '');
+    container.innerHTML = `
+      <label>Narrativa IA</label>
+      ${narrativaParts.html}
+    `;
+    document.getElementById('btn-aplicar-veredito')?.addEventListener('click', () => {
+      aplicarVereditoSugerido(alertaId, narrativaParts.statusSugerido, narrativaParts.justificativa);
+    });
+
+    btn.textContent = '🦙 Regenerar narrativa';
+    if (narrativaParts.temVeredito) {
+      statusEl.textContent = `Narrativa revisada (${payload.chars || 0} caracteres). Use «Aplicar status sugerido» ou salve na Triagem acima.`;
+    } else if (payload.revisao_gemini === false) {
+      statusEl.textContent = 'Rascunho Llama salvo sem veredito — configure GEMINI_API_KEY e reinicie o web_app.';
+    } else {
+      statusEl.textContent = `Narrativa salva (${payload.chars || 0} caracteres), mas sem seção de veredito.`;
+    }
     statusEl.className = 'investigacao-status investigacao-ok';
 
     if (state.currentTab === 'alertas') {
@@ -756,6 +835,31 @@ async function investigarComLlama(alertaId) {
     statusEl.className = 'investigacao-status investigacao-erro';
   } finally {
     btn.disabled = false;
+  }
+}
+
+async function aplicarVereditoSugerido(alertaId, statusSugerido, justificativa) {
+  const statusEl = document.getElementById('triage-status');
+  const notaEl = document.getElementById('triage-nota');
+  const btn = document.getElementById('btn-aplicar-veredito');
+  if (!statusSugerido || !statusEl) return;
+
+  statusEl.value = statusSugerido;
+  if (notaEl && justificativa) {
+    const prefixo = `[IA] ${justificativa}`;
+    notaEl.value = notaEl.value.trim()
+      ? `${prefixo}\n\n${notaEl.value.trim()}`
+      : prefixo;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Aplicando…';
+  }
+  await salvarTriagem(alertaId);
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Aplicar status sugerido';
   }
 }
 
