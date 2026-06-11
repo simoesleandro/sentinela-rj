@@ -104,6 +104,36 @@ function truncate(str, n) {
   return str.length > n ? str.slice(0, n) + '…' : str;
 }
 
+function renderTransparenciaRjHtml(items) {
+  if (!items || !items.length) return '';
+  const rows = items.map(e => `
+    <tr>
+      <td>${formatDate(e.data_lancamento)}</td>
+      <td style="white-space:nowrap">${formatCurrency(e.valor)}</td>
+      <td>${esc(e.orgao || '—')}</td>
+      <td title="${esc(e.descricao || '')}">${esc(truncate(e.descricao, 72))}</td>
+      <td>${esc(e.documento || '—')}</td>
+      <td>${e.score != null ? `${Math.round(e.score * 100)}%` : '—'}</td>
+    </tr>
+  `).join('');
+  return `
+    <div class="detail-block transparencia-rj-block">
+      <label>Transparência RJ — empenhos vinculados</label>
+      <p class="section-note">Cruzamento automático fornecedor + valor (PNCP × portal RJ).</p>
+      <div class="transp-rj-table-wrap">
+        <table class="transp-rj-table">
+          <thead>
+            <tr>
+              <th>Data</th><th>Valor</th><th>Órgão</th><th>Descrição</th><th>Doc.</th><th>Match</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 function escapeHtml(str) {
   return String(str || '')
     .replace(/&/g, '&amp;')
@@ -274,6 +304,8 @@ function setupTabs() {
       if (!state.tabLoaded[tab]) {
         loadTab(tab);
         state.tabLoaded[tab] = true;
+      } else if (tab === 'rede') {
+        loadComparadorCatalogo();
       }
     });
   });
@@ -299,6 +331,7 @@ function loadTab(name) {
       loadOrgaos();
       break;
     case 'rede':
+      loadComparadorCatalogo();
       loadRede();
       break;
     case 'monitoramento':
@@ -777,6 +810,7 @@ async function openDetail(id) {
         <p>${d.descricao || '—'}</p>
       </div>
       ${complementar}
+      ${renderTransparenciaRjHtml(d.transparencia_rj)}
       <div class="investigation-toolbar">
         <button type="button" id="btn-investigar-ia" class="btn-investigar" title="Llama (Ollama) gera rascunho; Gemini revisa e sugere veredito se GEMINI_API_KEY estiver configurada">
           🦙 ${btnIaLabel}
@@ -1351,6 +1385,228 @@ async function openOrgaoDetail(cnpj, nome) {
   }
 }
 
+// ─── Comparador multi-fornecedor ───────────────────────────────────────────
+
+const comparadorState = {
+  catalogo: [],
+  selecionados: new Map(),
+  busca: '',
+};
+
+const COMPARADOR_MAX = 4;
+
+function _formatarCnpj(ni) {
+  const d = String(ni || '').replace(/\D/g, '');
+  if (d.length !== 14) return d;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
+function _atualizarComparadorBtn() {
+  const btn = document.getElementById('comparador-btn');
+  if (!btn) return;
+  const n = comparadorState.selecionados.size;
+  btn.textContent = `Comparar (${n}/${COMPARADOR_MAX})`;
+  btn.disabled = n < 2;
+}
+
+function _renderComparadorChips() {
+  const el = document.getElementById('comparador-chips');
+  if (!el) return;
+  if (!comparadorState.selecionados.size) {
+    el.innerHTML = '<span class="section-note" style="margin:0">Nenhum fornecedor selecionado.</span>';
+    _atualizarComparadorBtn();
+    return;
+  }
+  el.innerHTML = [...comparadorState.selecionados.values()].map(f => `
+    <span class="comparador-chip">
+      ${esc(truncate(f.fornecedor || f.fornecedor_ni, 28))}
+      <button type="button" data-ni="${esc(f.fornecedor_ni)}" title="Remover" aria-label="Remover">×</button>
+    </span>
+  `).join('');
+  el.querySelectorAll('button[data-ni]').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      toggleComparadorNi(btn.dataset.ni);
+    });
+  });
+  _atualizarComparadorBtn();
+}
+
+function _renderComparadorLista() {
+  const el = document.getElementById('comparador-lista');
+  if (!el) return;
+  const termo = comparadorState.busca.trim().toLowerCase();
+  const filtrados = comparadorState.catalogo.filter(f => {
+    if (!termo) return true;
+    const ni = (f.fornecedor_ni || '').toLowerCase();
+    const nome = (f.fornecedor || '').toLowerCase();
+    return nome.includes(termo) || ni.includes(termo);
+  });
+
+  if (!comparadorState.catalogo.length) {
+    el.innerHTML = '<div class="loading-msg" style="padding:1rem">Nenhum fornecedor com alertas no Sentinela.</div>';
+    return;
+  }
+  if (!filtrados.length) {
+    el.innerHTML = '<div class="loading-msg" style="padding:1rem">Nenhum resultado para o filtro.</div>';
+    return;
+  }
+
+  el.innerHTML = filtrados.map(f => {
+    const ni = f.fornecedor_ni;
+    const sel = comparadorState.selecionados.has(ni);
+    const lotado = !sel && comparadorState.selecionados.size >= COMPARADOR_MAX;
+    const sancao = f.tem_sancao ? ' · sanção' : '';
+    return `
+      <label class="comparador-item ${sel ? 'selected' : ''} ${lotado ? 'disabled' : ''}">
+        <input type="checkbox" ${sel ? 'checked' : ''} ${lotado ? 'disabled' : ''} data-ni="${esc(ni)}" />
+        <div class="comparador-item-main">
+          <div class="comparador-item-nome">${esc(f.fornecedor || 'Sem razão social')}</div>
+          <div class="comparador-item-ni">${esc(_formatarCnpj(ni))}</div>
+          <div class="comparador-item-meta">
+            ${f.total_alertas} alerta(s) · ${f.alertas_alta || 0} alta · ${formatCurrency(f.valor_total)}${sancao}
+          </div>
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  el.querySelectorAll('input[type="checkbox"][data-ni]').forEach(cb => {
+    cb.addEventListener('change', () => toggleComparadorNi(cb.dataset.ni, cb.checked));
+  });
+}
+
+function toggleComparadorNi(ni, forcar) {
+  const limpo = String(ni || '').replace(/\D/g, '');
+  if (!limpo) return;
+  const item = comparadorState.catalogo.find(f => f.fornecedor_ni === limpo)
+    || comparadorState.selecionados.get(limpo)
+    || { fornecedor_ni: limpo, fornecedor: limpo };
+
+  if (forcar === true) {
+    if (comparadorState.selecionados.size >= COMPARADOR_MAX && !comparadorState.selecionados.has(limpo)) return;
+    comparadorState.selecionados.set(limpo, item);
+  } else if (forcar === false) {
+    comparadorState.selecionados.delete(limpo);
+  } else if (comparadorState.selecionados.has(limpo)) {
+    comparadorState.selecionados.delete(limpo);
+  } else {
+    if (comparadorState.selecionados.size >= COMPARADOR_MAX) return;
+    comparadorState.selecionados.set(limpo, item);
+  }
+  _renderComparadorChips();
+  _renderComparadorLista();
+}
+
+function preencherComparadorNi(ni) {
+  document.querySelector('.tab-btn[data-tab="rede"]')?.click();
+  if (!comparadorState.catalogo.length) {
+    loadComparadorCatalogo().then(() => toggleComparadorNi(ni, true));
+    return;
+  }
+  toggleComparadorNi(ni, true);
+}
+
+function limparComparadorSelecao() {
+  comparadorState.selecionados.clear();
+  _renderComparadorChips();
+  _renderComparadorLista();
+}
+
+async function loadComparadorCatalogo() {
+  const lista = document.getElementById('comparador-lista');
+  if (lista) {
+    lista.innerHTML = '<div class="loading-msg" style="padding:1rem">Carregando fornecedores investigados…</div>';
+  }
+  try {
+    const data = await api('/api/fornecedores/investigados');
+    comparadorState.catalogo = data.items || [];
+    _renderComparadorLista();
+    _renderComparadorChips();
+  } catch (e) {
+    if (lista) {
+      lista.innerHTML = `<div class="error-msg" style="padding:1rem">Erro ao carregar lista: ${esc(e.message)}</div>`;
+    }
+  }
+}
+
+function _comparadorSublistaHtml(items, mapper, vazio) {
+  if (!items || !items.length) return `<p class="loading-msg">${esc(vazio)}</p>`;
+  return `<ul class="comparador-list">${items.map(mapper).join('')}</ul>`;
+}
+
+function renderComparadorResultado(data) {
+  const vinculos = data.vinculos?.socios_compartilhados || [];
+  const vinculosHtml = vinculos.length
+    ? `<div class="comparador-vinculos"><strong>Sócios em comum:</strong> ${
+        vinculos.map(v =>
+          `${esc(v.nome)} (${v.fornecedores.map(f => esc(truncate(f.razao_social, 28))).join(' · ')})`
+        ).join(' · ')
+      }</div>`
+    : '';
+
+  const cols = (data.fornecedores || []).map(p => {
+    const id = p.identidade || {};
+    const res = p.resumo || {};
+    const sancao = id.tem_sancao
+      ? '<span class="comparador-badge-sancao">Sanção CEIS/CNEP</span>'
+      : '';
+    const alertasHtml = _comparadorSublistaHtml(
+      p.alertas,
+      a => `<li>${sevBadge(a.severidade)} ${tipoBadge(a.tipo)}<br>${esc(truncate(a.descricao, 60))}</li>`,
+      'Nenhum alerta'
+    );
+    const contratosHtml = _comparadorSublistaHtml(
+      p.contratos,
+      c => `<li>${formatCurrency(c.valor_global)} — ${esc(truncate(c.objeto, 50))}</li>`,
+      'Sem contratos'
+    );
+    const sociosHtml = _comparadorSublistaHtml(
+      (p.socios || []).map(n => ({ nome: n })),
+      s => `<li>${esc(s.nome)}</li>`,
+      'Sócios não cadastrados'
+    );
+    return `
+      <div class="comparador-col">
+        <h3>${esc(truncate(id.razao_social || '—', 48))}</h3>
+        <div class="comparador-ni">${esc(id.ni)}</div>
+        ${sancao}
+        <div class="comparador-kpis">
+          <div><span>Contratos</span>${res.total_contratos ?? 0}</div>
+          <div><span>Valor total</span>${formatCurrency(res.valor_total)}</div>
+          <div><span>Alertas</span>${res.total_alertas ?? 0}</div>
+          <div><span>Alta</span>${res.alertas_alta ?? 0}</div>
+        </div>
+        <div class="comparador-section"><label>Alertas</label>${alertasHtml}</div>
+        <div class="comparador-section"><label>Contratos</label>${contratosHtml}</div>
+        <div class="comparador-section"><label>Sócios</label>${sociosHtml}</div>
+        <a href="/fornecedor/${esc(id.ni)}" class="detail-link" style="display:inline-block;margin-top:0.5rem">Perfil completo →</a>
+      </div>
+    `;
+  }).join('');
+
+  return `${vinculosHtml}<div class="comparador-grid" style="grid-template-columns:repeat(${data.fornecedores.length}, minmax(220px, 1fr))">${cols}</div>`;
+}
+
+async function executarComparador() {
+  const wrap = document.getElementById('comparador-resultado');
+  if (!wrap) return;
+  const nis = [...comparadorState.selecionados.keys()];
+  if (nis.length < 2) {
+    wrap.innerHTML = '<div class="error-msg">Selecione ao menos dois fornecedores na lista.</div>';
+    return;
+  }
+  wrap.innerHTML = '<div class="loading-msg">Comparando fornecedores…</div>';
+  try {
+    const params = new URLSearchParams();
+    nis.forEach(ni => params.append('ni', ni));
+    const data = await api(`/api/fornecedores/comparar?${params}`);
+    wrap.innerHTML = renderComparadorResultado(data);
+  } catch (e) {
+    wrap.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
 // ─── Rede ──────────────────────────────────────────────────────────────────
 
 async function loadRede() {
@@ -1378,6 +1634,7 @@ async function loadRede() {
           <a href="/fornecedor/${f.ni}" target="_self" class="fornecedor-link" style="font-size:0.82rem">${truncate(f.razao_social, 50)}</a>
           <span style="color:var(--muted);font-size:0.78rem;margin-left:0.5rem">${formatCurrency(f.valor_total)}</span>
           <button type="button" class="btn-grafo" data-ni="${f.ni}" data-nome="${escapeHtml(truncate(f.razao_social, 40))}" style="margin-left:0.5rem;font-size:0.72rem;padding:2px 8px;border:1px solid var(--border);background:#111;color:var(--text);border-radius:4px;cursor:pointer">Grafo</button>
+          <button type="button" class="btn-comparar-add" data-ni="${f.ni}" style="margin-left:0.35rem;font-size:0.72rem;padding:2px 8px;border:1px solid var(--border);background:#1a1208;color:#fbbf24;border-radius:4px;cursor:pointer">+ Comparar</button>
         </div>`
       ).join('');
 
@@ -1410,6 +1667,12 @@ async function loadRede() {
       btn.addEventListener('click', (ev) => {
         ev.stopPropagation();
         loadGrafoFornecedor(btn.dataset.ni, btn.dataset.nome);
+      });
+    });
+    tbody.querySelectorAll('.btn-comparar-add').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        preencherComparadorNi(btn.dataset.ni);
       });
     });
 
@@ -2018,4 +2281,25 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('config-form-modal')?.addEventListener('click', (ev) => {
     if (ev.target.id === 'config-form-modal') _closeConfigModal();
   });
+
+  document.getElementById('comparador-btn')?.addEventListener('click', executarComparador);
+  document.getElementById('comparador-limpar')?.addEventListener('click', limparComparadorSelecao);
+  const comparadorBusca = document.getElementById('comparador-busca');
+  if (comparadorBusca) {
+    comparadorBusca.addEventListener('input', debounce(() => {
+      comparadorState.busca = comparadorBusca.value;
+      _renderComparadorLista();
+    }, 200));
+  }
+
+  const compararParam = new URLSearchParams(window.location.search).get('comparar');
+  if (compararParam) {
+    const nisUrl = compararParam.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    setTimeout(async () => {
+      document.querySelector('.tab-btn[data-tab="rede"]')?.click();
+      await loadComparadorCatalogo();
+      nisUrl.slice(0, COMPARADOR_MAX).forEach(ni => toggleComparadorNi(ni, true));
+      if (comparadorState.selecionados.size >= 2) executarComparador();
+    }, 400);
+  }
 });

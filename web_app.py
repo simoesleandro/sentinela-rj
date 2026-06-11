@@ -455,12 +455,16 @@ def alertas_detail(alert_id: int):
         ).fetchone()
         if row is None:
             return jsonify({"error": "not found"}), 404
+        from db.transparencia_cruzamentos import listar_empenhos_vinculados
         from db.triagem import listar_historico, normalizar_status, status_permitidos
 
         payload = dict(row)
         payload["status"] = normalizar_status(payload.get("status"))
         payload["historico"] = listar_historico(db, alert_id)
         payload["transicoes_permitidas"] = status_permitidos(payload["status"])
+        payload["transparencia_rj"] = listar_empenhos_vinculados(
+            db, payload.get("numero_controle_pncp")
+        )
         return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -777,6 +781,88 @@ def fornecedores_ranking():
 # ---------------------------------------------------------------------------
 # Fornecedor — dossier
 # ---------------------------------------------------------------------------
+
+@app.route("/api/fornecedores/investigados")
+def fornecedores_investigados():
+    """Fornecedores com alertas no Sentinela — catálogo para o comparador."""
+    db = get_db()
+    try:
+        q = request.args.get("q", "").strip()
+        params: list = []
+        filtro_forn = ""
+        if q:
+            cnpj_q = q.replace(".", "").replace("/", "").replace("-", "")
+            filtro_forn = "AND (f.razao_social LIKE ? OR f.ni LIKE ?)"
+            params.extend([f"%{q}%", f"%{cnpj_q}%"])
+        rows = db.execute(
+            f"""
+            WITH contratos_agg AS (
+                SELECT fornecedor_ni,
+                       COUNT(*) AS total_contratos,
+                       COALESCE(SUM(valor_global), 0) AS valor_total
+                FROM contratos
+                WHERE valor_global > 0
+                GROUP BY fornecedor_ni
+            ),
+            alertas_agg AS (
+                SELECT c.fornecedor_ni,
+                       COUNT(DISTINCT a.id) AS total_alertas,
+                       COUNT(DISTINCT CASE WHEN a.severidade = 'alta' THEN a.id END) AS alertas_alta
+                FROM alertas a
+                JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+                WHERE c.valor_global > 0
+                  AND COALESCE(a.status, 'aberto') != 'descartado'
+                GROUP BY c.fornecedor_ni
+            )
+            SELECT f.ni AS fornecedor_ni,
+                   f.razao_social AS fornecedor,
+                   aa.total_alertas,
+                   aa.alertas_alta,
+                   ca.total_contratos,
+                   ca.valor_total,
+                   COALESCE(f.tem_sancao, 0) AS tem_sancao
+            FROM fornecedores f
+            JOIN alertas_agg aa ON aa.fornecedor_ni = f.ni
+            JOIN contratos_agg ca ON ca.fornecedor_ni = f.ni
+            WHERE 1=1 {filtro_forn}
+            ORDER BY aa.alertas_alta DESC, aa.total_alertas DESC, ca.valor_total DESC, f.razao_social
+            """,
+            params,
+        ).fetchall()
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["tem_sancao"] = bool(item.get("tem_sancao"))
+            items.append(item)
+        return jsonify({"items": items, "total": len(items)})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/fornecedores/comparar")
+def fornecedores_comparar():
+    from analise.comparador import ComparadorError, montar_comparacao
+
+    nis = request.args.getlist("ni")
+    if not nis:
+        bruto = request.args.get("nis", "").strip()
+        if bruto:
+            nis = [p.strip() for p in bruto.replace(";", ",").split(",") if p.strip()]
+    if not nis:
+        return jsonify({"error": "Informe ao menos dois CNPJs via ?ni= ou ?nis=."}), 400
+
+    db = get_db()
+    try:
+        return jsonify(montar_comparacao(db, nis))
+    except ComparadorError as exc:
+        return jsonify({"error": str(exc)}), 422
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
+
 
 @app.route("/api/fornecedores/<fornecedor_ni>")
 def fornecedor_dossie(fornecedor_ni: str):

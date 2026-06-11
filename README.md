@@ -89,7 +89,7 @@ python web_app.py
 | **Visão Geral** | KPIs, gráficos e card de status do pipeline (`GET /api/pipeline/status`) |
 | **Triagem** | Fila de alertas + `PATCH /api/alertas/{id}` com `{ "status", "nota" }` |
 | **Monitoramento** | CRUD de watchlists e regras de alerta (filtros Discord) |
-| **Rede** | Grafo investigativo por fornecedor |
+| **Rede** | Comparador multi-fornecedor, sócios compartilhados e grafo investigativo |
 
 Export dossiê na API: `GET /api/dossie/{id}?formato=md|json|pdf`.
 
@@ -316,6 +316,8 @@ sentinela/
 - [x] Card de status do pipeline na Visão Geral
 - [x] Export PDF do dossiê (`?formato=pdf`)
 - [x] Multi-município via env + backfill histórico + CEIS/CNEP + Transparência RJ
+- [x] Cross-ref Transparência RJ no painel de detalhes do alerta
+- [x] Comparador multi-fornecedor com lista de fornecedores investigados (`GET /api/fornecedores/investigados`)
 
 ---
 

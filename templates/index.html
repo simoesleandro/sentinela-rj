@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
   <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/app.js" defer></script>
+  <script src="/static/app.js?v=20260611" defer></script>
 </head>
 <body>
   <header>
@@ -209,7 +209,25 @@
 
     <!-- Section 7: Rede -->
     <section id="tab-rede" class="tab-section">
-      <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:0.25rem">Sócios em múltiplas empresas contratadas</h2>
+      <div class="comparador-panel">
+        <h2 class="section-heading">Comparador multi-fornecedor</h2>
+        <p class="section-note">Selecione 2 a 4 fornecedores com alertas no Sentinela — CNPJ e razão social já listados abaixo.</p>
+        <div class="comparador-picker">
+          <input type="search" id="comparador-busca" placeholder="Filtrar por nome ou CNPJ…" autocomplete="off" />
+          <div id="comparador-chips" class="comparador-chips" aria-live="polite"></div>
+          <div class="comparador-picker-actions">
+            <button type="button" id="comparador-limpar" class="btn-secondary-sm">Limpar seleção</button>
+            <button type="button" id="comparador-btn" class="btn-primary-sm" disabled>Comparar (0/4)</button>
+          </div>
+          <div id="comparador-lista" class="comparador-lista">
+            <div class="loading-msg">Carregando fornecedores investigados…</div>
+          </div>
+        </div>
+        <div id="comparador-resultado" class="comparador-resultado">
+          <p class="loading-msg">Selecione fornecedores na lista e clique em Comparar.</p>
+        </div>
+      </div>
+      <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:0.25rem;margin-top:2rem">Sócios em múltiplas empresas contratadas</h2>
       <p class="section-note" style="color:var(--muted);font-size:0.85rem;margin-bottom:1.5rem">
         Pessoas físicas que aparecem como sócias em 2 ou mais fornecedores que receberam contratos da prefeitura
       </p>
