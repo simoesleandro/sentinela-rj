@@ -112,6 +112,25 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+const esc = escapeHtml;
+
+async function api(path, { method = 'GET', body, ...rest } = {}) {
+  const init = { method, ...rest };
+  if (body !== undefined) {
+    init.headers = { 'Content-Type': 'application/json', ...(rest.headers || {}) };
+    init.body = JSON.stringify(body);
+  }
+  const res = await fetch(`${BASE}${path}`, init);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || res.statusText || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return null;
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return res.json();
+  return res;
+}
+
 const VEREDITO_MARKER = '[Recomendação de Veredito]';
 
 function parseVereditoIa(narrativa) {
@@ -282,6 +301,9 @@ function loadTab(name) {
     case 'rede':
       loadRede();
       break;
+    case 'monitoramento':
+      loadMonitoramento();
+      break;
   }
 }
 
@@ -331,8 +353,10 @@ async function loadStats() {
         <div class="kpi-hint">Intervalo dos contratos</div>
       </div>
     `;
+    loadPipelineStatus();
   } catch (e) {
     showError('kpi-cards', e.message);
+    loadPipelineStatus();
   }
 }
 
@@ -1677,6 +1701,238 @@ function endTour() {
   localStorage.setItem('sentinela_tour_seen', '1');
 }
 
+// ─── Pipeline status ───────────────────────────────────────────────────────
+
+async function loadPipelineStatus() {
+  const el = document.getElementById('pipeline-status-card');
+  if (!el) return;
+  try {
+    const data = await api('/api/pipeline/status');
+    const ultima = data.ultima_coleta || {};
+    const cfg = data.pipeline || {};
+    const saude = data.saude || 'desconhecido';
+    const badgeCls = saude === 'ok' ? 'ok' : saude === 'atencao' ? 'warn' : 'fail';
+    const linhas = (data.log_ultimas_linhas || []).join('\n');
+    const agendador = cfg.cron ? `cron ${cfg.cron}` : 'manual / Task Scheduler';
+    el.innerHTML = `
+      <div class="pipeline-status-header">
+        <h3>Pipeline automático</h3>
+        <span class="pipeline-badge ${badgeCls}">${esc(saude)}</span>
+      </div>
+      <div class="pipeline-status-grid">
+        <div class="pipeline-stat"><label>Última coleta</label><span>${esc(ultima.finalizado_em || ultima.iniciado_em || '—')}</span></div>
+        <div class="pipeline-stat"><label>Período</label><span>${esc(ultima.data_inicial || '—')} → ${esc(ultima.data_final || '—')}</span></div>
+        <div class="pipeline-stat"><label>Registros RJ</label><span>${ultima.registros_municipio ?? '—'}</span></div>
+        <div class="pipeline-stat"><label>Agendador</label><span>${esc(agendador)}</span></div>
+        <div class="pipeline-stat"><label>Janela (dias)</label><span>${cfg.janela_dias ?? '—'}</span></div>
+        <div class="pipeline-stat"><label>Discord</label><span>${cfg.discord_configurado ? 'sim' : 'não'}</span></div>
+      </div>
+      ${linhas ? `<pre class="pipeline-log-snippet">${esc(linhas)}</pre>` : ''}
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">Falha ao carregar pipeline: ${esc(e.message)}</div>`;
+  }
+}
+
+// ─── Watchlists & Regras ───────────────────────────────────────────────────
+
+let _configFormMode = null;
+let _configFormId = null;
+
+function _openConfigModal(title, fieldsHtml) {
+  const modal = document.getElementById('config-form-modal');
+  document.getElementById('config-form-title').textContent = title;
+  document.getElementById('config-form').innerHTML = fieldsHtml;
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function _closeConfigModal() {
+  const modal = document.getElementById('config-form-modal');
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  _configFormMode = null;
+  _configFormId = null;
+}
+
+function _watchlistCriterio(w) {
+  if (w.fornecedor_ni) return `Fornecedor ${w.fornecedor_ni}`;
+  if (w.orgao_cnpj) return `Órgão ${w.orgao_cnpj}`;
+  if (w.palavra_chave_objeto) return `"${w.palavra_chave_objeto}"`;
+  return '—';
+}
+
+function _watchlistFormHtml(w = {}) {
+  return `
+    <label>Rótulo</label><input name="rotulo" required value="${esc(w.rotulo || '')}" />
+    <label>CNPJ fornecedor</label><input name="fornecedor_ni" value="${esc(w.fornecedor_ni || '')}" placeholder="opcional" />
+    <label>CNPJ órgão</label><input name="orgao_cnpj" value="${esc(w.orgao_cnpj || '')}" placeholder="opcional" />
+    <label>Palavra-chave no objeto</label><input name="palavra_chave_objeto" value="${esc(w.palavra_chave_objeto || '')}" placeholder="opcional" />
+    <p class="section-note">Informe ao menos um critério acima.</p>
+    <label><input type="checkbox" name="ativo" ${w.ativo !== 0 ? 'checked' : ''} /> Ativo</label>
+  `;
+}
+
+function _regraFormHtml(r = {}) {
+  const tipos = ['', ...Object.keys(TIPO_LABELS)];
+  return `
+    <label>Tipo de alerta</label>
+    <select name="tipo">
+      ${tipos.map(t => {
+        const label = t ? (TIPO_LABELS[t] || t) : 'Todos os tipos';
+        return `<option value="${esc(t)}" ${(r.tipo || '') === t ? 'selected' : ''}>${esc(label)}</option>`;
+      }).join('')}
+    </select>
+    <label>Severidade mínima</label>
+    <select name="severidade_min">
+      ${['baixa', 'media', 'alta'].map(s =>
+        `<option value="${s}" ${r.severidade_min === s ? 'selected' : ''}>${s}</option>`
+      ).join('')}
+    </select>
+    <label>Valor mínimo (R$)</label><input name="valor_min" type="number" step="0.01" min="0" value="${r.valor_min ?? 0}" />
+    <label><input type="checkbox" name="ativo" ${r.ativo !== 0 ? 'checked' : ''} /> Ativo</label>
+  `;
+}
+
+function _watchlistPayload(form) {
+  const g = (name) => form.querySelector(`[name="${name}"]`)?.value.trim() || null;
+  return {
+    rotulo: g('rotulo'),
+    fornecedor_ni: g('fornecedor_ni'),
+    orgao_cnpj: g('orgao_cnpj'),
+    palavra_chave_objeto: g('palavra_chave_objeto'),
+    ativo: form.querySelector('[name=ativo]')?.checked ? 1 : 0,
+  };
+}
+
+function _regraPayload(form) {
+  const tipo = form.querySelector('[name=tipo]')?.value.trim();
+  return {
+    tipo: tipo || null,
+    severidade_min: form.querySelector('[name=severidade_min]').value,
+    valor_min: parseFloat(form.querySelector('[name=valor_min]').value) || 0,
+    ativo: form.querySelector('[name=ativo]')?.checked ? 1 : 0,
+  };
+}
+
+async function loadWatchlists() {
+  const wrap = document.getElementById('watchlists-table-wrap');
+  if (!wrap) return;
+  try {
+    const data = await api('/api/watchlists');
+    const rows = data.items || [];
+    if (!rows.length) {
+      wrap.innerHTML = '<p class="loading-msg">Nenhuma watchlist cadastrada.</p>';
+      return;
+    }
+    wrap.innerHTML = `
+      <table class="config-table">
+        <thead><tr><th>Rótulo</th><th>Critério</th><th>Ativo</th><th></th></tr></thead>
+        <tbody>${rows.map(w => `
+          <tr>
+            <td>${esc(w.rotulo)}</td><td>${esc(_watchlistCriterio(w))}</td>
+            <td>${w.ativo ? 'sim' : 'não'}</td>
+            <td class="config-actions">
+              <button type="button" data-edit-wl="${w.id}">Editar</button>
+              <button type="button" class="danger" data-del-wl="${w.id}">Desativar</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    wrap.querySelectorAll('[data-edit-wl]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const w = rows.find(x => x.id === parseInt(btn.dataset.editWl, 10));
+        _configFormMode = 'watchlist-edit';
+        _configFormId = w.id;
+        _openConfigModal('Editar watchlist', _watchlistFormHtml(w));
+      });
+    });
+    wrap.querySelectorAll('[data-del-wl]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Desativar esta watchlist?')) return;
+        await api(`/api/watchlists/${btn.dataset.delWl}`, { method: 'DELETE' });
+        loadWatchlists();
+      });
+    });
+  } catch (e) {
+    wrap.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
+async function loadRegras() {
+  const wrap = document.getElementById('regras-table-wrap');
+  if (!wrap) return;
+  try {
+    const data = await api('/api/regras-alerta');
+    const rows = data.items || [];
+    if (!rows.length) {
+      wrap.innerHTML = '<p class="loading-msg">Nenhuma regra cadastrada.</p>';
+      return;
+    }
+    wrap.innerHTML = `
+      <table class="config-table">
+        <thead><tr><th>Tipo</th><th>Severidade mín.</th><th>Valor mín.</th><th>Ativo</th><th></th></tr></thead>
+        <tbody>${rows.map(r => `
+          <tr>
+            <td>${esc(r.tipo ? (TIPO_LABELS[r.tipo] || r.tipo) : 'Todos')}</td>
+            <td>${esc(r.severidade_min)}</td>
+            <td>${formatCurrency(r.valor_min)}</td>
+            <td>${r.ativo ? 'sim' : 'não'}</td>
+            <td class="config-actions">
+              <button type="button" data-edit-rg="${r.id}">Editar</button>
+              <button type="button" class="danger" data-del-rg="${r.id}">Desativar</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    wrap.querySelectorAll('[data-edit-rg]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const r = rows.find(x => x.id === parseInt(btn.dataset.editRg, 10));
+        _configFormMode = 'regra-edit';
+        _configFormId = r.id;
+        _openConfigModal('Editar regra', _regraFormHtml(r));
+      });
+    });
+    wrap.querySelectorAll('[data-del-rg]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Desativar esta regra?')) return;
+        await api(`/api/regras-alerta/${btn.dataset.delRg}`, { method: 'DELETE' });
+        loadRegras();
+      });
+    });
+  } catch (e) {
+    wrap.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
+function loadMonitoramento() {
+  loadWatchlists();
+  loadRegras();
+}
+
+async function _salvarConfigForm() {
+  const form = document.getElementById('config-form');
+  if (!form || !_configFormMode) return;
+  try {
+    if (_configFormMode === 'watchlist-create') {
+      await api('/api/watchlists', { method: 'POST', body: _watchlistPayload(form) });
+      loadWatchlists();
+    } else if (_configFormMode === 'watchlist-edit') {
+      await api(`/api/watchlists/${_configFormId}`, { method: 'PATCH', body: _watchlistPayload(form) });
+      loadWatchlists();
+    } else if (_configFormMode === 'regra-create') {
+      await api('/api/regras-alerta', { method: 'POST', body: _regraPayload(form) });
+      loadRegras();
+    } else if (_configFormMode === 'regra-edit') {
+      await api(`/api/regras-alerta/${_configFormId}`, { method: 'PATCH', body: _regraPayload(form) });
+      loadRegras();
+    }
+    _closeConfigModal();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
 // ─── Bootstrap ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1746,4 +2002,20 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     if (!localStorage.getItem('sentinela_tour_seen')) startTour();
   }, 1200);
+
+  document.getElementById('btn-nova-watchlist')?.addEventListener('click', () => {
+    _configFormMode = 'watchlist-create';
+    _configFormId = null;
+    _openConfigModal('Nova watchlist', _watchlistFormHtml());
+  });
+  document.getElementById('btn-nova-regra')?.addEventListener('click', () => {
+    _configFormMode = 'regra-create';
+    _configFormId = null;
+    _openConfigModal('Nova regra de alerta', _regraFormHtml());
+  });
+  document.getElementById('config-form-cancel')?.addEventListener('click', _closeConfigModal);
+  document.getElementById('config-form-save')?.addEventListener('click', _salvarConfigForm);
+  document.getElementById('config-form-modal')?.addEventListener('click', (ev) => {
+    if (ev.target.id === 'config-form-modal') _closeConfigModal();
+  });
 });

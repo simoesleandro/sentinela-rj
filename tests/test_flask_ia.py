@@ -10,11 +10,12 @@ from db.conexao import SCHEMA_PATH, aplicar_migracoes
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
     import web_app as wa
 
     wa._migracoes_aplicadas = True
-    conexao = sqlite3.connect(":memory:")
+    db_file = tmp_path / "flask_ia.db"
+    conexao = sqlite3.connect(db_file)
     conexao.row_factory = sqlite3.Row
     conexao.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     aplicar_migracoes(conexao)
@@ -61,9 +62,12 @@ def client():
         ),
     )
     conexao.commit()
+    conexao.close()
 
     def _fake_get_db() -> sqlite3.Connection:
-        return conexao
+        c = sqlite3.connect(db_file, check_same_thread=False)
+        c.row_factory = sqlite3.Row
+        return c
 
     wa.get_db = _fake_get_db
     with wa.app.test_client() as test_client:
@@ -92,3 +96,11 @@ def test_dossie_md_retorna_attachment(client) -> None:
     assert "text/markdown" in res.content_type
     assert "attachment" in res.headers.get("Content-Disposition", "")
     assert b"# " in res.data or b"## " in res.data
+
+
+def test_dossie_pdf_retorna_attachment(client) -> None:
+    res = client.get("/api/dossie/1?formato=pdf")
+    assert res.status_code == 200
+    assert "application/pdf" in res.content_type
+    assert "attachment" in res.headers.get("Content-Disposition", "")
+    assert res.data[:4] == b"%PDF"

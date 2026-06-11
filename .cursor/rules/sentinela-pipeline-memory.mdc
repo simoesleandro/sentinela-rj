@@ -5,6 +5,18 @@ alwaysApply: true
 
 # Sentinela RJ — Memória de Sessão (atualizada)
 
+## ⚠️ Dois projetos distintos (não misturar)
+
+| | **Sentinela RJ** (este repo) | **HermesCommand / agente_local** |
+|--|------------------------------|----------------------------------|
+| Pasta | `Desktop\Sentinela` | `Meus Projetos\agente_local` |
+| Git | repo Sentinela | GitHub HermesCommand |
+| Função | PNCP, alertas, Flask :5055 | Chat agente Llama, API :8080 |
+| `.env` | PNCP, IA, Discord, DB | `SCRAPER_FOLDER_PATH`, Ollama, VM |
+| VM / terminal.log | **não usa** | `auditar_terminal_vm_real()` |
+
+Variáveis `SCRAPER_FOLDER_PATH`, `VBOX_*`, `VM_*` **não pertencem** ao `.env` deste projeto.
+
 ## Fluxo ponta a ponta
 
 ```
@@ -153,3 +165,8 @@ Gemini (gemini-2.5-flash) → revisão + **[Recomendação de Veredito]**
 ## Artefatos a NÃO versionar
 
 - `data/*.db`, `.env`, `backend.zip`, `frontend.zip`, `.web/`, `reflex.lock/`
+
+## Integração HermesCommand (somente referência cruzada)
+
+O chat **Sentinela-RJ** e a telemetria **Vigilante STF** vivem em `C:\Meus Projetos\agente_local`.
+Memória completa: `agente_local/.cursor/rules/hermes-vigilante-telemetry-memory.mdc`

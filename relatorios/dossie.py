@@ -359,6 +359,31 @@ def renderizar_markdown(dados: DossieAlerta) -> str:
     return "\n".join(partes)
 
 
+def renderizar_pdf(dados: DossieAlerta) -> bytes:
+    """Exporta dossiê como PDF (texto plano a partir do Markdown)."""
+    from fpdf import FPDF
+
+    texto = renderizar_markdown(dados)
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=9)
+    largura = pdf.epw
+    for linha in texto.splitlines():
+        seguro = (
+            linha.replace("—", "-")
+            .encode("latin-1", errors="replace")
+            .decode("latin-1")
+        )
+        pdf.multi_cell(largura, 4.5, seguro)
+    out = pdf.output()
+    if isinstance(out, bytes):
+        return out
+    if isinstance(out, bytearray):
+        return bytes(out)
+    return str(out).encode("latin-1")
+
+
 def serializar_json(dados: DossieAlerta) -> dict[str, Any]:
     return dict(dados)
 
@@ -394,6 +419,10 @@ def exportar_dossie(
             json.dumps(serializar_json(dados), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        return caminho
+    if formato.lower() == "pdf":
+        caminho = destino / f"dossie_alerta_{alerta_id}_{hoje}.pdf"
+        caminho.write_bytes(renderizar_pdf(dados))
         return caminho
     caminho = destino / f"dossie_alerta_{alerta_id}_{hoje}.md"
     caminho.write_text(renderizar_markdown(dados), encoding="utf-8")

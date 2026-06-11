@@ -54,7 +54,8 @@ Dashboards Streamlit/Reflex estão **deprecados** — ver [DEPRECATED.md](DEPREC
 ```bash
 git clone https://github.com/simoesleandro/sentinela-rj
 cd sentinela-rj
-pip install -r requirements-web.txt   # core + Flask
+pip install -r requirements-web.txt   # core + Flask + fpdf2 (PDF dossiê)
+pip install -r requirements-ia.txt    # opcional: Gemini/Groq
 cp .env.example .env                  # opcional
 ```
 
@@ -70,7 +71,7 @@ python __main__.py coletar [data_ini data_fim]
 python __main__.py analisar              # sync incremental — preserva triagem
 python __main__.py investigar [--limite N]
 python __main__.py relatorio [--dir DIR]
-python __main__.py dossie --alerta ID [--formato md|json] [--gerar-ia]
+python __main__.py dossie --alerta ID [--formato md|json|pdf] [--gerar-ia]
 python __main__.py publicar [--dir DIR] [--limite-ia N]
 python __main__.py enriquecer [--reset]
 python __main__.py painel
@@ -83,7 +84,14 @@ python web_app.py
 # → http://localhost:5055/dashboard
 ```
 
-Triagem de alertas: aba **Triagem** → `PATCH /api/alertas/{id}` com `{ "status", "nota" }`.
+| Aba | Função |
+|-----|--------|
+| **Visão Geral** | KPIs, gráficos e card de status do pipeline (`GET /api/pipeline/status`) |
+| **Triagem** | Fila de alertas + `PATCH /api/alertas/{id}` com `{ "status", "nota" }` |
+| **Monitoramento** | CRUD de watchlists e regras de alerta (filtros Discord) |
+| **Rede** | Grafo investigativo por fornecedor |
+
+Export dossiê na API: `GET /api/dossie/{id}?formato=md|json|pdf`.
 
 ### Testes
 
@@ -102,6 +110,16 @@ python -m automacoes.pipeline --daemon    # APScheduler embutido
 Esteira: **coletar → enriquecer → analisar → investigar (Top N Ollama) → Discord**.
 
 Logs em `logs/pipeline_YYYYMMDD.txt`. Agendar no Windows: `scripts\agendar.ps1`.
+
+Variáveis principais do pipeline (`.env`):
+
+| Variável | Uso |
+|----------|-----|
+| `PIPELINE_CRON` | Expressão cron (modo `--daemon`) |
+| `PIPELINE_JANELA_DIAS` | Janela retroativa de coleta |
+| `PIPELINE_INVESTIGAR_LIMITE` | Top N alertas para narrativa IA |
+| `DISCORD_WEBHOOK_URL` | Notificações filtradas por regras de alerta |
+| `MUNICIPIO_IBGE` | Código IBGE do município monitorado |
 
 ---
 
@@ -249,29 +267,42 @@ Limiares de severidade por subtipo (baseados nos limites legais da Lei 14.133/20
 
 ```
 sentinela/
-├── __main__.py            # Entry point: python __main__.py <cmd>
+├── __main__.py              # CLI: coletar, analisar, dossie, pipeline…
+├── web_app.py               # Flask SPA — UI canônica (:5055/dashboard)
+├── automacoes/
+│   ├── pipeline.py          # Coleta agendada + Discord
+│   └── utils/notificador.py
 ├── db/
-│   ├── schema.sql         # Tabelas e índices (CREATE TABLE IF NOT EXISTS)
-│   └── conexao.py         # get_conn(), init_db()
+│   ├── schema.sql           # DDL SQLite
+│   ├── conexao.py           # get_conn(), init_db()
+│   ├── alertas_sync.py      # Sync incremental (preserva triagem)
+│   ├── triagem.py           # Workflow de status
+│   ├── watchlists.py        # CRUD watchlists
+│   ├── regras_alerta.py     # Filtros de notificação
+│   └── narrativa.py         # Persistência narrativa IA
 ├── extrator/
-│   └── pncp.py            # Coleta paginada com retry/backoff
+│   ├── pncp.py              # Coleta PNCP paginada
+│   ├── enriquecedor.py      # BrasilAPI cadastral
+│   ├── sancoes_ingestao.py  # CEIS/CNEP
+│   └── transparencia_rj.py  # Cruzamento empenhos RJ
 ├── analisador/
-│   ├── engine.py          # Orquestração + sync incremental de alertas
-│   ├── outliers.py        # Detector IQR por categoria
-│   ├── concentracao.py    # Detector janela deslizante
-│   ├── licitacao.py       # Detector regex modalidade
-│   ├── fracionamento.py   # Fracionamento por AP
-│   ├── sancoes.py         # Empresas inativas / sanções
-│   └── socios.py          # Sócios compartilhados
-├── db/
-│   ├── alertas_sync.py    # Preserva triagem na re-análise
-│   └── triagem.py         # Workflow de status + histórico
+│   ├── engine.py            # Orquestração dos detectores
+│   ├── outliers.py          # IQR por categoria
+│   ├── concentracao.py      # Janela 90 dias
+│   ├── licitacao.py         # Regex modalidade
+│   ├── fracionamento.py     # Fracionamento por AP
+│   ├── sancoes.py           # Empresas inativas
+│   ├── socios.py            # Sócios compartilhados
+│   └── watchlists.py        # Detector de matches
+├── analise/
+│   ├── motor_ia.py          # Ollama / Gemini / Groq
+│   └── grafo.py             # Rede investigativa
 ├── relatorios/
-│   ├── builder.py         # Relatório Markdown
-│   └── dossie.py          # Dossiê por alerta
-├── web_app.py             # Flask — UI canônica
-└── data/
-    └── sentinela_rj.db    # SQLite — não versionado (.gitignore)
+│   ├── builder.py           # Relatório Markdown
+│   └── dossie.py            # Dossiê MD/JSON/PDF
+├── static/ + templates/     # SPA do dashboard
+├── tests/                   # pytest
+└── data/sentinela_rj.db     # SQLite local (.gitignore)
 ```
 
 ---
@@ -281,7 +312,9 @@ sentinela/
 - [x] Dashboard Flask com triagem, dossiê, grafo e narrativa IA on-demand
 - [x] Sync incremental de alertas (preserva triagem e narrativa IA)
 - [x] Pipeline agendado (`coletar → enriquecer → analisar → investigar → notificar`)
-- [x] Watchlists e alertas Discord
+- [x] Watchlists e alertas Discord (backend + UI na aba Monitoramento)
+- [x] Card de status do pipeline na Visão Geral
+- [x] Export PDF do dossiê (`?formato=pdf`)
 - [x] Multi-município via env + backfill histórico + CEIS/CNEP + Transparência RJ
 
 ---

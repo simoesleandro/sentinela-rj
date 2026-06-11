@@ -5,6 +5,9 @@ import json
 import math
 import os
 import sqlite3
+from datetime import datetime
+from pathlib import Path
+
 from flask import Flask, jsonify, request, render_template, Response
 from dotenv import load_dotenv
 
@@ -527,6 +530,7 @@ def dossie_api(alerta_id: int):
         DossieNaoEncontradoError,
         obter_dossie,
         renderizar_markdown,
+        renderizar_pdf,
         serializar_json,
     )
 
@@ -558,7 +562,83 @@ def dossie_api(alerta_id: int):
                 ),
             },
         )
+    if formato == "pdf":
+        return Response(
+            renderizar_pdf(dados),
+            mimetype="application/pdf",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="dossie-alerta-{alerta_id}.pdf"'
+                ),
+            },
+        )
     return jsonify(serializar_json(dados))
+
+
+# ---------------------------------------------------------------------------
+# Pipeline — status operacional
+# ---------------------------------------------------------------------------
+
+def _saude_pipeline(ultima_coleta: dict | None, janela_dias: int) -> str:
+    if not ultima_coleta or not ultima_coleta.get("finalizado_em"):
+        return "desconhecido"
+    obs = (ultima_coleta.get("observacao") or "").lower()
+    if any(termo in obs for termo in ("erro", "falha", "exception", "traceback")):
+        return "falha"
+    try:
+        bruto = str(ultima_coleta["finalizado_em"]).replace("Z", "")
+        fim = datetime.fromisoformat(bruto.split(".")[0])
+        limite = max(int(janela_dias) + 2, 3)
+        if (datetime.now() - fim).days > limite:
+            return "atencao"
+    except (ValueError, TypeError):
+        return "atencao"
+    return "ok"
+
+
+@app.route("/api/pipeline/status")
+def pipeline_status():
+    from automacoes.pipeline import PipelineConfig
+
+    db = get_db()
+    try:
+        row = db.execute(
+            """
+            SELECT fonte, data_inicial, data_final, paginas_lidas,
+                   registros_brutos, registros_municipio,
+                   iniciado_em, finalizado_em, observacao
+            FROM coletas_log
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        ultima_coleta = dict(row) if row else None
+
+        cfg = PipelineConfig.from_env()
+        log_dir = Path(__file__).resolve().parent / "logs"
+        log_hoje = log_dir / f"pipeline_{datetime.now().strftime('%Y%m%d')}.txt"
+        ultimas_linhas: list[str] = []
+        if log_hoje.is_file():
+            linhas = log_hoje.read_text(encoding="utf-8", errors="replace").splitlines()
+            ultimas_linhas = [ln for ln in linhas if ln.strip()][-8:]
+
+        return jsonify({
+            "ultima_coleta": ultima_coleta,
+            "saude": _saude_pipeline(ultima_coleta, cfg.janela_dias),
+            "pipeline": {
+                "cron": cfg.cron,
+                "timezone": cfg.timezone,
+                "janela_dias": cfg.janela_dias,
+                "investigar_limite": cfg.investigar_limite,
+                "discord_configurado": bool(os.getenv("DISCORD_WEBHOOK_URL", "").strip()),
+            },
+            "log_hoje": str(log_hoje) if log_hoje.is_file() else None,
+            "log_ultimas_linhas": ultimas_linhas,
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,4 @@
+# Dependências opcionais — narrativa IA (Gemini / Groq)
+-r requirements.txt
+google-generativeai>=0.8.0
+groq>=0.9.0

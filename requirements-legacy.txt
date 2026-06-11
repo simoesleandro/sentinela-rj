@@ -1,2 +1,0 @@
-# Painéis Streamlit/Reflex removidos do repositório (ver DEPRECATED.md).
-# Use requirements-web.txt para a UI Flask canônica.

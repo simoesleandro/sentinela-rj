@@ -1,58 +1,66 @@
-"""Testes unitários do gerenciador de banco de dados."""
+"""Testes do gerenciador de narrativas IA."""
 from __future__ import annotations
 
 import sqlite3
-from typing import Any
 
 import pytest
 
-from db.database import GerenciadorBanco
-
-_TABELA = "despesas"
-
-
-@pytest.fixture
-def gerenciador() -> GerenciadorBanco:
-    return GerenciadorBanco(":memory:")
+from db.conexao import SCHEMA_PATH, aplicar_migracoes
+from db.narrativa import GerenciadorNarrativa
 
 
 @pytest.fixture
-def contratos_mock() -> list[dict[str, Any]]:
-    return [
-        {
-            "numero_controle_pncp": "PNCP-2026-0001",
-            "orgao_cnpj": "12345678000199",
-            "fornecedor_ni": "98765432000111",
-            "valor_global": 150000.0,
-            "objeto": "Aquisição de equipamentos de TI",
-            "data_assinatura": "2026-01-15",
-        },
-    ]
-
-
-def _consultar_registros(
-    gerenciador: GerenciadorBanco,
-    tabela: str,
-) -> list[dict[str, Any]]:
-    conn = gerenciador._obter_conexao()
+def gerenciador() -> GerenciadorNarrativa:
+    conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
-    linhas = conn.execute(f'SELECT * FROM "{tabela}"').fetchall()
-    return [dict(linha) for linha in linhas]
+    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    aplicar_migracoes(conn)
+    conn.commit()
+    return GerenciadorNarrativa(connection=conn)
 
 
-def test_salvar_despesas_sucesso(
-    gerenciador: GerenciadorBanco,
-    contratos_mock: list[dict[str, Any]],
-) -> None:
-    gerenciador.salvar_despesas(contratos_mock, _TABELA)
+def _inserir_alerta(conn: sqlite3.Connection, *, narrativa: str | None = None) -> int:
+    conn.execute(
+        """
+        INSERT INTO alertas (
+            numero_controle_pncp, tipo, severidade, descricao,
+            metodologia, valor_referencia, narrativa_ia
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        ("PNCP-1", "outlier", "alta", "Teste", "iqr", 1000.0, narrativa),
+    )
+    conn.commit()
+    row = conn.execute("SELECT id FROM alertas ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    return int(row[0])
 
-    salvo = _consultar_registros(gerenciador, _TABELA)
-    assert len(salvo) == 1
-    assert salvo[0]["numero_controle_pncp"] == "PNCP-2026-0001"
-    assert salvo[0]["orgao_cnpj"] == "12345678000199"
-    assert float(salvo[0]["valor_global"]) == 150000.0
+
+def test_listar_sem_narrativa(gerenciador: GerenciadorNarrativa) -> None:
+    gerenciador.garantir_tabela_anomalias()
+    conn = gerenciador._obter_conexao()
+    _inserir_alerta(conn, narrativa=None)
+    _inserir_alerta(conn, narrativa="já tem texto")
+
+    pendentes = gerenciador.listar_anomalias_sem_narrativa(limite=10)
+    assert len(pendentes) == 1
+    assert pendentes[0]["numero_controle_pncp"] == "PNCP-1"
 
 
-def test_salvar_despesas_lista_vazia(gerenciador: GerenciadorBanco) -> None:
-    with pytest.raises(ValueError, match="Lista vazia"):
-        gerenciador.salvar_despesas([], _TABELA)
+def test_atualizar_narrativa(gerenciador: GerenciadorNarrativa) -> None:
+    gerenciador.garantir_tabela_anomalias()
+    conn = gerenciador._obter_conexao()
+    alerta_id = _inserir_alerta(conn, narrativa=None)
+
+    gerenciador.atualizar_narrativa_anomalia(alerta_id, "Narrativa gerada pela IA.")
+
+    row = conn.execute(
+        "SELECT narrativa_ia FROM alertas WHERE id = ?",
+        (alerta_id,),
+    ).fetchone()
+    assert row is not None
+    assert row[0] == "Narrativa gerada pela IA."
+
+
+def test_atualizar_narrativa_id_invalido(gerenciador: GerenciadorNarrativa) -> None:
+    with pytest.raises(ValueError, match="positivo"):
+        gerenciador.atualizar_narrativa_anomalia(0, "x")

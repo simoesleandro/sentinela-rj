@@ -12,6 +12,7 @@ from relatorios.dossie import (
     carregar_dossie,
     exportar_dossie,
     renderizar_markdown,
+    renderizar_pdf,
 )
 
 
@@ -110,3 +111,16 @@ def test_exportar_dossie_markdown(tmp_path: Path, conn: sqlite3.Connection) -> N
 def test_alerta_inexistente(conn: sqlite3.Connection) -> None:
     with pytest.raises(DossieNaoEncontradoError):
         carregar_dossie(conn, 999)
+
+
+def test_renderizar_pdf_bytes(conn: sqlite3.Connection) -> None:
+    dados = carregar_dossie(conn, 1)
+    pdf = renderizar_pdf(dados)
+    assert isinstance(pdf, bytes)
+    assert pdf[:4] == b"%PDF"
+
+
+def test_exportar_dossie_pdf(tmp_path: Path, conn: sqlite3.Connection) -> None:
+    caminho = exportar_dossie(conn, 1, tmp_path, gerar_ia=False, formato="pdf")
+    assert caminho.suffix == ".pdf"
+    assert caminho.read_bytes()[:4] == b"%PDF"

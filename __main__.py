@@ -21,6 +21,10 @@ from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # ── Helpers de saída ─────────────────────────────────────────────────────────
 
 SEP = "-" * 56
@@ -623,8 +627,8 @@ def _build_parser() -> argparse.ArgumentParser:
     col.add_argument("data_fim", nargs="?", metavar="AAAAMMDD",
                      help="Data final (padrao: hoje)")
 
-    # analisar
-    col.add_argument("data_fim", nargs="?", help="Data final AAAAMMDD")
+    sub.add_parser("analisar",
+                   help="Detecta anomalias e salva alertas no banco")
 
     # backfill
     bf = sub.add_parser(
@@ -646,9 +650,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Ingere empenhos Transparencia RJ e cruza com contratos PNCP",
     )
 
-    sub.add_parser("analisar",
-                   help="Detecta anomalias e salva alertas no banco")
-
     # relatorio
     rel = sub.add_parser("relatorio", help="Gera relatorio Markdown de anomalias")
     rel.add_argument("--dir", metavar="DIR",
@@ -668,7 +669,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     dos.add_argument(
         "--formato",
-        choices=("md", "json"),
+        choices=("md", "json", "pdf"),
         default="md",
         help="Formato de exportacao (padrao: md)",
     )
@@ -745,24 +746,6 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _carregar_env() -> None:
-    env_path = Path(__file__).resolve().parent / ".env"
-    try:
-        with env_path.open(encoding="utf-8") as handle:
-            for linha in handle:
-                linha = linha.strip()
-                if not linha or linha.startswith("#"):
-                    continue
-                chave, separador, valor = linha.partition("=")
-                if not separador:
-                    continue
-                chave = chave.strip()
-                if chave:
-                    os.environ[chave] = valor.strip()
-    except FileNotFoundError:
-        pass
-
-
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
@@ -794,5 +777,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    _carregar_env()
     main()

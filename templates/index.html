@@ -27,6 +27,7 @@
     <button class="tab-btn" data-tab="fornecedores">Fornecedores</button>
     <button class="tab-btn" data-tab="orgaos">Órgãos</button>
     <button class="tab-btn" data-tab="rede">Rede</button>
+    <button class="tab-btn" data-tab="monitoramento">Monitoramento</button>
     <button class="tab-btn" data-tab="sobre">Sobre</button>
   </nav>
 
@@ -39,6 +40,9 @@
         <a href="/api/export/contratos" class="btn-download">⬇ Contratos (.csv)</a>
         <a href="/api/export/alertas" class="btn-download">⬇ Alertas (.csv)</a>
         <span class="download-hint">Todos os dados disponíveis para verificação independente</span>
+      </div>
+      <div id="pipeline-status-card" class="pipeline-status-card">
+        <div class="loading-msg">Carregando status do pipeline…</div>
       </div>
       <div class="charts-grid">
         <div class="chart-box">
@@ -236,6 +240,41 @@
     </section>
 
     <!-- Section 5: Sobre -->
+    <section id="tab-monitoramento" class="tab-section">
+      <h2 class="section-heading">Watchlists e Regras de Alerta</h2>
+      <p class="section-note">Critérios de monitoramento contínuo e filtros para notificações Discord.</p>
+      <div class="config-grid">
+        <div class="config-panel">
+          <div class="config-panel-header">
+            <h3>Watchlists</h3>
+            <button type="button" id="btn-nova-watchlist" class="btn-primary-sm">+ Nova</button>
+          </div>
+          <div id="watchlists-table-wrap" class="table-wrap">
+            <div class="loading-msg">Carregando watchlists…</div>
+          </div>
+        </div>
+        <div class="config-panel">
+          <div class="config-panel-header">
+            <h3>Regras de alerta</h3>
+            <button type="button" id="btn-nova-regra" class="btn-primary-sm">+ Nova</button>
+          </div>
+          <div id="regras-table-wrap" class="table-wrap">
+            <div class="loading-msg">Carregando regras…</div>
+          </div>
+        </div>
+      </div>
+      <div id="config-form-modal" class="config-modal hidden" aria-hidden="true">
+        <div class="config-modal-inner">
+          <h3 id="config-form-title">Formulário</h3>
+          <form id="config-form"></form>
+          <div class="config-modal-actions">
+            <button type="button" id="config-form-cancel" class="btn-secondary-sm">Cancelar</button>
+            <button type="button" id="config-form-save" class="btn-primary-sm">Salvar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="tab-sobre" class="tab-section sobre-section">
       <h2>Sobre o Sentinela RJ</h2>
       <p>O <strong>Sentinela RJ</strong> é um sistema independente de monitoramento de contratos públicos do município do Rio de Janeiro. Nosso objetivo é tornar mais fácil para qualquer cidadão identificar irregularidades ou padrões suspeitos nos contratos firmados pela prefeitura.</p>

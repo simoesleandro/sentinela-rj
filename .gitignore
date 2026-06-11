@@ -44,3 +44,9 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# ── Artefatos legados (UI removida) ───────────────────────────────────────────
+backend.zip
+frontend.zip
+reflex.lock/
+.streamlit/
