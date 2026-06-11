@@ -5,6 +5,8 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from analise.motivos_descarte import MOTIVOS_FALSO_POSITIVO, formatar_nota_descarte
+
 STATUS_ABERTO = "aberto"
 STATUS_INVESTIGANDO = "investigando"
 STATUS_CONFIRMADO = "confirmado"
@@ -81,6 +83,7 @@ def atualizar_status_alerta(
     *,
     status: str,
     nota: str | None = None,
+    motivo_descarte: str | None = None,
 ) -> dict[str, Any]:
     row = conn.execute(
         "SELECT id, status, notas_triagem FROM alertas WHERE id = ?",
@@ -93,6 +96,19 @@ def atualizar_status_alerta(
     novo = normalizar_status(status)
     nota_limpa = (nota or "").strip()
     agora = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    if novo == STATUS_DESCARTADO and anterior != STATUS_DESCARTADO:
+        motivo = (motivo_descarte or "").strip().lower()
+        if not motivo:
+            raise TriagemError(
+                "Informe o motivo do descarte (feedback de falso positivo)."
+            )
+        if motivo not in MOTIVOS_FALSO_POSITIVO:
+            raise TriagemError(
+                f"Motivo inválido: '{motivo}'. "
+                f"Use: {', '.join(sorted(MOTIVOS_FALSO_POSITIVO))}."
+            )
+        nota_limpa = formatar_nota_descarte(motivo, nota_limpa)
 
     if anterior == novo:
         if not nota_limpa:

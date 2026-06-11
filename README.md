@@ -318,6 +318,9 @@ sentinela/
 - [x] Multi-município via env + backfill histórico + CEIS/CNEP + Transparência RJ
 - [x] Cross-ref Transparência RJ no painel de detalhes do alerta
 - [x] Comparador multi-fornecedor com lista de fornecedores investigados (`GET /api/fornecedores/investigados`)
+- [x] Detector de evolução temporal (`evolucao_temporal_fornecedor`)
+- [x] Score composto na listagem de alertas (coluna Prioridade + ordenação padrão)
+- [x] Feedback estruturado ao descartar alertas (`motivo_descarte` + `GET /api/alertas/feedback/descartes`)
 
 ---
 

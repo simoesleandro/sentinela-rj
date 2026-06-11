@@ -56,3 +56,11 @@ def test_resumo_status_conta_fila(conn: sqlite3.Connection) -> None:
 def test_alerta_inexistente(conn: sqlite3.Connection) -> None:
     with pytest.raises(AlertaNaoEncontradoError):
         atualizar_status_alerta(conn, 999, status="investigando")
+
+
+def test_descarte_para_investigando(conn: sqlite3.Connection) -> None:
+    atualizar_status_alerta(
+        conn, 1, status="descartado", motivo_descarte="outro", nota="Sem risco",
+    )
+    resultado = atualizar_status_alerta(conn, 1, status="investigando", nota="Reabrir")
+    assert resultado["status"] == "investigando"

@@ -34,6 +34,7 @@ class AnomaliaResult:
 def _carregar_detectores() -> _Detectores:
     from analisador import (
         concentracao,
+        evolucao_temporal,
         fracionamento,
         licitacao,
         outliers,
@@ -44,6 +45,7 @@ def _carregar_detectores() -> _Detectores:
     return [
         ("outliers", outliers.detectar),
         ("concentracao", concentracao.detectar),
+        ("evolucao_temporal", evolucao_temporal.detectar),
         ("licitacao", licitacao.detectar),
         ("fracionamento", fracionamento.detectar),
         ("sancoes", sancoes.detectar),

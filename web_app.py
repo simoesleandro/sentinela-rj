@@ -13,9 +13,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from analise.motivos_descarte import MOTIVOS_FALSO_POSITIVO, extrair_motivo_descarte
+from analise.score_composto import calcular_score_composto
 from db.conexao import DB_PATH, aplicar_migracoes
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+
+_SCORE_SQL = """(
+    COALESCE(a.score, 0) * 0.35
+    + CASE COALESCE(a.severidade, 'baixa')
+      WHEN 'alta' THEN 0.4 WHEN 'media' THEN 0.25 ELSE 0.1 END
+    + MIN(COALESCE(a.valor_referencia, 0) / 50000000.0, 1.0) * 0.25
+)"""
 _migracoes_aplicadas = False
 
 
@@ -238,21 +247,63 @@ def alertas_triagem():
                    c.objeto, c.data_assinatura,
                    o.razao_social AS orgao
             {base} {where}
-            ORDER BY CASE a.severidade
-                     WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END,
-                     a.score IS NULL, a.score DESC,
-                     a.id DESC
+            ORDER BY {_SCORE_SQL} DESC, a.id DESC
             LIMIT ? OFFSET ?
             """,
             params + [per_page, offset],
         ).fetchall()
 
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["score_composto"] = calcular_score_composto(
+                item.get("score"), item.get("severidade"), item.get("valor_referencia"),
+            )
+            items.append(item)
+
         return jsonify({
             "resumo": resumo_status(db),
-            "items": [dict(r) for r in rows],
+            "items": items,
             "total": total,
             "page": page,
             "pages": pages,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/alertas/feedback/descartes")
+def alertas_feedback_descartes():
+    """Resumo de descartes por tipo de alerta e motivo de falso positivo."""
+    db = get_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT a.tipo, h.nota
+            FROM alertas_historico h
+            JOIN alertas a ON a.id = h.alerta_id
+            WHERE h.status_novo = 'descartado'
+            """
+        ).fetchall()
+        por_tipo: dict[str, int] = {}
+        por_motivo: dict[str, int] = {}
+        sem_motivo = 0
+        for row in rows:
+            tipo = row["tipo"] or "desconhecido"
+            por_tipo[tipo] = por_tipo.get(tipo, 0) + 1
+            motivo = extrair_motivo_descarte(row["nota"])
+            if motivo:
+                por_motivo[motivo] = por_motivo.get(motivo, 0) + 1
+            else:
+                sem_motivo += 1
+        return jsonify({
+            "motivos_disponiveis": MOTIVOS_FALSO_POSITIVO,
+            "por_tipo": por_tipo,
+            "por_motivo": por_motivo,
+            "sem_motivo_estruturado": sem_motivo,
+            "total_descartes": len(rows),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -316,9 +367,11 @@ def alertas_agrupados():
 
         group_rows = db.execute(
             f"""
-            SELECT DISTINCT c.fornecedor_ni, a.tipo, f.razao_social AS fornecedor_nome
+            SELECT c.fornecedor_ni, a.tipo, f.razao_social AS fornecedor_nome,
+                   MAX({_SCORE_SQL}) AS score_composto
             {joins} {where}
-            ORDER BY c.fornecedor_ni, a.tipo
+            GROUP BY c.fornecedor_ni, a.tipo, f.razao_social
+            ORDER BY score_composto DESC, c.fornecedor_ni, a.tipo
             LIMIT ? OFFSET ?
             """,
             params + [per_page, offset],
@@ -368,6 +421,7 @@ def alertas_agrupados():
                 "tipo": tp,
                 "severidade": max_sev,
                 "status": max_status,
+                "score_composto": round(float(gr["score_composto"] or 0), 4),
                 "ocorrencias": len(alerts),
                 "valor_total": valor_total,
                 "valor_max": valor_max,
@@ -423,6 +477,7 @@ def alertas_detail(alert_id: int):
                 alert_id,
                 status=str(status),
                 nota=body.get("nota"),
+                motivo_descarte=body.get("motivo_descarte"),
             )
             return jsonify(resultado)
         except AlertaNaoEncontradoError:

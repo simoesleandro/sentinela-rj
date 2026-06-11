@@ -10,6 +10,7 @@ const TIPO_LABELS = {
   sem_licitacao_dispensa: 'Dispensa',
   fracionamento_ap: 'Fracionamento',
   watchlist_match: 'Match em Watchlist',
+  evolucao_temporal_fornecedor: 'Aceleração contratual',
 };
 
 const TIPO_COLORS = {
@@ -19,12 +20,21 @@ const TIPO_COLORS = {
   sem_licitacao_emergencia: '#eab308',
   sem_licitacao_dispensa: '#3b82f6',
   fracionamento_ap: '#22c55e',
+  evolucao_temporal_fornecedor: '#06b6d4',
 };
 
 const SEV_COLORS = {
   alta: '#ef4444',
   media: '#f97316',
   baixa: '#6b7280',
+};
+
+const MOTIVOS_DESCARTE = {
+  valor_rotineiro: 'Valor rotineiro para a categoria',
+  categoria_diferente: 'Categoria/objeto não se aplica ao detector',
+  dados_incompletos: 'Dados insuficientes ou inconsistentes',
+  duplicado: 'Alerta duplicado ou já investigado',
+  outro: 'Outro motivo',
 };
 
 const STATUS_LABELS = {
@@ -63,7 +73,7 @@ const state = {
   currentTab: 'visao-geral',
   alertasPage: 1,
   alertasFiltros: { status: 'fila', tipo: '', severidade: '', ano: '', fornecedor: '', valorMin: '' },
-  alertasSort: { column: null, direction: 'desc' },
+  alertasSort: { column: 'prioridade', direction: 'desc' },
   charts: {},
   tabLoaded: {},
   timelineData: null,
@@ -547,7 +557,7 @@ async function loadAlertas() {
     }
 
     if (!d.items.length) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Nenhuma anomalia encontrada.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Nenhuma anomalia encontrada.</td></tr>';
     } else {
       const SEV_SORT_VAL = { alta: 3, media: 2, baixa: 1 };
       const groups = [...d.items];
@@ -555,6 +565,7 @@ async function loadAlertas() {
         const dir = state.alertasSort.direction === 'asc' ? 1 : -1;
         groups.sort((a, b) => {
           switch (state.alertasSort.column) {
+            case 'prioridade': return dir * ((a.score_composto || 0) - (b.score_composto || 0));
             case 'valor':      return dir * ((a.valor_total || 0) - (b.valor_total || 0));
             case 'severidade': return dir * ((SEV_SORT_VAL[a.severidade] || 0) - (SEV_SORT_VAL[b.severidade] || 0));
             case 'data':       return dir * ((a.data_mais_recente || '').localeCompare(b.data_mais_recente || ''));
@@ -575,9 +586,11 @@ async function loadAlertas() {
           : '<span style="color:var(--muted)">—</span>';
         const gid = grupo.grupo_id;
 
+        const prioPct = Math.round((grupo.score_composto || 0) * 100);
         html.push(`
           <tr class="row-group" data-grupo="${gid}">
             <td><button class="expand-btn" data-grupo="${gid}">▶</button></td>
+            <td><span class="prio-score" title="Score composto">${prioPct}</span></td>
             <td>${tipoBadge(grupo.tipo)}</td>
             <td>${sevBadge(grupo.severidade)}</td>
             <td>${statusBadge(grupo.status)}</td>
@@ -595,7 +608,7 @@ async function loadAlertas() {
             : '';
           html.push(`
             <tr class="row-detail" data-grupo="${gid}">
-              <td colspan="8">
+              <td colspan="9">
                 <div class="detail-inner" style="border-left-color:${tipoColor}">
                   <div class="detail-meta" style="margin-bottom:0.5rem">
                     <div class="detail-item">
@@ -678,7 +691,10 @@ async function loadAlertas() {
       }
     }
 
-    const SORT_BASE = { tipo: 'Tipo', severidade: 'Severidade', valor: 'Valor ▲▼', fornecedor: 'Fornecedor', data: 'Data ▲▼' };
+    const SORT_BASE = {
+      prioridade: 'Prioridade ▲▼', tipo: 'Tipo', severidade: 'Severidade',
+      valor: 'Valor ▲▼', fornecedor: 'Fornecedor', data: 'Data ▲▼',
+    };
     document.querySelectorAll('#alertas-table th[data-sort]').forEach(th => {
       const col = th.dataset.sort;
       th.classList.toggle('sort-active', col === state.alertasSort.column);
@@ -747,6 +763,10 @@ async function openDetail(id) {
       `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
     ).join('');
 
+    const motivoOpts = Object.entries(MOTIVOS_DESCARTE).map(
+      ([k, lbl]) => `<option value="${k}">${lbl}</option>`
+    ).join('');
+
     const historicoHtml = (d.historico || []).length
       ? (d.historico || []).map(h => `
           <li>
@@ -772,6 +792,13 @@ async function openDetail(id) {
             <option value="${d.status}">${STATUS_LABELS[d.status] || d.status} (atual)</option>
             ${transicoes}
           </select>
+          <div id="triage-motivo-wrap" class="triage-motivo-wrap" hidden>
+            <label for="triage-motivo">Motivo do descarte</label>
+            <select id="triage-motivo">
+              <option value="">Selecione o motivo…</option>
+              ${motivoOpts}
+            </select>
+          </div>
           <label for="triage-nota">Nota / histórico</label>
           <textarea id="triage-nota" rows="3" placeholder="Observações da investigação…">${escapeHtml(d.notas_triagem || '')}</textarea>
           <button type="button" id="triage-save" class="btn-page">Salvar triagem</button>
@@ -830,6 +857,16 @@ async function openDetail(id) {
         <button id="share-btn" class="btn-page" onclick="shareAlert(${id})" style="font-size:0.8rem">🔗 Copiar link</button>
       </div>
     `;
+
+    const statusAtual = d.status;
+    const toggleMotivoDescarte = () => {
+      const sel = document.getElementById('triage-status');
+      const wrap = document.getElementById('triage-motivo-wrap');
+      if (!sel || !wrap) return;
+      wrap.hidden = !(sel.value === 'descartado' && sel.value !== statusAtual);
+    };
+    document.getElementById('triage-status')?.addEventListener('change', toggleMotivoDescarte);
+    toggleMotivoDescarte();
 
     document.getElementById('triage-save')?.addEventListener('click', () => {
       salvarTriagem(id);
@@ -966,21 +1003,28 @@ async function exportarDossie(alertaId) {
 async function salvarTriagem(alertaId) {
   const statusEl = document.getElementById('triage-status');
   const notaEl = document.getElementById('triage-nota');
+  const motivoEl = document.getElementById('triage-motivo');
   const erroEl = document.getElementById('triage-erro');
   const btn = document.getElementById('triage-save');
   if (!statusEl || !btn) return;
 
   const status = statusEl.value;
   const nota = notaEl ? notaEl.value.trim() : '';
+  const motivo = motivoEl ? motivoEl.value : '';
   erroEl.style.display = 'none';
   btn.disabled = true;
   btn.textContent = 'Salvando…';
+
+  const body = { status, nota };
+  if (status === 'descartado' && motivo) {
+    body.motivo_descarte = motivo;
+  }
 
   try {
     const res = await fetch(`${BASE}/api/alertas/${alertaId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, nota }),
+      body: JSON.stringify(body),
     });
     const payload = await res.json();
     if (!res.ok) throw new Error(payload.error || res.statusText);

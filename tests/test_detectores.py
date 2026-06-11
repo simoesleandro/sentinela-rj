@@ -7,6 +7,7 @@ import pytest
 
 from analisador import (
     concentracao,
+    evolucao_temporal,
     fracionamento,
     licitacao,
     outliers,
@@ -19,6 +20,7 @@ from db.conexao import SCHEMA_PATH, aplicar_migracoes
 _DETECTORES = (
     ("outliers", outliers.detectar),
     ("concentracao", concentracao.detectar),
+    ("evolucao_temporal", evolucao_temporal.detectar),
     ("licitacao", licitacao.detectar),
     ("fracionamento", fracionamento.detectar),
     ("sancoes", sancoes.detectar),

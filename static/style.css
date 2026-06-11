@@ -1340,6 +1340,23 @@ th.sort-active {
   margin-top: 0.75rem;
 }
 
+.triage-motivo-wrap {
+  margin-top: 0.5rem;
+}
+
+.prio-score {
+  display: inline-block;
+  min-width: 2rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: #1e1e2e;
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  color: #a5b4fc;
+}
+
 .triage-historico {
   margin-top: 1rem;
   padding-top: 1rem;

@@ -13,6 +13,7 @@ LABEL_TIPO: dict[str, str] = {
     "empresa_jovem_contrato_grande": "Empresa Jovem — Contrato Grande",
     "socio_compartilhado": "Sócio Compartilhado entre Fornecedores",
     "watchlist_match": "Match em Watchlist",
+    "evolucao_temporal_fornecedor": "Aceleração Contratual",
 }
 
 LABEL_SEVERIDADE: dict[str, str] = {
