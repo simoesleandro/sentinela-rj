@@ -321,6 +321,7 @@ sentinela/
 - [x] Detector de evolução temporal (`evolucao_temporal_fornecedor`)
 - [x] Score composto na listagem de alertas (coluna Prioridade + ordenação padrão)
 - [x] Feedback estruturado ao descartar alertas (`motivo_descarte` + `GET /api/alertas/feedback/descartes`)
+- [x] Seletor de município no dashboard (`GET /api/municipios` + filtro `municipio_ibge`)
 
 ---
 

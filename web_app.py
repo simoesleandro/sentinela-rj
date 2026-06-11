@@ -63,6 +63,48 @@ def index():
 
 
 # ---------------------------------------------------------------------------
+# Município — filtro do dashboard
+# ---------------------------------------------------------------------------
+
+def _municipio_ibge_request() -> str | None:
+    raw = (request.args.get("municipio_ibge") or "").strip()
+    return raw if raw else None
+
+
+def _aplicar_filtro_municipio(
+    conditions: list[str],
+    params: list,
+    ibge: str | None,
+    alias: str = "o",
+) -> None:
+    from db.filtro_municipio import filtro_municipio_sql
+
+    clause, filtro_params = filtro_municipio_sql(ibge, alias=alias)
+    if clause:
+        conditions.append(clause)
+        params.extend(filtro_params)
+
+
+@app.route("/api/municipios")
+def municipios_list():
+    from extrator.config_municipio import municipio_esfera, municipio_ibge, municipio_nome
+    from db.filtro_municipio import listar_municipios
+
+    db = get_db()
+    try:
+        return jsonify({
+            "coleta_ibge": municipio_ibge(),
+            "coleta_nome": municipio_nome(),
+            "coleta_esfera": municipio_esfera(),
+            "items": listar_municipios(db),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Stats
 # ---------------------------------------------------------------------------
 
@@ -70,33 +112,78 @@ def index():
 def stats():
     db = get_db()
     try:
+        ibge = _municipio_ibge_request()
+        join_o = "JOIN orgaos o ON o.cnpj = c.orgao_cnpj" if ibge else ""
+        where_mun: list[str] = []
+        params_mun: list = []
+        _aplicar_filtro_municipio(where_mun, params_mun, ibge)
+        extra = (" AND " + " AND ".join(where_mun)) if where_mun else ""
+
         contratos_total = db.execute(
-            "SELECT COUNT(*) FROM contratos WHERE valor_global > 0"
+            f"SELECT COUNT(*) FROM contratos c {join_o} WHERE c.valor_global > 0{extra}",
+            params_mun,
         ).fetchone()[0]
         valor_total = db.execute(
-            "SELECT SUM(valor_global) FROM contratos WHERE valor_global > 0"
+            f"SELECT SUM(c.valor_global) FROM contratos c {join_o} WHERE c.valor_global > 0{extra}",
+            params_mun,
         ).fetchone()[0]
-        alertas_total = db.execute(
-            "SELECT COUNT(*) FROM alertas"
-        ).fetchone()[0]
-        alertas_alta = db.execute(
-            "SELECT COUNT(*) FROM alertas WHERE severidade = 'alta'"
-        ).fetchone()[0]
-        fornecedores_distintos = db.execute(
-            "SELECT COUNT(DISTINCT fornecedor_ni) FROM contratos"
-        ).fetchone()[0]
+
+        if ibge:
+            alertas_sql = f"""
+                SELECT COUNT(*) FROM alertas a
+                JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+                JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+                WHERE o.municipio_ibge = ?
+            """
+            alertas_total = db.execute(alertas_sql, (ibge,)).fetchone()[0]
+            alertas_alta = db.execute(
+                alertas_sql + " AND a.severidade = 'alta'", (ibge,)
+            ).fetchone()[0]
+            fornecedores_distintos = db.execute(
+                f"""
+                SELECT COUNT(DISTINCT c.fornecedor_ni) FROM contratos c
+                {join_o} WHERE c.valor_global > 0{extra}
+                """,
+                params_mun,
+            ).fetchone()[0]
+            periodo_inicio = db.execute(
+                f"""
+                SELECT MIN(c.data_assinatura) FROM contratos c {join_o}
+                WHERE c.valor_global > 0{extra}
+                """,
+                params_mun,
+            ).fetchone()[0]
+            periodo_fim = db.execute(
+                f"""
+                SELECT MAX(c.data_assinatura) FROM contratos c {join_o}
+                WHERE c.valor_global > 0{extra}
+                """,
+                params_mun,
+            ).fetchone()[0]
+            from db.filtro_municipio import resumo_triagem_municipio
+
+            triagem = resumo_triagem_municipio(db, ibge)
+        else:
+            alertas_total = db.execute("SELECT COUNT(*) FROM alertas").fetchone()[0]
+            alertas_alta = db.execute(
+                "SELECT COUNT(*) FROM alertas WHERE severidade = 'alta'"
+            ).fetchone()[0]
+            fornecedores_distintos = db.execute(
+                "SELECT COUNT(DISTINCT fornecedor_ni) FROM contratos"
+            ).fetchone()[0]
+            periodo_inicio = db.execute(
+                "SELECT MIN(data_assinatura) FROM contratos"
+            ).fetchone()[0]
+            periodo_fim = db.execute(
+                "SELECT MAX(data_assinatura) FROM contratos"
+            ).fetchone()[0]
+            from db.triagem import resumo_status
+
+            triagem = resumo_status(db)
+
         ultima_coleta = db.execute(
             "SELECT MAX(finalizado_em) FROM coletas_log"
         ).fetchone()[0]
-        periodo_inicio = db.execute(
-            "SELECT MIN(data_assinatura) FROM contratos"
-        ).fetchone()[0]
-        periodo_fim = db.execute(
-            "SELECT MAX(data_assinatura) FROM contratos"
-        ).fetchone()[0]
-        from db.triagem import resumo_status
-
-        triagem = resumo_status(db)
         return jsonify(
             {
                 "contratos_total": contratos_total,
@@ -108,6 +195,7 @@ def stats():
                 "periodo_inicio": periodo_inicio,
                 "periodo_fim": periodo_fim,
                 "triagem": triagem,
+                "municipio_ibge": ibge,
             }
         )
     except Exception as e:
@@ -152,6 +240,7 @@ def alertas_list():
         if fornecedor:
             conditions.append("f.razao_social LIKE ?")
             params.append(f"%{fornecedor}%")
+        _aplicar_filtro_municipio(conditions, params, _municipio_ibge_request())
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -215,6 +304,7 @@ def _aplicar_filtro_status(
 
 @app.route("/api/alertas/triagem")
 def alertas_triagem():
+    from db.filtro_municipio import resumo_triagem_municipio
     from db.triagem import resumo_status
 
     db = get_db()
@@ -222,6 +312,7 @@ def alertas_triagem():
         page = max(1, int(request.args.get("page", 1)))
         per_page = min(100, max(1, int(request.args.get("per_page", 20))))
         status = request.args.get("status", "fila")
+        ibge = _municipio_ibge_request()
 
         base = """
             FROM alertas a
@@ -232,6 +323,7 @@ def alertas_triagem():
         conditions: list[str] = []
         params: list = []
         _aplicar_filtro_status(conditions, params, status)
+        _aplicar_filtro_municipio(conditions, params, ibge)
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         total = db.execute(f"SELECT COUNT(*) {base} {where}", params).fetchone()[0]
@@ -261,12 +353,14 @@ def alertas_triagem():
             )
             items.append(item)
 
+        resumo = resumo_triagem_municipio(db, ibge) if ibge else resumo_status(db)
         return jsonify({
-            "resumo": resumo_status(db),
+            "resumo": resumo,
             "items": items,
             "total": total,
             "page": page,
             "pages": pages,
+            "municipio_ibge": ibge,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -332,11 +426,13 @@ def alertas_agrupados():
             FROM alertas a
             LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
             LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
         """
         conditions: list[str] = []
         params: list = []
 
         _aplicar_filtro_status(conditions, params, status)
+        _aplicar_filtro_municipio(conditions, params, _municipio_ibge_request())
 
         if tipo:
             conditions.append("a.tipo = ?")
@@ -442,7 +538,13 @@ def alertas_agrupados():
                 ],
             })
 
-        return jsonify({"items": items, "total": total, "page": page, "pages": pages})
+        return jsonify({
+            "items": items,
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "municipio_ibge": _municipio_ibge_request(),
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -709,21 +811,31 @@ def timeline():
     db = get_db()
     try:
         granularity = request.args.get("granularity", "month")
+        ibge = _municipio_ibge_request()
         strftime_expr = (
-            "strftime('%Y-%m', data_assinatura)"
+            "strftime('%Y-%m', c.data_assinatura)"
             if granularity == "month"
-            else "strftime('%Y', data_assinatura)"
+            else "strftime('%Y', c.data_assinatura)"
         )
+        conditions = ["c.valor_global > 0", "c.data_assinatura IS NOT NULL"]
+        params: list = []
+        join_o = ""
+        if ibge:
+            join_o = "JOIN orgaos o ON o.cnpj = c.orgao_cnpj"
+            _aplicar_filtro_municipio(conditions, params, ibge)
+        where = "WHERE " + " AND ".join(conditions)
         rows = db.execute(
             f"""
             SELECT {strftime_expr} AS periodo,
                    COUNT(*) AS contratos,
-                   SUM(valor_global) AS valor
-            FROM contratos
-            WHERE valor_global > 0 AND data_assinatura IS NOT NULL
+                   SUM(c.valor_global) AS valor
+            FROM contratos c
+            {join_o}
+            {where}
             GROUP BY periodo
             ORDER BY periodo
-            """
+            """,
+            params,
         ).fetchall()
         return jsonify(
             {
@@ -768,6 +880,11 @@ def fornecedores_ranking():
 
         ranking_conditions = ["c.valor_global > 0"]
         ranking_params: list = []
+        ibge = _municipio_ibge_request()
+        join_o = ""
+        if ibge:
+            join_o = "JOIN orgaos o ON o.cnpj = c.orgao_cnpj"
+            _aplicar_filtro_municipio(ranking_conditions, ranking_params, ibge)
         if q:
             cnpj_q = q.replace(".", "").replace("/", "").replace("-", "")
             ranking_conditions.append("(f.razao_social LIKE ? OR f.ni LIKE ?)")
@@ -786,6 +903,7 @@ def fornecedores_ranking():
             FROM contratos c
             LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
             LEFT JOIN alertas a ON a.numero_controle_pncp = c.numero_controle_pncp
+            {join_o}
             {ranking_where}
             GROUP BY c.fornecedor_ni
             ORDER BY {order_col} DESC
@@ -843,8 +961,15 @@ def fornecedores_investigados():
     db = get_db()
     try:
         q = request.args.get("q", "").strip()
+        ibge = _municipio_ibge_request()
         params: list = []
         filtro_forn = ""
+        filtro_mun_c = ""
+        filtro_mun_a = ""
+        if ibge:
+            filtro_mun_c = "AND o.municipio_ibge = ?"
+            filtro_mun_a = "AND o.municipio_ibge = ?"
+            params.extend([ibge, ibge])
         if q:
             cnpj_q = q.replace(".", "").replace("/", "").replace("-", "")
             filtro_forn = "AND (f.razao_social LIKE ? OR f.ni LIKE ?)"
@@ -852,12 +977,13 @@ def fornecedores_investigados():
         rows = db.execute(
             f"""
             WITH contratos_agg AS (
-                SELECT fornecedor_ni,
+                SELECT c.fornecedor_ni,
                        COUNT(*) AS total_contratos,
-                       COALESCE(SUM(valor_global), 0) AS valor_total
-                FROM contratos
-                WHERE valor_global > 0
-                GROUP BY fornecedor_ni
+                       COALESCE(SUM(c.valor_global), 0) AS valor_total
+                FROM contratos c
+                JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+                WHERE c.valor_global > 0 {filtro_mun_c}
+                GROUP BY c.fornecedor_ni
             ),
             alertas_agg AS (
                 SELECT c.fornecedor_ni,
@@ -865,8 +991,10 @@ def fornecedores_investigados():
                        COUNT(DISTINCT CASE WHEN a.severidade = 'alta' THEN a.id END) AS alertas_alta
                 FROM alertas a
                 JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+                JOIN orgaos o ON o.cnpj = c.orgao_cnpj
                 WHERE c.valor_global > 0
                   AND COALESCE(a.status, 'aberto') != 'descartado'
+                  {filtro_mun_a}
                 GROUP BY c.fornecedor_ni
             )
             SELECT f.ni AS fornecedor_ni,
@@ -1098,9 +1226,16 @@ def fornecedor_dossie(fornecedor_ni: str):
 def orgaos_ranking():
     db = get_db()
     try:
-        rows = db.execute("""
+        ibge = _municipio_ibge_request()
+        conditions: list[str] = []
+        params: list = []
+        _aplicar_filtro_municipio(conditions, params, ibge)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        rows = db.execute(
+            f"""
             SELECT o.razao_social AS orgao,
                    o.cnpj,
+                   o.municipio_nome,
                    COUNT(DISTINCT c.numero_controle_pncp) AS total_contratos,
                    COALESCE(SUM(c.valor_global), 0) AS valor_total,
                    COUNT(DISTINCT a.id) AS total_alertas,
@@ -1112,10 +1247,13 @@ def orgaos_ranking():
             FROM orgaos o
             LEFT JOIN contratos c ON c.orgao_cnpj = o.cnpj
             LEFT JOIN alertas a ON a.numero_controle_pncp = c.numero_controle_pncp
+            {where}
             GROUP BY o.cnpj
             ORDER BY total_alertas DESC
-        """).fetchall()
-        return jsonify({"items": [dict(r) for r in rows]})
+            """,
+            params,
+        ).fetchall()
+        return jsonify({"items": [dict(r) for r in rows], "municipio_ibge": ibge})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -1153,15 +1291,24 @@ def orgaos_contratos(cnpj: str):
 def anomalias_por_tipo():
     db = get_db()
     try:
+        ibge = _municipio_ibge_request()
+        conditions: list[str] = []
+        params: list = []
+        _aplicar_filtro_municipio(conditions, params, ibge)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         rows = db.execute(
-            """
-            SELECT tipo, severidade, COUNT(*) AS quantidade
-            FROM alertas
-            GROUP BY tipo, severidade
-            ORDER BY tipo, severidade
-            """
+            f"""
+            SELECT a.tipo, a.severidade, COUNT(*) AS quantidade
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            {where}
+            GROUP BY a.tipo, a.severidade
+            ORDER BY a.tipo, a.severidade
+            """,
+            params,
         ).fetchall()
-        return jsonify({"items": [dict(r) for r in rows]})
+        return jsonify({"items": [dict(r) for r in rows], "municipio_ibge": ibge})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -1176,18 +1323,26 @@ def anomalias_por_tipo():
 def export_contratos():
     db = get_db()
     try:
-        rows = db.execute("""
+        ibge = _municipio_ibge_request()
+        conditions = ["c.valor_global > 0"]
+        params: list = []
+        _aplicar_filtro_municipio(conditions, params, ibge)
+        where = "WHERE " + " AND ".join(conditions)
+        rows = db.execute(
+            f"""
             SELECT c.numero_controle_pncp, c.objeto, c.categoria_processo_nome,
                    c.valor_global, c.data_assinatura, c.data_vigencia_inicio,
                    c.data_vigencia_fim, f.razao_social AS fornecedor,
                    f.ni AS fornecedor_cnpj, o.razao_social AS orgao,
-                   c.orgao_cnpj, c.unidade_nome
+                   c.orgao_cnpj, c.unidade_nome, o.municipio_nome
             FROM contratos c
             LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
             LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
-            WHERE c.valor_global > 0
+            {where}
             ORDER BY c.data_assinatura DESC
-        """).fetchall()
+            """,
+            params,
+        ).fetchall()
 
         fieldnames = [
             "numero_controle_pncp", "objeto", "categoria_processo_nome",
@@ -1216,18 +1371,27 @@ def export_contratos():
 def export_alertas():
     db = get_db()
     try:
-        rows = db.execute("""
+        ibge = _municipio_ibge_request()
+        conditions: list[str] = []
+        params: list = []
+        _aplicar_filtro_municipio(conditions, params, ibge)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        rows = db.execute(
+            f"""
             SELECT a.id, a.tipo, a.severidade, a.descricao, a.valor_referencia,
                    a.metodologia, a.narrativa_ia, a.criado_em,
                    f.razao_social AS fornecedor, f.ni AS fornecedor_cnpj,
                    c.objeto, c.data_assinatura, c.valor_global,
-                   o.razao_social AS orgao
+                   o.razao_social AS orgao, o.municipio_nome
             FROM alertas a
             LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
             LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
             LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            {where}
             ORDER BY a.severidade DESC, a.valor_referencia DESC
-        """).fetchall()
+            """,
+            params,
+        ).fetchall()
 
         fieldnames = [
             "id", "tipo", "severidade", "descricao", "valor_referencia",
@@ -1296,7 +1460,19 @@ def socios_compartilhados():
     import re as _re
     db = get_db()
     try:
-        rows = db.execute("""
+        ibge = _municipio_ibge_request()
+        conditions = [
+            "fc.socios IS NOT NULL",
+            "fc.socios != '[]'",
+            "ct.valor_global > 0",
+        ]
+        params: list = []
+        if ibge:
+            conditions.append("o.municipio_ibge = ?")
+            params.append(ibge)
+        where = "WHERE " + " AND ".join(conditions)
+        rows = db.execute(
+            f"""
             SELECT fc.fornecedor_ni,
                    fc.socios,
                    f.razao_social,
@@ -1305,11 +1481,12 @@ def socios_compartilhados():
             FROM fornecedor_cadastro fc
             JOIN fornecedores f  ON f.ni  = fc.fornecedor_ni
             JOIN contratos ct    ON ct.fornecedor_ni = fc.fornecedor_ni
-            WHERE fc.socios IS NOT NULL
-              AND fc.socios != '[]'
-              AND ct.valor_global > 0
+            JOIN orgaos o ON o.cnpj = ct.orgao_cnpj
+            {where}
             GROUP BY fc.fornecedor_ni
-        """).fetchall()
+            """,
+            params,
+        ).fetchall()
 
         re_cnpj = _re.compile(r"^\d{14}$")
         por_socio: dict[str, list[dict]] = {}

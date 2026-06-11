@@ -69,8 +69,19 @@ const TIPO_TOOLTIPS = {
   fracionamento_ap: 'Mesmo serviço dividido entre várias empresas por região. Pode ser tentativa de driblar o limite de licitação.',
 };
 
+const MUNICIPIO_STORAGE_KEY = 'sentinela_municipio_ibge';
+const MUNICIPIO_FILTER_PREFIXES = [
+  '/api/stats', '/api/anomalias', '/api/alertas/agrupados', '/api/alertas/triagem',
+  '/api/timeline', '/api/fornecedores/ranking', '/api/fornecedores/investigados',
+  '/api/orgaos/ranking', '/api/socios/compartilhados', '/api/export/',
+];
+
 const state = {
   currentTab: 'visao-geral',
+  municipioIbge: localStorage.getItem(MUNICIPIO_STORAGE_KEY) || '',
+  municipioNome: '',
+  coletaIbge: '',
+  coletaNome: '',
   alertasPage: 1,
   alertasFiltros: { status: 'fila', tipo: '', severidade: '', ano: '', fornecedor: '', valorMin: '' },
   alertasSort: { column: 'prioridade', direction: 'desc' },
@@ -81,6 +92,102 @@ const state = {
   fornecedoresOrderby: 'valor',
   orgaosData: {},
 };
+
+function shouldFilterMunicipio(path) {
+  return MUNICIPIO_FILTER_PREFIXES.some(prefix => path.startsWith(prefix));
+}
+
+function apiUrl(path) {
+  if (!state.municipioIbge || !shouldFilterMunicipio(path) || path.includes('municipio_ibge=')) {
+    return `${BASE}${path}`;
+  }
+  const sep = path.includes('?') ? '&' : '?';
+  return `${BASE}${path}${sep}municipio_ibge=${encodeURIComponent(state.municipioIbge)}`;
+}
+
+function updateExportLinks() {
+  document.querySelectorAll('.btn-download').forEach(link => {
+    const base = link.getAttribute('data-export-base') || link.getAttribute('href')?.split('?')[0];
+    if (!base) return;
+    link.setAttribute('data-export-base', base);
+    link.href = state.municipioIbge ? `${base}?municipio_ibge=${encodeURIComponent(state.municipioIbge)}` : base;
+  });
+}
+
+function updateMunicipioHeader() {
+  const subtitle = document.getElementById('header-subtitle');
+  const hint = document.getElementById('municipio-coleta-hint');
+  if (subtitle && state.municipioIbge) {
+    subtitle.textContent = `Exibindo dados de ${state.municipioNome || 'município ' + state.municipioIbge}`;
+  }
+  if (hint && state.coletaIbge) {
+    const coletaLabel = state.coletaNome || state.coletaIbge;
+    hint.textContent = state.municipioIbge === state.coletaIbge
+      ? `Coleta PNCP: ${coletaLabel}`
+      : `Coleta PNCP: ${coletaLabel} · visualizando outro município`;
+  }
+}
+
+function reloadDashboardData() {
+  state.tabLoaded = {};
+  updateExportLinks();
+  updateMunicipioHeader();
+  loadTab(state.currentTab);
+  state.tabLoaded[state.currentTab] = true;
+}
+
+async function initMunicipioSelector() {
+  const select = document.getElementById('municipio-select');
+  if (!select) return;
+  try {
+    const res = await fetch(`${BASE}/api/municipios`);
+    if (!res.ok) throw new Error(res.statusText);
+    const data = await res.json();
+    state.coletaIbge = data.coleta_ibge || '';
+    state.coletaNome = data.coleta_nome || '';
+
+    const items = data.items || [];
+    if (!state.municipioIbge && state.coletaIbge) {
+      state.municipioIbge = state.coletaIbge;
+    }
+    const hasSaved = items.some(i => i.ibge === state.municipioIbge);
+    if (!hasSaved && state.coletaIbge) {
+      state.municipioIbge = state.coletaIbge;
+    }
+
+    select.innerHTML = [
+      '<option value="">Todos os municípios no banco</option>',
+      ...items.map(i => {
+        const label = `${i.nome || i.ibge} (${(i.contratos || 0).toLocaleString('pt-BR')} contratos)`;
+        return `<option value="${escapeHtml(i.ibge)}">${escapeHtml(label)}</option>`;
+      }),
+    ].join('');
+    select.value = state.municipioIbge || '';
+
+    const selected = items.find(i => i.ibge === state.municipioIbge);
+    state.municipioNome = selected?.nome || state.coletaNome || '';
+    if (state.municipioIbge) {
+      localStorage.setItem(MUNICIPIO_STORAGE_KEY, state.municipioIbge);
+    }
+
+    select.addEventListener('change', () => {
+      state.municipioIbge = select.value;
+      const opt = items.find(i => i.ibge === state.municipioIbge);
+      state.municipioNome = opt?.nome || '';
+      if (state.municipioIbge) {
+        localStorage.setItem(MUNICIPIO_STORAGE_KEY, state.municipioIbge);
+      } else {
+        localStorage.removeItem(MUNICIPIO_STORAGE_KEY);
+      }
+      reloadDashboardData();
+    });
+
+    updateMunicipioHeader();
+    updateExportLinks();
+  } catch (e) {
+    select.innerHTML = '<option value="">Município indisponível</option>';
+  }
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -160,7 +267,7 @@ async function api(path, { method = 'GET', body, ...rest } = {}) {
     init.headers = { 'Content-Type': 'application/json', ...(rest.headers || {}) };
     init.body = JSON.stringify(body);
   }
-  const res = await fetch(`${BASE}${path}`, init);
+  const res = await fetch(apiUrl(path), init);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || res.statusText || `HTTP ${res.status}`);
@@ -356,7 +463,7 @@ async function loadStats() {
   const container = document.getElementById('kpi-cards');
   container.innerHTML = '<div class="loading-msg">Carregando…</div>';
   try {
-    const res = await fetch(`${BASE}/api/stats`);
+    const res = await fetch(apiUrl('/api/stats'));
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
 
@@ -407,7 +514,7 @@ async function loadStats() {
 
 async function loadChartTipos() {
   try {
-    const res = await fetch(`${BASE}/api/anomalias/por-tipo`);
+    const res = await fetch(apiUrl('/api/anomalias/por-tipo'));
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
 
@@ -546,11 +653,11 @@ async function loadAlertas() {
     if (f.fornecedor) params.set('fornecedor', f.fornecedor);
     if (f.valorMin)   params.set('valor_min',  f.valorMin);
 
-    const res = await fetch(`${BASE}/api/alertas/agrupados?${params}`);
+    const res = await fetch(apiUrl(`/api/alertas/agrupados?${params}`));
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
 
-    const resumoRes = await fetch(`${BASE}/api/alertas/triagem?per_page=1&status=fila`);
+    const resumoRes = await fetch(apiUrl('/api/alertas/triagem?per_page=1&status=fila'));
     if (resumoRes.ok) {
       const triagem = await resumoRes.json();
       renderTriagemResumo(triagem.resumo);
@@ -1143,7 +1250,7 @@ function closeDetail() {
 
 async function loadTimeline() {
   try {
-    const res = await fetch(`${BASE}/api/timeline?granularity=${state.timelineGranularity}`);
+    const res = await fetch(apiUrl(`/api/timeline?granularity=${state.timelineGranularity}`));
     if (!res.ok) throw new Error(res.statusText);
     state.timelineData = await res.json();
     renderTimeline();
@@ -1244,7 +1351,7 @@ async function loadFornecedores() {
     const q = (document.getElementById('filter-fornecedor-ranking')?.value || '').trim();
     const params = new URLSearchParams({ limit: 15, orderby: state.fornecedoresOrderby });
     if (q) params.set('q', q);
-    const res = await fetch(`${BASE}/api/fornecedores/ranking?${params}`);
+    const res = await fetch(apiUrl(`/api/fornecedores/ranking?${params}`));
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
 
@@ -1344,7 +1451,7 @@ async function loadOrgaos() {
   if (tbody)   tbody.innerHTML   = '<tr><td colspan="8" class="loading-msg">Carregando…</td></tr>';
 
   try {
-    const res = await fetch(`${BASE}/api/orgaos/ranking`);
+    const res = await fetch(apiUrl('/api/orgaos/ranking'));
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
     const items = d.items || [];
@@ -1739,7 +1846,7 @@ async function loadRede() {
   tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Carregando…</td></tr>';
 
   try {
-    const res = await fetch(`${BASE}/api/socios/compartilhados`);
+    const res = await fetch(apiUrl('/api/socios/compartilhados'));
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
     const items = d.items || [];
@@ -2323,8 +2430,9 @@ async function _salvarConfigForm() {
 
 // ─── Bootstrap ─────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
+  await initMunicipioSelector();
   loadTab('visao-geral');
   state.tabLoaded['visao-geral'] = true;
 

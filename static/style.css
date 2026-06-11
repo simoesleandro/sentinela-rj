@@ -46,6 +46,47 @@ header h1 {
   margin-top: 0.2rem;
 }
 
+.municipio-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  min-width: 220px;
+}
+
+.municipio-selector label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.municipio-selector select {
+  width: 100%;
+  max-width: 280px;
+  background: #18181b;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.45rem 0.65rem;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.municipio-selector select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.municipio-coleta-hint {
+  font-size: 0.7rem;
+  color: #52525b;
+  text-align: right;
+  max-width: 280px;
+}
+
 /* ─── Nav tabs ─── */
 #main-nav {
   display: flex;
