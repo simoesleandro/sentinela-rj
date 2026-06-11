@@ -75,7 +75,7 @@ class PipelineConfig:
             discord_max=_env_int("PIPELINE_DISCORD_MAX", 5),
             discord_resumo=_env_bool("PIPELINE_DISCORD_RESUMO", True),
             skip_enriquecer=_env_bool("PIPELINE_SKIP_ENRIQUECER", False),
-            skip_investigar=_env_bool("PIPELINE_SKIP_INVESTIGAR", False),
+            skip_investigar=_env_bool("PIPELINE_SKIP_INVESTIGAR", True),
             skip_notificar=_env_bool("PIPELINE_SKIP_NOTIFICAR", False),
             abort_on_error=_env_bool("PIPELINE_ABORT_ON_ERROR", False),
             cron=os.getenv("PIPELINE_CRON", "0 8 * * 1").strip(),

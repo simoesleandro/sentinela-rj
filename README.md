@@ -322,6 +322,7 @@ sentinela/
 - [x] Score composto na listagem de alertas (coluna Prioridade + ordenação padrão)
 - [x] Feedback estruturado ao descartar alertas (`motivo_descarte` + `GET /api/alertas/feedback/descartes`)
 - [x] Seletor de município no dashboard (`GET /api/municipios` + filtro `municipio_ibge`)
+- [x] Coleta automática multi-município RM-RJ (`MUNICIPIOS_MONITORADOS` ou lista padrão; IA off no pipeline)
 
 ---
 

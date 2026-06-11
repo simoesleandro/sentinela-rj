@@ -87,15 +87,27 @@ def _aplicar_filtro_municipio(
 
 @app.route("/api/municipios")
 def municipios_list():
-    from extrator.config_municipio import municipio_esfera, municipio_ibge, municipio_nome
+    from extrator.config_municipio import (
+        municipio_esfera,
+        municipio_ibge,
+        municipio_nome,
+        municipios_monitorados,
+        rotulo_filtro,
+    )
     from db.filtro_municipio import listar_municipios
 
     db = get_db()
     try:
+        monitorados = municipios_monitorados()
         return jsonify({
             "coleta_ibge": municipio_ibge(),
             "coleta_nome": municipio_nome(),
             "coleta_esfera": municipio_esfera(),
+            "coleta_rotulo": rotulo_filtro(),
+            "monitorados": [
+                {"ibge": m.ibge, "nome": m.nome, "prioridade": m.prioridade}
+                for m in monitorados
+            ],
             "items": listar_municipios(db),
         })
     except Exception as e:
@@ -791,6 +803,7 @@ def pipeline_status():
                 "timezone": cfg.timezone,
                 "janela_dias": cfg.janela_dias,
                 "investigar_limite": cfg.investigar_limite,
+                "skip_investigar": cfg.skip_investigar,
                 "discord_configurado": bool(os.getenv("DISCORD_WEBHOOK_URL", "").strip()),
             },
             "log_hoje": str(log_hoje) if log_hoje.is_file() else None,

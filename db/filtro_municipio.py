@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from extrator.config_municipio import municipio_ibge, municipio_nome
+from extrator.config_municipio import municipio_ibge, municipio_nome, municipios_monitorados
 
 
 def listar_municipios(conn: sqlite3.Connection) -> list[dict[str, Any]]:
@@ -21,13 +21,31 @@ def listar_municipios(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         ORDER BY contratos DESC, nome
         """
     ).fetchall()
-    items = [dict(r) for r in rows]
+    por_ibge = {r["ibge"]: dict(r) for r in rows}
+    for alvo in municipios_monitorados():
+        if alvo.ibge not in por_ibge:
+            por_ibge[alvo.ibge] = {
+                "ibge": alvo.ibge,
+                "nome": alvo.nome,
+                "contratos": 0,
+                "monitorado": True,
+                "prioridade": alvo.prioridade,
+            }
+        else:
+            por_ibge[alvo.ibge]["monitorado"] = True
+            por_ibge[alvo.ibge]["prioridade"] = alvo.prioridade
+    items = sorted(
+        por_ibge.values(),
+        key=lambda i: (not i.get("monitorado"), i.get("prioridade", 9), -(i.get("contratos") or 0)),
+    )
     ativo = municipio_ibge()
     if not any(i["ibge"] == ativo for i in items):
         items.insert(0, {
             "ibge": ativo,
             "nome": municipio_nome(),
             "contratos": 0,
+            "monitorado": True,
+            "prioridade": 1,
         })
     return items
 

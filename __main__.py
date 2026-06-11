@@ -138,7 +138,10 @@ def cmd_coletar(args) -> int:
     print("  RESUMO DA COLETA")
     print(SEP)
     print(f"  Brutos varridos : {sumario['brutos_varridos']}")
-    print(f"  Salvos (municipio): {sumario.get('salvos_municipio', sumario['salvos_rio'])}")
+    print(f"  Salvos (todos): {sumario.get('salvos_municipio', sumario['salvos_rio'])}")
+    for item in sumario.get("salvos_por_municipio") or []:
+        if item.get("salvos"):
+            print(f"    · {item.get('nome')}: {item['salvos']}")
     if sumario["paginas_falhas"]:
         _warn(f"Paginas com falha: {len(sumario['paginas_falhas'])} (ver log acima)")
     print(f"  Tempo total     : {_elapsed(t0)}")

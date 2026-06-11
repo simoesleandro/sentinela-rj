@@ -82,6 +82,8 @@ const state = {
   municipioNome: '',
   coletaIbge: '',
   coletaNome: '',
+  coletaRotulo: '',
+  monitorados: [],
   alertasPage: 1,
   alertasFiltros: { status: 'fila', tipo: '', severidade: '', ano: '', fornecedor: '', valorMin: '' },
   alertasSort: { column: 'prioridade', direction: 'desc' },
@@ -120,11 +122,16 @@ function updateMunicipioHeader() {
   if (subtitle && state.municipioIbge) {
     subtitle.textContent = `Exibindo dados de ${state.municipioNome || 'município ' + state.municipioIbge}`;
   }
-  if (hint && state.coletaIbge) {
-    const coletaLabel = state.coletaNome || state.coletaIbge;
-    hint.textContent = state.municipioIbge === state.coletaIbge
-      ? `Coleta PNCP: ${coletaLabel}`
-      : `Coleta PNCP: ${coletaLabel} · visualizando outro município`;
+  if (hint) {
+    const n = state.monitorados?.length || 0;
+    const coletaLabel = state.coletaRotulo || state.coletaNome || state.coletaIbge;
+    if (n > 1) {
+      hint.textContent = `Coleta automática: ${n} municípios (Rio é prioridade 1)`;
+    } else if (state.coletaIbge) {
+      hint.textContent = state.municipioIbge === state.coletaIbge
+        ? `Coleta PNCP: ${coletaLabel}`
+        : `Coleta PNCP: ${coletaLabel} · visualizando outro município`;
+    }
   }
 }
 
@@ -145,6 +152,8 @@ async function initMunicipioSelector() {
     const data = await res.json();
     state.coletaIbge = data.coleta_ibge || '';
     state.coletaNome = data.coleta_nome || '';
+    state.monitorados = data.monitorados || [];
+    state.coletaRotulo = data.coleta_rotulo || '';
 
     const items = data.items || [];
     if (!state.municipioIbge && state.coletaIbge) {

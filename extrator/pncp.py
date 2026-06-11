@@ -23,7 +23,12 @@ from datetime import date, timedelta
 import requests
 
 from db.conexao import init_db
-from extrator.config_municipio import municipio_esfera, municipio_ibge, rotulo_filtro
+from extrator.config_municipio import (
+    MunicipioMonitorado,
+    municipio_esfera,
+    municipios_monitorados,
+    rotulo_filtro,
+)
 
 BASE = os.getenv("PNCP_BASE_URL", "https://pncp.gov.br/api/consulta/v1").strip()
 TIMEOUT = int(os.getenv("PNCP_TIMEOUT", "60"))
@@ -132,24 +137,41 @@ def _insert_contrato(conn, d):
     )
 
 
-def _e_do_municipio_alvo(d):
+def _e_do_municipio(d: dict, alvo: MunicipioMonitorado) -> bool:
     uni = d.get("unidadeOrgao") or {}
     o = d.get("orgaoEntidade") or {}
-    return (uni.get("codigoIbge") == municipio_ibge()) and (
-        o.get("esferaId") == municipio_esfera()
-    )
+    return (uni.get("codigoIbge") == alvo.ibge) and (o.get("esferaId") == alvo.esfera)
+
+
+def _ibge_do_contrato(d: dict) -> str | None:
+    uni = d.get("unidadeOrgao") or {}
+    codigo = uni.get("codigoIbge")
+    return str(codigo) if codigo else None
+
+
+def _resolver_alvo(d: dict, alvos: list[MunicipioMonitorado]) -> MunicipioMonitorado | None:
+    for alvo in alvos:
+        if _e_do_municipio(d, alvo):
+            return alvo
+    return None
 
 
 # ----------------------------- Coleta -----------------------------
 
-def _coletar_janela(conn, data_inicial, data_final):
+def _coletar_janela(
+    conn,
+    data_inicial: str,
+    data_final: str,
+    alvos: list[MunicipioMonitorado],
+) -> tuple[int, int, int, list, dict[str, int]]:
     """Coleta uma janela (idealmente <= 1 mes). Tolera falha de pagina isolada."""
     print(f"\n>>> Janela {data_inicial} a {data_final}")
     pagina = 1
     total_paginas = None
     brutos = 0
     salvos = 0
-    paginas_falhas = []
+    paginas_falhas: list[int] = []
+    salvos_por_ibge: dict[str, int] = {a.ibge: 0 for a in alvos}
 
     while total_paginas is None or pagina <= total_paginas:
         try:
@@ -173,23 +195,29 @@ def _coletar_janela(conn, data_inicial, data_final):
 
         lote = j["data"]
         brutos += len(lote)
-        do_municipio = [d for d in lote if _e_do_municipio_alvo(d)]
+        do_municipio: list[dict] = []
+        for registro in lote:
+            if _resolver_alvo(registro, alvos):
+                do_municipio.append(registro)
         for d in do_municipio:
             _upsert_orgao(conn, d.get("orgaoEntidade"), d.get("unidadeOrgao"))
             _upsert_fornecedor(conn, d)
             _insert_contrato(conn, d)
             salvos += 1
+            ibge = _ibge_do_contrato(d)
+            if ibge and ibge in salvos_por_ibge:
+                salvos_por_ibge[ibge] += 1
         conn.commit()
 
         if pagina % 50 == 0 or do_municipio:
-            print(f"  pag {pagina}/{total_paginas} | municipio {len(do_municipio)} | acumulado janela {salvos}")
+            print(f"  pag {pagina}/{total_paginas} | alvo {len(do_municipio)} | acumulado janela {salvos}")
         pagina += 1
         time.sleep(0.3)
 
     if paginas_falhas:
         print(f"  ATENCAO: {len(paginas_falhas)} paginas falharam: {paginas_falhas[:20]}")
     print(f"  Janela ok: brutos {brutos} | salvos {salvos}")
-    return brutos, salvos, pagina - 1, paginas_falhas
+    return brutos, salvos, pagina - 1, paginas_falhas, salvos_por_ibge
 
 
 def _janelas_mensais(data_inicial, data_final):
@@ -210,23 +238,29 @@ def _janelas_mensais(data_inicial, data_final):
 
 
 def coletar(data_inicial: str, data_final: str) -> dict:
-    """Ponto de entrada público. Retorna sumário da coleta."""
+    """Ponto de entrada público. Uma varredura PNCP por janela, todos os municípios monitorados."""
+    alvos = municipios_monitorados()
     conn = init_db()
     print(f"Coletando contratos PNCP de {data_inicial} a {data_final}")
     print(f"Filtro: {rotulo_filtro()}")
+    for alvo in alvos:
+        print(f"  · {alvo.rotulo()} (prioridade {alvo.prioridade})")
 
     iniciado = time.strftime("%Y-%m-%d %H:%M:%S")
     janelas = _janelas_mensais(data_inicial, data_final)
     print(f"Dividido em {len(janelas)} janela(s) mensal(is): {janelas}")
 
     tot_brutos = tot_salvos = tot_paginas = 0
-    todas_falhas = []
+    todas_falhas: list[str] = []
+    totais_por_ibge: dict[str, int] = {a.ibge: 0 for a in alvos}
     for (di, df) in janelas:
-        b, s, p, falhas = _coletar_janela(conn, di, df)
+        b, s, p, falhas, por_ibge = _coletar_janela(conn, di, df, alvos)
         tot_brutos += b
         tot_salvos += s
         tot_paginas += p
         todas_falhas += [f"{di}:{pg}" for pg in falhas]
+        for ibge, qtd in por_ibge.items():
+            totais_por_ibge[ibge] = totais_por_ibge.get(ibge, 0) + qtd
 
     finalizado = time.strftime("%Y-%m-%d %H:%M:%S")
     obs = f"filtro {rotulo_filtro()}"
@@ -241,16 +275,25 @@ def coletar(data_inicial: str, data_final: str) -> dict:
     conn.commit()
     conn.close()
 
+    principal = alvos[0].ibge
     sumario = {
         "data_inicial": data_inicial,
         "data_final": data_final,
         "brutos_varridos": tot_brutos,
-        "salvos_rio": tot_salvos,
+        "salvos_rio": totais_por_ibge.get(principal, tot_salvos),
         "salvos_municipio": tot_salvos,
+        "salvos_por_municipio": [
+            {"ibge": a.ibge, "nome": a.nome, "salvos": totais_por_ibge.get(a.ibge, 0)}
+            for a in alvos
+        ],
+        "municipios_monitorados": len(alvos),
         "paginas_falhas": todas_falhas,
     }
     print(f"\n=== Coleta concluida ===")
-    print(f"Brutos varridos: {tot_brutos} | Salvos (municipio alvo): {tot_salvos}")
+    print(f"Brutos varridos: {tot_brutos} | Salvos (todos os alvos): {tot_salvos}")
+    for item in sumario["salvos_por_municipio"]:
+        if item["salvos"]:
+            print(f"  - {item['nome']}: {item['salvos']}")
     if todas_falhas:
         print(f"Paginas que falharam: {todas_falhas}")
     return sumario
