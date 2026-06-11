@@ -885,15 +885,86 @@ async function openDetail(id) {
   }
 }
 
+const IA_LOADING_STEPS = [
+  { id: 'ctx', label: 'Montando contexto do alerta' },
+  { id: 'llama', label: 'Llama gerando rascunho (Ollama)' },
+  { id: 'gemini', label: 'Gemini revisando e sugerindo veredito' },
+];
+
+function _iaLoadingHtml(stepIndex) {
+  const steps = IA_LOADING_STEPS.map((s, i) => {
+    let cls = 'ia-step';
+    if (i < stepIndex) cls += ' is-done';
+    else if (i === stepIndex) cls += ' is-active';
+    return `<div class="${cls}" data-ia-step="${s.id}"><span class="ia-step-dot"></span>${s.label}</div>`;
+  }).join('');
+  const current = IA_LOADING_STEPS[stepIndex] || IA_LOADING_STEPS[0];
+  return `
+    <label>Narrativa IA</label>
+    <div class="ia-progress" role="status" aria-live="polite" aria-busy="true">
+      <div class="ia-spinner" aria-hidden="true"></div>
+      <div class="ia-progress-text">
+        <strong id="ia-step-title">${current.label}…</strong>
+        <p id="ia-step-hint">Pode levar até 2 minutos — não feche este painel.</p>
+      </div>
+    </div>
+    <div class="ia-progress-steps" id="ia-progress-steps">${steps}</div>
+    <div class="narrativa-skeleton" aria-hidden="true">
+      <div class="narrativa-skeleton-line"></div>
+      <div class="narrativa-skeleton-line"></div>
+      <div class="narrativa-skeleton-line"></div>
+      <div class="narrativa-skeleton-line"></div>
+    </div>
+  `;
+}
+
+function _setIaLoadingUi(stepIndex) {
+  const container = document.getElementById('narrativa-container');
+  const statusEl = document.getElementById('investigacao-status');
+  const toolbar = document.querySelector('.investigation-toolbar');
+  if (!container) return;
+
+  container.classList.add('is-loading');
+  container.innerHTML = _iaLoadingHtml(stepIndex);
+  if (toolbar) toolbar.classList.add('is-loading');
+  if (statusEl) {
+    const step = IA_LOADING_STEPS[stepIndex];
+    statusEl.textContent = step ? `Em andamento: ${step.label}…` : 'Investigação em andamento…';
+    statusEl.className = 'investigacao-status investigacao-loading';
+  }
+}
+
+function _startIaLoadingTimers() {
+  let stepIndex = 0;
+  const timers = [];
+
+  const advance = () => {
+    if (stepIndex >= IA_LOADING_STEPS.length - 1) return;
+    stepIndex += 1;
+    _setIaLoadingUi(stepIndex);
+  };
+
+  timers.push(setTimeout(advance, 8000));
+  timers.push(setTimeout(advance, 35000));
+
+  return () => timers.forEach(clearTimeout);
+}
+
 async function investigarComLlama(alertaId) {
   const btn = document.getElementById('btn-investigar-ia');
   const statusEl = document.getElementById('investigacao-status');
   const container = document.getElementById('narrativa-container');
+  const dossieBtn = document.getElementById('btn-export-dossie');
+  const toolbar = document.querySelector('.investigation-toolbar');
   if (!btn || !statusEl || !container) return;
 
+  const btnLabelOriginal = btn.textContent;
   btn.disabled = true;
-  statusEl.textContent = 'Gerando narrativa IA… (Llama + revisão Gemini; pode levar até 2 min)';
-  statusEl.className = 'investigacao-status investigacao-loading';
+  if (dossieBtn) dossieBtn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Investigando…';
+
+  _setIaLoadingUi(0);
+  const stopTimers = _startIaLoadingTimers();
 
   try {
     const res = await fetch(`${BASE}/api/alertas/${alertaId}/investigar`, {
@@ -904,6 +975,7 @@ async function investigarComLlama(alertaId) {
     if (!res.ok) throw new Error(payload.error || res.statusText);
 
     const narrativaParts = renderNarrativaVereditoHtml(payload.narrativa_ia || '');
+    container.classList.remove('is-loading');
     container.innerHTML = `
       <label>Narrativa IA</label>
       ${narrativaParts.html}
@@ -926,10 +998,19 @@ async function investigarComLlama(alertaId) {
       loadAlertas();
     }
   } catch (e) {
+    container.classList.remove('is-loading');
+    container.innerHTML = `
+      <label>Narrativa IA</label>
+      <p class="narrativa-empty">Falha na investigação: ${escapeHtml(e.message)}</p>
+    `;
     statusEl.textContent = e.message;
     statusEl.className = 'investigacao-status investigacao-erro';
+    btn.textContent = btnLabelOriginal;
   } finally {
+    stopTimers();
+    if (toolbar) toolbar.classList.remove('is-loading');
     btn.disabled = false;
+    if (dossieBtn) dossieBtn.disabled = false;
   }
 }
 

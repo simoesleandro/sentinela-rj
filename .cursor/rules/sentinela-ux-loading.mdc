@@ -1,0 +1,31 @@
+---
+description: Padrões de UX para operações longas no dashboard Sentinela (loading, feedback, estados)
+globs: static/**/*.{js,css},templates/**/*.html
+alwaysApply: false
+---
+
+# Sentinela — UX de operações longas
+
+Ao implementar ações que demoram (IA, export, coleta, comparação):
+
+## Obrigatório
+
+1. **Spinner visível** no botão que disparou a ação (`btn-spinner` + `cursor: wait`)
+2. **Desabilitar** controles relacionados durante o processo (evitar duplo clique)
+3. **Área de resultado** com skeleton animado (`narrativa-skeleton` + `ia-shimmer`) onde o conteúdo aparecerá
+4. **Etapas nomeadas** quando o fluxo tem fases (ex.: contexto → Llama → Gemini) com `.ia-step` / `.is-active` / `.is-done`
+5. **`role="status"` + `aria-live="polite"` + `aria-busy="true"`** no bloco de progresso
+6. **Mensagem de tempo esperado** (“pode levar até X min — não feche este painel”)
+7. **Estado de erro** no mesmo bloco de resultado, não só texto cinza solto
+8. **Destaque visual** no container (borda ` #4f46e5`, toolbar `.is-loading`)
+
+## Estilo (Linear/Vercel dark)
+
+- Spinner: borda `#3f3f46`, topo `#818cf8`, animação `ia-spin`
+- Texto ativo: `#c4b5fd` / `#e4e4e7`
+- Sucesso: `#22c55e` | Erro: `#ef4444`
+- Skeleton: gradiente `#1f1f23` → `#2a2a30`
+
+## Referência
+
+Ver `investigarComLlama()` em `static/app.js` e classes `.ia-progress*` em `static/style.css`.
