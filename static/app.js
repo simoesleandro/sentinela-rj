@@ -289,6 +289,33 @@ async function api(path, { method = 'GET', body, ...rest } = {}) {
 
 const VEREDITO_MARKER = '[Recomendação de Veredito]';
 
+function renderComparacaoHtml(narrativa_ia, narrativa_gemma) {
+  if (!narrativa_gemma || !String(narrativa_gemma).trim()) return '';
+  return `
+    <div class="narrativa-comparacao">
+      <div class="comparacao-header">
+        <span class="comparacao-title">Comparação de Modelos IA</span>
+        <span class="comparacao-badge">EXPERIMENTO</span>
+      </div>
+      <div class="comparacao-grid">
+        <div class="narrativa-col">
+          <div class="narrativa-col-label">
+            <span class="model-dot gemini"></span>
+            Gemini 2.5 Flash
+          </div>
+          <div class="narrativa-col-text">${escapeHtml(String(narrativa_ia || ''))}</div>
+        </div>
+        <div class="narrativa-col">
+          <div class="narrativa-col-label">
+            <span class="model-dot gemma"></span>
+            Gemma 4 12B · local
+          </div>
+          <div class="narrativa-col-text">${escapeHtml(String(narrativa_gemma))}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function parseVereditoIa(narrativa) {
   const texto = String(narrativa || '').trim();
   if (!texto) return { corpo: '', veredito: null, statusSugerido: null, justificativa: null };
@@ -874,6 +901,7 @@ async function openDetail(id) {
           statusSugerido: null,
         };
     const btnIaLabel = temNarrativa ? 'Regenerar narrativa' : 'Investigar com IA';
+    const comparacaoHtml = renderComparacaoHtml(d.narrativa_ia, d.narrativa_gemma);
 
     const transicoes = (d.transicoes_permitidas || []).map(st =>
       `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
@@ -967,6 +995,7 @@ async function openDetail(id) {
         <label>Narrativa IA</label>
         ${narrativaParts.html}
       </div>
+      <div id="comparacao-container">${comparacaoHtml}</div>
       <div class="detail-actions">
         ${pncpLink}
         ${d.fornecedor_ni ? `<a href="/fornecedor/${d.fornecedor_ni}" target="_self" class="detail-link">Ver página do fornecedor →</a>` : ''}
@@ -1096,6 +1125,10 @@ async function investigarComLlama(alertaId) {
       <label>Narrativa IA</label>
       ${narrativaParts.html}
     `;
+    const comparacaoEl = document.getElementById('comparacao-container');
+    if (comparacaoEl) {
+      comparacaoEl.innerHTML = renderComparacaoHtml(payload.narrativa_ia, payload.narrativa_gemma);
+    }
     document.getElementById('btn-aplicar-veredito')?.addEventListener('click', () => {
       aplicarVereditoSugerido(alertaId, narrativaParts.statusSugerido, narrativaParts.justificativa);
     });

@@ -112,6 +112,18 @@ def _call_gemma4(prompt: str) -> str:
     return texto
 
 
+def _limpar_latex(texto: str) -> str:
+    """Remove artefatos LaTeX que vazam do Gemma 4."""
+    import re
+    texto = re.sub(r'\$([^$]+)\$', r'\1', texto)
+    texto = texto.replace(r'\times', '×')
+    texto = texto.replace(r'\%', '%')
+    texto = texto.replace(r'\cdot', '·')
+    texto = texto.replace(r'\approx', '≈')
+    texto = re.sub(r'\\[a-zA-Z]+\{([^}]+)\}', r'\1', texto)
+    return texto.strip()
+
+
 def _call_ollama(prompt: str) -> str:
     url = f"{_OLLAMA_BASE}/api/chat"
     payload = {
@@ -236,7 +248,7 @@ class InvestigadorIA:
         prompt = _montar_prompt_revisao(
             anomalia, rascunho, extra=self._prompt_revisao_extra
         )
-        revisado = _call_gemma4(prompt)
+        revisado = _limpar_latex(_call_gemma4(prompt))
         logger.info(
             "Revisão Gemma 4 concluída (rascunho=%d chars, final=%d chars)",
             len(rascunho),
