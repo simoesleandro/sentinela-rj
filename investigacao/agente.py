@@ -90,7 +90,7 @@ class AgenteInvestigador:
 
         processos_tjrj: dict[str, Any] = {}
         if fornecedor_ni:
-            print("  [Agente] DataJud — processos TJRJ do fornecedor...")
+            print("  [Agente] TJRJ — verificando processos (stub)...")
             fornecedor_nome_busca = (
                 dados_alerta.get("fornecedor_nome")
                 or dados_alerta.get("razao_social")
