@@ -7,7 +7,6 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-_PNCP_BASE = "https://pncp.gov.br/api/pncp/v1"
 _TIMEOUT = 15
 _MAX_PAGINAS = 3
 _TAMANHO_PAGINA = 20
@@ -27,11 +26,13 @@ def buscar_historico_orgao(
 
     for pagina in range(1, _MAX_PAGINAS + 1):
         try:
-            url = f"{_PNCP_BASE}/orgaos/{cnpj_limpo}/contratos"
+            url = "https://pncp.gov.br/api/consulta/v1/contratos"
             params = {
+                "cnpjOrgao": cnpj_limpo,
                 "pagina": pagina,
                 "tamanhoPagina": _TAMANHO_PAGINA,
-                "ano": ano,
+                "dataInicial": f"{ano}0101",
+                "dataFinal": f"{ano}1231",
             }
             resp = requests.get(url, params=params, timeout=_TIMEOUT)
             if resp.status_code == 404:
