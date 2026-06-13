@@ -506,6 +506,86 @@ def cmd_investigar(args) -> int:
     return 0 if sucesso == len(pendentes) else 1
 
 
+# ── Sub-comando: investigar_profundo ─────────────────────────────────────────
+
+def cmd_investigar_profundo(args) -> int:
+    import json
+    from datetime import datetime, timezone
+
+    from db.conexao import get_conn
+    from investigacao import AgenteInvestigador
+
+    alerta_id = args.alerta_id
+    _header(f"investigar_profundo  alerta #{alerta_id}")
+
+    conn = get_conn(row_factory=True)
+    try:
+        row = conn.execute(
+            """
+            SELECT a.*, f.ni AS fornecedor_ni, o.cnpj AS orgao_cnpj
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            WHERE a.id = ?
+            """,
+            (alerta_id,),
+        ).fetchone()
+
+        if row is None:
+            _warn(f"Alerta {alerta_id} não encontrado")
+            return 1
+
+        dados = dict(row)
+        agente = AgenteInvestigador()
+        print()
+        print(SEP)
+        print(f"  INVESTIGAÇÃO PROFUNDA — Alerta #{alerta_id}")
+        print(SEP)
+
+        resultado = agente.investigar(alerta_id, dados)
+        agora = datetime.now(timezone.utc).isoformat()
+
+        conn.execute(
+            """
+            INSERT INTO investigacoes
+            (alerta_id, status, iniciado_em, concluido_em, evidencias,
+             sintese, conclusao, grau_confianca, recomendacao, erro)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                alerta_id,
+                resultado.status,
+                agora,
+                agora,
+                json.dumps(resultado.evidencias, ensure_ascii=False, default=str),
+                resultado.sintese,
+                resultado.conclusao,
+                resultado.grau_confianca,
+                resultado.recomendacao,
+                resultado.erro,
+            ),
+        )
+        conn.commit()
+    except Exception as exc:
+        _warn(f"Falha na investigação profunda: {exc}")
+        return 1
+    finally:
+        conn.close()
+
+    print()
+    print(SEP)
+    print("  RESULTADO")
+    print(SEP)
+    print(f"  Status      : {resultado.status}")
+    print(f"  Conclusão   : {resultado.conclusao}")
+    print(f"  Confiança   : {resultado.grau_confianca}")
+    print(f"  Recomendação: {resultado.recomendacao}")
+    print(SEP)
+    print()
+    return 0 if resultado.status == "concluida" else 1
+
+
 # ── Sub-comando: publicar ─────────────────────────────────────────────────────
 
 def cmd_publicar(args) -> int:
@@ -747,6 +827,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Maximo de alertas a processar por execucao (padrao: 10)",
     )
 
+    # investigar_profundo
+    ip = sub.add_parser(
+        "investigar_profundo",
+        help="Investigacao profunda ReAct (PNCP + BrasilAPI + Gemma4)",
+    )
+    ip.add_argument(
+        "alerta_id",
+        type=int,
+        metavar="ID",
+        help="ID do alerta na tabela alertas",
+    )
+
     # publicar
     pub = sub.add_parser(
         "publicar",
@@ -809,6 +901,7 @@ def main() -> None:
         "publicar":  cmd_publicar,
         "painel":      cmd_painel,
         "investigar":  cmd_investigar,
+        "investigar_profundo": cmd_investigar_profundo,
         "enriquecer":  cmd_enriquecer,
         "pipeline":    cmd_pipeline,
     }

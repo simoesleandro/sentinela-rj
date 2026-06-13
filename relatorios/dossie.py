@@ -67,6 +67,7 @@ class DossieAlerta(TypedDict, total=False):
     orgao: dict[str, Any]
     cadastro: dict[str, Any] | None
     correlatos: list[dict[str, Any]]
+    investigacao: dict[str, Any] | None
 
 
 def _row_para_dict(row: sqlite3.Row | None) -> dict[str, Any]:
@@ -182,7 +183,22 @@ def carregar_dossie(conn: sqlite3.Connection, alerta_id: int) -> DossieAlerta:
         },
         "cadastro": _buscar_cadastro(conn, fornecedor_ni),
         "correlatos": _buscar_correlatos(conn, alerta_id, fornecedor_ni, tipo),
+        "investigacao": _buscar_investigacao(conn, alerta_id),
     }
+
+
+def _buscar_investigacao(
+    conn: sqlite3.Connection,
+    alerta_id: int,
+) -> dict[str, Any] | None:
+    try:
+        row = conn.execute(
+            "SELECT * FROM investigacoes WHERE alerta_id = ? ORDER BY id DESC LIMIT 1",
+            (alerta_id,),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    return _row_para_dict(row) if row else None
 
 
 def garantir_narrativa_ia(
@@ -334,6 +350,28 @@ def _secao_correlatos(dados: DossieAlerta) -> str:
     return "\n".join(["## Alertas Correlatos", ""] + linhas + ["", "---", ""])
 
 
+def _secao_investigacao_profunda(dados: DossieAlerta) -> str:
+    inv = dados.get("investigacao")
+    if not inv:
+        return ""
+    linhas = [
+        "## Investigação Profunda",
+        "",
+        f"**Status:** {inv.get('status', '—')}  ",
+        f"**Conclusão:** {inv.get('conclusao', '—')}  ",
+        f"**Grau de confiança:** {inv.get('grau_confianca', '—')}  ",
+        f"**Recomendação:** {inv.get('recomendacao', '—')}",
+        "",
+        "### Síntese do Agente",
+        "",
+        str(inv.get("sintese") or ""),
+        "",
+        "---",
+        "",
+    ]
+    return "\n".join(linhas)
+
+
 def _secao_veredito_ia(narrativa: str) -> str:
     if not narrativa.strip():
         return "## Veredito IA\n\n*Narrativa não gerada. Use `--gerar-ia` ou `?gerar_ia=true`.*\n"
@@ -357,6 +395,7 @@ def renderizar_markdown(dados: DossieAlerta) -> str:
         _secao_partes(dados),
         _secao_cadastro(dados),
         _secao_correlatos(dados),
+        _secao_investigacao_profunda(dados),
         _secao_veredito_ia(narrativa),
     ]
     return "\n".join(partes)
