@@ -188,8 +188,8 @@ def test_investigar_aguarda_cooldown_apos_gemini(
         def gemini_utilizado(self) -> bool:
             return self._gemini
 
-        def investigar_anomalia(self, anomalia: dict) -> str:
-            return f"narrativa-{anomalia['id']}"
+        def investigar_anomalia(self, anomalia: dict) -> tuple:
+            return f"narrativa-{anomalia['id']}", None
 
     class _GerenciadorFake:
         def __init__(self, db_path) -> None:
@@ -198,7 +198,13 @@ def test_investigar_aguarda_cooldown_apos_gemini(
         def listar_anomalias_sem_narrativa(self, limite: int) -> list:
             return anomalias[:limite]
 
-        def atualizar_narrativa_anomalia(self, id_anomalia: int, narrativa: str) -> None:
+        def atualizar_narrativa_anomalia(
+            self,
+            id_anomalia: int,
+            narrativa: str,
+            narrativa_gemma=None,
+            gemma_utilizado: int = 0,
+        ) -> None:
             pass
 
     monkeypatch.setattr("analise.motor_ia.InvestigadorIA", _InvestigadorFake)

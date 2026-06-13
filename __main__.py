@@ -449,8 +449,13 @@ def cmd_investigar(args) -> int:
     for anomalia in pendentes:
         id_anomalia = int(anomalia["id"])
         try:
-            narrativa = investigador.investigar_anomalia(anomalia)
-            gerenciador.atualizar_narrativa_anomalia(id_anomalia, narrativa)
+            narrativa, narrativa_gemma = investigador.investigar_anomalia(anomalia)
+            gerenciador.atualizar_narrativa_anomalia(
+                id_anomalia,
+                narrativa,
+                narrativa_gemma=narrativa_gemma,
+                gemma_utilizado=1 if narrativa_gemma else 0,
+            )
             sucesso += 1
             _ok(f"id={id_anomalia}  narrativa salva ({len(narrativa)} chars)")
             time.sleep(13)

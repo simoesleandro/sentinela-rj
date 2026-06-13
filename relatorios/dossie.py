@@ -201,10 +201,13 @@ def garantir_narrativa_ia(
     from db.database import GerenciadorBanco
 
     payload = {**alerta, **dados.get("contrato", {}), **dados.get("fornecedor", {})}
-    narrativa = InvestigadorIA().investigar_anomalia(payload)
+    narrativa, narrativa_gemma = InvestigadorIA().investigar_anomalia(payload)
     caminho = db_path or DB_PATH
     GerenciadorBanco(db_path=caminho).atualizar_narrativa_anomalia(
-        int(alerta["id"]), narrativa
+        int(alerta["id"]),
+        narrativa,
+        narrativa_gemma=narrativa_gemma,
+        gemma_utilizado=1 if narrativa_gemma else 0,
     )
     alerta["narrativa_ia"] = narrativa
     return narrativa

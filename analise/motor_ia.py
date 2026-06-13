@@ -51,6 +51,8 @@ _PROMPT_REVISAO_GEMINI = (
 _OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 _OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1")
 _OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "120"))
+_GEMMA4_MODEL = os.environ.get("GEMMA4_MODEL", "gemma4:12b")
+_GEMMA4_TIMEOUT = int(os.environ.get("GEMMA4_TIMEOUT", "180"))
 
 
 def _serializar_anomalia(anomalia: dict[str, Any]) -> str:
@@ -81,6 +83,33 @@ def _revisao_gemini_disponivel() -> bool:
         return False
     flag = os.environ.get("SENTINELA_IA_REVISAO_GEMINI", "true").strip().lower()
     return flag in ("true", "1", "yes", "sim")
+
+
+def _revisao_gemma4_disponivel() -> bool:
+    flag = os.environ.get("SENTINELA_IA_REVISAO_GEMMA4", "true").strip().lower()
+    return flag in ("true", "1", "yes", "sim")
+
+
+def _call_gemma4(prompt: str) -> str:
+    """Chama Gemma 4 12B via Ollama para revisão alternativa."""
+    url = f"{_OLLAMA_BASE}/api/chat"
+    payload = {
+        "model": _GEMMA4_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+    }
+    try:
+        resposta = requests.post(url, json=payload, timeout=_GEMMA4_TIMEOUT)
+        resposta.raise_for_status()
+    except requests.RequestException as exc:
+        raise ValueError(
+            f"Gemma 4 indisponível em {_OLLAMA_BASE} (modelo {_GEMMA4_MODEL}): {exc}"
+        ) from exc
+    dados = resposta.json()
+    texto = (dados.get("message") or {}).get("content", "").strip()
+    if not texto:
+        raise ValueError("Resposta do Gemma 4 sem conteúdo textual.")
+    return texto
 
 
 def _call_ollama(prompt: str) -> str:
@@ -180,10 +209,15 @@ class InvestigadorIA:
     def __init__(self, prompt_revisao_extra: str | None = None) -> None:
         self._prompt_revisao_extra = prompt_revisao_extra
         self._gemini_utilizado = False
+        self._gemma4_utilizado = False
 
     @property
     def gemini_utilizado(self) -> bool:
         return self._gemini_utilizado
+
+    @property
+    def gemma4_utilizado(self) -> bool:
+        return self._gemma4_utilizado
 
     def _revisar_com_gemini(self, anomalia: dict[str, Any], rascunho: str) -> str:
         prompt = _montar_prompt_revisao(
@@ -192,6 +226,19 @@ class InvestigadorIA:
         revisado = _call_gemini(prompt)
         logger.info(
             "Revisão Gemini concluída (rascunho=%d chars, final=%d chars)",
+            len(rascunho),
+            len(revisado),
+        )
+        return revisado
+
+    def _revisar_com_gemma4(self, anomalia: dict[str, Any], rascunho: str) -> str:
+        """Revisão alternativa usando Gemma 4 12B local."""
+        prompt = _montar_prompt_revisao(
+            anomalia, rascunho, extra=self._prompt_revisao_extra
+        )
+        revisado = _call_gemma4(prompt)
+        logger.info(
+            "Revisão Gemma 4 concluída (rascunho=%d chars, final=%d chars)",
             len(rascunho),
             len(revisado),
         )
@@ -218,19 +265,57 @@ class InvestigadorIA:
             self._gemini_utilizado = False
             return rascunho
 
-    def investigar_anomalia(self, anomalia: dict[str, Any]) -> str:
+    def investigar_anomalia(
+        self, anomalia: dict[str, Any]
+    ) -> tuple[str, str | None]:
+        """Retorna (narrativa_ia, narrativa_gemma).
+
+        narrativa_gemma é None se Gemma 4 estiver desabilitado ou falhar.
+        """
         self._gemini_utilizado = False
+        self._gemma4_utilizado = False
         logger.info(
-            "Solicitando narrativa para anomalia id=%s (provider=%s, revisao_gemini=%s)",
+            "Solicitando narrativa para anomalia id=%s (provider=%s, revisao_gemini=%s, revisao_gemma4=%s)",
             anomalia.get("id", "?"),
             os.environ.get("SENTINELA_IA_PROVIDER", "ollama"),
             _revisao_gemini_disponivel(),
+            _revisao_gemma4_disponivel(),
         )
         prompt = _montar_prompt(anomalia)
-        if _revisao_gemini_disponivel():
-            narrativa = self._gerar_com_revisao_gemini(anomalia, prompt)
+
+        # Gera rascunho base (Ollama/Llama)
+        try:
+            rascunho = _call_ollama(prompt)
+            rascunho_ok = True
+        except ValueError as exc:
+            logger.warning("Rascunho Ollama falhou: %s", exc)
+            rascunho = None
+            rascunho_ok = False
+
+        # Narrativa principal (Gemini)
+        if _revisao_gemini_disponivel() and rascunho_ok:
+            try:
+                narrativa = self._revisar_com_gemini(anomalia, rascunho)
+                self._gemini_utilizado = True
+            except ValueError as exc:
+                logger.warning("Revisão Gemini falhou — usando rascunho: %s", exc)
+                narrativa = rascunho
+        elif rascunho_ok:
+            narrativa = rascunho
+            self._gemini_utilizado = False
         else:
             narrativa, usou_gemini = _gerar_narrativa_com_rastreio(prompt)
             self._gemini_utilizado = usou_gemini
+
+        # Narrativa alternativa (Gemma 4) — paralela, nunca bloqueia
+        narrativa_gemma = None
+        if _revisao_gemma4_disponivel() and rascunho_ok:
+            try:
+                narrativa_gemma = self._revisar_com_gemma4(anomalia, rascunho)
+                self._gemma4_utilizado = True
+                logger.info("Narrativa Gemma 4 gerada (%d chars)", len(narrativa_gemma))
+            except ValueError as exc:
+                logger.warning("Revisão Gemma 4 falhou — narrativa_gemma=None: %s", exc)
+
         logger.info("Narrativa final (%d caracteres)", len(narrativa))
-        return narrativa
+        return narrativa, narrativa_gemma

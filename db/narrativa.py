@@ -129,7 +129,13 @@ class GerenciadorNarrativa:
             if self._owns_connection and not _eh_banco_memoria(self._db_path):
                 conn.close()
 
-    def atualizar_narrativa_anomalia(self, id_anomalia: int, texto: str) -> None:
+    def atualizar_narrativa_anomalia(
+        self,
+        id_anomalia: int,
+        texto: str,
+        narrativa_gemma: str | None = None,
+        gemma_utilizado: int = 0,
+    ) -> None:
         if id_anomalia <= 0:
             raise ValueError("id_anomalia deve ser positivo.")
         narrativa = texto.strip()
@@ -139,8 +145,10 @@ class GerenciadorNarrativa:
         conn = self._obter_conexao()
         try:
             cur = conn.execute(
-                f'UPDATE "{_TABELA_ANOMALIAS}" SET narrativa_ia = ? WHERE id = ?',
-                (narrativa, id_anomalia),
+                f'UPDATE "{_TABELA_ANOMALIAS}" '
+                "SET narrativa_ia = ?, narrativa_gemma = ?, gemma_utilizado = ? "
+                "WHERE id = ?",
+                (narrativa, narrativa_gemma, gemma_utilizado, id_anomalia),
             )
             conn.commit()
             if cur.rowcount == 0:

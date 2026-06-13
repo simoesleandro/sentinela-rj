@@ -77,7 +77,8 @@ def client(tmp_path):
 def test_investigar_endpoint_salva_narrativa(client) -> None:
     with patch("analise.motor_ia.InvestigadorIA") as mock_cls:
         inst = MagicMock()
-        inst.investigar_anomalia.return_value = "Laudo investigativo gerado pela IA."
+        inst.investigar_anomalia.return_value = ("Laudo investigativo gerado pela IA.", None)
+        inst.gemma4_utilizado = False
         mock_cls.return_value = inst
 
         with patch("db.database.GerenciadorBanco") as mock_db:

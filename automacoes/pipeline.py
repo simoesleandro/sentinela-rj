@@ -264,8 +264,13 @@ def _etapa_investigar(config: PipelineConfig) -> EtapaResult:
                 indice,
                 len(pendentes),
             )
-            narrativa = investigador.investigar_anomalia(anomalia)
-            gerenciador.atualizar_narrativa_anomalia(id_anomalia, narrativa)
+            narrativa, narrativa_gemma = investigador.investigar_anomalia(anomalia)
+            gerenciador.atualizar_narrativa_anomalia(
+                id_anomalia,
+                narrativa,
+                narrativa_gemma=narrativa_gemma,
+                gemma_utilizado=1 if narrativa_gemma else 0,
+            )
             sucesso += 1
             if investigador.gemini_utilizado:
                 _aguardar_rate_limit_gemini()

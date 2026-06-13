@@ -675,15 +675,20 @@ def alertas_investigar(alert_id: int):
             return jsonify({"error": str(exc)}), 503
 
         payload = dict(row)
-        narrativa = investigador.investigar_anomalia(payload)
+        narrativa, narrativa_gemma = investigador.investigar_anomalia(payload)
         GerenciadorBanco(db_path=DB_PATH).atualizar_narrativa_anomalia(
-            alert_id, narrativa
+            alert_id,
+            narrativa,
+            narrativa_gemma=narrativa_gemma,
+            gemma_utilizado=1 if narrativa_gemma else 0,
         )
         return jsonify({
             "id": alert_id,
             "narrativa_ia": narrativa,
+            "narrativa_gemma": narrativa_gemma,
             "chars": len(narrativa),
             "revisao_gemini": _revisao_gemini_disponivel(),
+            "revisao_gemma4": investigador.gemma4_utilizado,
         })
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 422

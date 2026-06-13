@@ -46,9 +46,11 @@ def test_investigar_aplica_revisao_gemini(
 
     with patch("analise.motor_ia._call_ollama", return_value=rascunho) as mock_ollama, patch(
         "analise.motor_ia._call_gemini", return_value=revisado
-    ) as mock_gemini:
+    ) as mock_gemini, patch(
+        "analise.motor_ia._call_gemma4", side_effect=ValueError("gemma4 off")
+    ):
         investigador = InvestigadorIA()
-        texto = investigador.investigar_anomalia(anomalia)
+        texto, _ = investigador.investigar_anomalia(anomalia)
 
     assert texto == revisado
     assert investigador.gemini_utilizado is True
@@ -66,17 +68,19 @@ def test_investigar_sem_chave_usa_fluxo_simples(
     anomalia: dict,
 ) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    rascunho_ollama = "Narrativa direta do Ollama."
 
     with patch(
-        "analise.motor_ia._gerar_narrativa_com_rastreio",
-        return_value=("Narrativa direta", False),
-    ) as mock_gen:
+        "analise.motor_ia._call_ollama", return_value=rascunho_ollama
+    ) as mock_ollama, patch(
+        "analise.motor_ia._call_gemma4", side_effect=ValueError("gemma4 off")
+    ):
         investigador = InvestigadorIA()
-        texto = investigador.investigar_anomalia(anomalia)
+        texto, _ = investigador.investigar_anomalia(anomalia)
 
-    assert texto == "Narrativa direta"
+    assert texto == rascunho_ollama
     assert investigador.gemini_utilizado is False
-    mock_gen.assert_called_once()
+    mock_ollama.assert_called_once()
 
 
 def test_revisao_falha_retorna_rascunho(
@@ -89,8 +93,8 @@ def test_revisao_falha_retorna_rascunho(
     with patch("analise.motor_ia._call_ollama", return_value=rascunho), patch(
         "analise.motor_ia._call_gemini",
         side_effect=ValueError("Gemini indisponível"),
-    ):
-        texto = InvestigadorIA().investigar_anomalia(anomalia)
+    ), patch("analise.motor_ia._call_gemma4", side_effect=ValueError("gemma4 off")):
+        texto, _ = InvestigadorIA().investigar_anomalia(anomalia)
 
     assert texto == rascunho
 
@@ -104,7 +108,9 @@ def test_pipeline_prompt_extra_incluido_na_revisao(
 
     with patch("analise.motor_ia._call_ollama", return_value="rascunho"), patch(
         "analise.motor_ia._call_gemini", return_value="revisado"
-    ) as mock_gemini:
+    ) as mock_gemini, patch(
+        "analise.motor_ia._call_gemma4", side_effect=ValueError("gemma4 off")
+    ):
         InvestigadorIA(prompt_revisao_extra=extra).investigar_anomalia(anomalia)
 
     prompt_revisao = mock_gemini.call_args[0][0]
