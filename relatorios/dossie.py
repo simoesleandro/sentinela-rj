@@ -201,16 +201,16 @@ def garantir_narrativa_ia(
     from db.database import GerenciadorBanco
 
     payload = {**alerta, **dados.get("contrato", {}), **dados.get("fornecedor", {})}
-    narrativa, narrativa_gemma = InvestigadorIA().investigar_anomalia(payload)
+    resultado = InvestigadorIA().investigar_anomalia(payload)
     caminho = db_path or DB_PATH
     GerenciadorBanco(db_path=caminho).atualizar_narrativa_anomalia(
         int(alerta["id"]),
-        narrativa,
-        narrativa_gemma=narrativa_gemma,
-        gemma_utilizado=1 if narrativa_gemma else 0,
+        resultado.narrativa_ia,
+        narrativa_gemma=resultado.narrativa_gemma,
+        gemma_utilizado=1 if resultado.narrativa_gemma else 0,
     )
-    alerta["narrativa_ia"] = narrativa
-    return narrativa
+    alerta["narrativa_ia"] = resultado.narrativa_ia
+    return resultado.narrativa_ia
 
 
 def _secao_cabecalho(dados: DossieAlerta) -> str:

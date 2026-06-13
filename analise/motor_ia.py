@@ -4,6 +4,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import warnings
+from dataclasses import dataclass
 from typing import Any
 
 import requests
@@ -12,6 +15,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ResultadoInvestigacao:
+    corpo: str
+    narrativa_ia: str  # corpo + veredito_gemini (formato atual)
+    narrativa_gemma: str | None = None  # só veredito Gemma4
+    veredito_gemini: dict[str, str] | None = None
+    veredito_gemma: dict[str, str] | None = None
+    gemini_utilizado: bool = False
+    gemma4_utilizado: bool = False
 
 _PROMPT_AUDITOR = (
     "Atue como um auditor investigativo. Seja direto: nas primeiras frases, "
@@ -48,6 +62,21 @@ _PROMPT_REVISAO_GEMINI = (
     "6. Responda com o parágrafo revisado seguido da seção de veredito — "
     "sem prefácio, sem repetir o JSON."
 )
+_PROMPT_VEREDITO = (
+    "Você é um auditor sênior de contratos públicos. "
+    "Receberá o JSON factual da anomalia e a narrativa investigativa já gerada.\n\n"
+    "Sua tarefa: APENAS gerar a recomendação de veredito.\n\n"
+    "Responda SOMENTE com o bloco abaixo (copie o título exatamente):\n\n"
+    "**[Recomendação de Veredito]**\n"
+    "Status sugerido: <Aberto | Investigando | Confirmado | Descartado>\n"
+    "Justificativa: 1 ou 2 linhas simples explicando por que esse status faz sentido.\n\n"
+    "Use apenas um dos quatro status. "
+    "Prefira Investigando quando houver indícios que exijam checagem; "
+    "Confirmado só com evidências claras; "
+    "Descartado quando a anomalia parecer explicável; "
+    "Aberto se faltar contexto mínimo.\n"
+    "Sem prefácio, sem repetir a narrativa, sem comentários adicionais."
+)
 _OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 _OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1")
 _OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "120"))
@@ -61,6 +90,39 @@ def _serializar_anomalia(anomalia: dict[str, Any]) -> str:
 
 def _montar_prompt(anomalia: dict[str, Any]) -> str:
     return f"{_PROMPT_AUDITOR}\n\nDados da anomalia:\n{_serializar_anomalia(anomalia)}"
+
+
+def _montar_prompt_veredito(
+    anomalia: dict[str, Any],
+    corpo: str,
+    extra: str | None = None,
+) -> str:
+    prompt = _PROMPT_VEREDITO
+    if extra:
+        prompt = f"{prompt}\n\n{extra.strip()}"
+    return (
+        f"{prompt}\n\n"
+        f"Dados factuais:\n{_serializar_anomalia(anomalia)}\n\n"
+        f"Narrativa gerada:\n{corpo.strip()}"
+    )
+
+
+def _parse_veredito(texto: str) -> dict[str, str] | None:
+    """Extrai status e justificativa do bloco de veredito."""
+    if not texto or "[Recomendação de Veredito]" not in texto:
+        return None
+    status_match = re.search(
+        r"Status sugerido:\s*(.+?)(?:\n|$)", texto, re.IGNORECASE
+    )
+    just_match = re.search(
+        r"Justificativa:\s*(.+?)(?:\n\n|\Z)", texto, re.IGNORECASE | re.DOTALL
+    )
+    if not status_match:
+        return None
+    return {
+        "status": status_match.group(1).strip(),
+        "justificativa": just_match.group(1).strip() if just_match else "",
+    }
 
 
 def _montar_prompt_revisao(
@@ -114,7 +176,6 @@ def _call_gemma4(prompt: str) -> str:
 
 def _limpar_latex(texto: str) -> str:
     """Remove artefatos LaTeX que vazam do Gemma 4."""
-    import re
     texto = re.sub(r'\$([^$]+)\$', r'\1', texto)
     texto = texto.replace(r'\times', '×')
     texto = texto.replace(r'\%', '%')
@@ -216,7 +277,7 @@ def _gerar_narrativa_com_rastreio(prompt: str) -> tuple[str, bool]:
 
 
 class InvestigadorIA:
-    """Gera narrativas investigativas (Ollama + revisão opcional Gemini)."""
+    """Gera narrativas investigativas (Gemma4 corpo + vereditos A/B)."""
 
     def __init__(self, prompt_revisao_extra: str | None = None) -> None:
         self._prompt_revisao_extra = prompt_revisao_extra
@@ -259,6 +320,11 @@ class InvestigadorIA:
     def _gerar_com_revisao_gemini(
         self, anomalia: dict[str, Any], prompt: str
     ) -> str:
+        warnings.warn(
+            "_gerar_com_revisao_gemini está obsoleto — use investigar_anomalia()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         try:
             rascunho = _call_ollama(prompt)
         except ValueError as exc:
@@ -279,55 +345,73 @@ class InvestigadorIA:
 
     def investigar_anomalia(
         self, anomalia: dict[str, Any]
-    ) -> tuple[str, str | None]:
-        """Retorna (narrativa_ia, narrativa_gemma).
-
-        narrativa_gemma é None se Gemma 4 estiver desabilitado ou falhar.
-        """
+    ) -> ResultadoInvestigacao:
         self._gemini_utilizado = False
         self._gemma4_utilizado = False
         logger.info(
-            "Solicitando narrativa para anomalia id=%s (provider=%s, revisao_gemini=%s, revisao_gemma4=%s)",
+            "Investigando anomalia id=%s — fluxo: Gemma4 corpo + vereditos A/B",
             anomalia.get("id", "?"),
-            os.environ.get("SENTINELA_IA_PROVIDER", "ollama"),
-            _revisao_gemini_disponivel(),
-            _revisao_gemma4_disponivel(),
         )
-        prompt = _montar_prompt(anomalia)
 
-        # Gera rascunho base (Ollama/Llama)
+        prompt_corpo = _montar_prompt(anomalia)
+        if self._prompt_revisao_extra:
+            prompt_corpo = f"{prompt_corpo}\n\n{self._prompt_revisao_extra}"
+
         try:
-            rascunho = _call_ollama(prompt)
-            rascunho_ok = True
+            corpo = _limpar_latex(_call_gemma4(prompt_corpo))
+            logger.info("Corpo Gemma4 gerado (%d chars)", len(corpo))
         except ValueError as exc:
-            logger.warning("Rascunho Ollama falhou: %s", exc)
-            rascunho = None
-            rascunho_ok = False
-
-        # Narrativa principal (Gemini)
-        if _revisao_gemini_disponivel() and rascunho_ok:
+            logger.warning("Gemma4 falhou — fallback Gemini para corpo: %s", exc)
             try:
-                narrativa = self._revisar_com_gemini(anomalia, rascunho)
+                corpo = _call_gemini(prompt_corpo)
                 self._gemini_utilizado = True
-            except ValueError as exc:
-                logger.warning("Revisão Gemini falhou — usando rascunho: %s", exc)
-                narrativa = rascunho
-        elif rascunho_ok:
-            narrativa = rascunho
-            self._gemini_utilizado = False
-        else:
-            narrativa, usou_gemini = _gerar_narrativa_com_rastreio(prompt)
-            self._gemini_utilizado = usou_gemini
+            except ValueError as exc2:
+                logger.warning("Gemini corpo falhou — fallback Groq: %s", exc2)
+                corpo = _call_groq(prompt_corpo)
 
-        # Narrativa alternativa (Gemma 4) — paralela, nunca bloqueia
-        narrativa_gemma = None
-        if _revisao_gemma4_disponivel() and rascunho_ok:
+        veredito_gemma: str | None = None
+        veredito_gemma_dict: dict[str, str] | None = None
+        if _revisao_gemma4_disponivel():
             try:
-                narrativa_gemma = self._revisar_com_gemma4(anomalia, rascunho)
+                prompt_v = _montar_prompt_veredito(
+                    anomalia, corpo, extra=self._prompt_revisao_extra
+                )
+                veredito_gemma = _limpar_latex(_call_gemma4(prompt_v))
+                veredito_gemma_dict = _parse_veredito(veredito_gemma)
                 self._gemma4_utilizado = True
-                logger.info("Narrativa Gemma 4 gerada (%d chars)", len(narrativa_gemma))
+                logger.info("Veredito Gemma4 gerado")
             except ValueError as exc:
-                logger.warning("Revisão Gemma 4 falhou — narrativa_gemma=None: %s", exc)
+                logger.warning("Veredito Gemma4 falhou: %s", exc)
 
-        logger.info("Narrativa final (%d caracteres)", len(narrativa))
-        return narrativa, narrativa_gemma
+        veredito_gemini: str | None = None
+        veredito_gemini_dict: dict[str, str] | None = None
+        if _revisao_gemini_disponivel():
+            try:
+                prompt_v = _montar_prompt_veredito(
+                    anomalia, corpo, extra=self._prompt_revisao_extra
+                )
+                veredito_gemini = _call_gemini(prompt_v)
+                veredito_gemini_dict = _parse_veredito(veredito_gemini)
+                self._gemini_utilizado = True
+                logger.info("Veredito Gemini gerado")
+            except ValueError as exc:
+                logger.warning("Veredito Gemini falhou: %s", exc)
+
+        if veredito_gemini:
+            narrativa_ia = f"{corpo}\n\n{veredito_gemini}"
+        else:
+            narrativa_ia = corpo
+
+        logger.info(
+            "Investigação concluída (%d chars narrativa_ia)", len(narrativa_ia)
+        )
+
+        return ResultadoInvestigacao(
+            corpo=corpo,
+            narrativa_ia=narrativa_ia,
+            narrativa_gemma=veredito_gemma,
+            veredito_gemini=veredito_gemini_dict,
+            veredito_gemma=veredito_gemma_dict,
+            gemini_utilizado=self._gemini_utilizado,
+            gemma4_utilizado=self._gemma4_utilizado,
+        )

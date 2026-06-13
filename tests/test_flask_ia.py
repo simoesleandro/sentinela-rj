@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from analise.motor_ia import ResultadoInvestigacao
 from db.conexao import SCHEMA_PATH, aplicar_migracoes
 
 
@@ -75,9 +76,14 @@ def client(tmp_path):
 
 
 def test_investigar_endpoint_salva_narrativa(client) -> None:
+    laudo = "Laudo investigativo gerado pela IA."
+    resultado_fake = ResultadoInvestigacao(
+        corpo=laudo,
+        narrativa_ia=laudo,
+    )
     with patch("analise.motor_ia.InvestigadorIA") as mock_cls:
         inst = MagicMock()
-        inst.investigar_anomalia.return_value = ("Laudo investigativo gerado pela IA.", None)
+        inst.investigar_anomalia.return_value = resultado_fake
         inst.gemma4_utilizado = False
         mock_cls.return_value = inst
 

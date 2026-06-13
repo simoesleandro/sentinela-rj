@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from analise.motor_ia import ResultadoInvestigacao
 from analisador.engine import AnomaliaResult
 from automacoes.pipeline import (
     EtapaResult,
@@ -188,8 +189,9 @@ def test_investigar_aguarda_cooldown_apos_gemini(
         def gemini_utilizado(self) -> bool:
             return self._gemini
 
-        def investigar_anomalia(self, anomalia: dict) -> tuple:
-            return f"narrativa-{anomalia['id']}", None
+        def investigar_anomalia(self, anomalia: dict) -> ResultadoInvestigacao:
+            texto = f"narrativa-{anomalia['id']}"
+            return ResultadoInvestigacao(corpo=texto, narrativa_ia=texto)
 
     class _GerenciadorFake:
         def __init__(self, db_path) -> None:

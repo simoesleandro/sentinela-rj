@@ -153,18 +153,44 @@ def cmd_coletar(args) -> int:
 
 def cmd_backfill(args) -> int:
     import os
-    from extrator.backfill import executar_backfill
+    from db.conexao import DB_PATH, get_conn
+    from extrator.backfill import executar_backfill, status_backfill
     from extrator.config_municipio import rotulo_filtro
 
     di = args.data_ini or os.getenv("BACKFILL_DATA_INICIO", "20220101")
     df = args.data_fim or date.today().strftime("%Y%m%d")
 
-    _header(f"backfill  {di} -> {df}")
+    if getattr(args, "status", False):
+        _header(f"backfill status  {di} -> {df}")
+        if not DB_PATH.exists():
+            _warn(f"Banco nao encontrado: {DB_PATH}")
+            return 1
+        conn = get_conn(row_factory=True)
+        try:
+            st = status_backfill(conn, di, df)
+        finally:
+            conn.close()
+        print(f"  Filtro            : {st['filtro']}")
+        print(f"  Janelas           : {st['janelas_concluidas']}/{st['janelas_total']} concluidas")
+        if st["ultima_janela_concluida"]:
+            u = st["ultima_janela_concluida"]
+            print(f"  Ultima concluida  : {u[0]} -> {u[1]}")
+        if st["proxima_janela"]:
+            p = st["proxima_janela"]
+            print(f"  Proxima pendente  : {p[0]} -> {p[1]}")
+        else:
+            _ok("Backfill concluido para este intervalo.")
+        print()
+        if not st["concluido"]:
+            _info("Retomar: python __main__.py backfill --continuar")
+        return 0
+
+    _header(f"backfill  {di} -> {df}" + ("  (continuar)" if args.continuar else ""))
     _info(f"Filtro: {rotulo_filtro()}")
     t0 = time.perf_counter()
 
     try:
-        resumo = executar_backfill(di, df)
+        resumo = executar_backfill(di, df, continuar=args.continuar)
     except Exception as exc:
         _warn(f"Erro no backfill: {exc}")
         return 1
@@ -173,7 +199,10 @@ def cmd_backfill(args) -> int:
     print(SEP)
     print("  RESUMO DO BACKFILL")
     print(SEP)
-    print(f"  Janelas mensais   : {resumo['janelas']}")
+    print(f"  Janelas (total)   : {resumo['janelas']}")
+    if resumo.get("janelas_puladas"):
+        print(f"  Janelas puladas   : {resumo['janelas_puladas']} (ja no log)")
+    print(f"  Janelas nesta run : {resumo.get('janelas_executadas', resumo['janelas'])}")
     print(f"  Brutos varridos   : {resumo['brutos_varridos']}")
     print(f"  Salvos municipio  : {resumo['salvos_municipio']}")
     if resumo["paginas_falhas"]:
@@ -449,15 +478,15 @@ def cmd_investigar(args) -> int:
     for anomalia in pendentes:
         id_anomalia = int(anomalia["id"])
         try:
-            narrativa, narrativa_gemma = investigador.investigar_anomalia(anomalia)
+            resultado = investigador.investigar_anomalia(anomalia)
             gerenciador.atualizar_narrativa_anomalia(
                 id_anomalia,
-                narrativa,
-                narrativa_gemma=narrativa_gemma,
-                gemma_utilizado=1 if narrativa_gemma else 0,
+                resultado.narrativa_ia,
+                narrativa_gemma=resultado.narrativa_gemma,
+                gemma_utilizado=1 if resultado.narrativa_gemma else 0,
             )
             sucesso += 1
-            _ok(f"id={id_anomalia}  narrativa salva ({len(narrativa)} chars)")
+            _ok(f"id={id_anomalia}  narrativa salva ({len(resultado.narrativa_ia)} chars)")
             time.sleep(13)
         except Exception as exc:
             _warn(f"id={id_anomalia}  falhou: {exc}")
@@ -645,6 +674,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bf.add_argument("data_ini", nargs="?", help="Data inicial AAAAMMDD (env BACKFILL_DATA_INICIO)")
     bf.add_argument("data_fim", nargs="?", help="Data final AAAAMMDD (padrao: hoje)")
+    bf.add_argument(
+        "--continuar",
+        action="store_true",
+        help="Retoma do ultimo mes concluido (consulta coletas_log)",
+    )
+    bf.add_argument(
+        "--status",
+        action="store_true",
+        help="Mostra progresso do backfill sem coletar",
+    )
 
     # sancoes
     sub.add_parser(
