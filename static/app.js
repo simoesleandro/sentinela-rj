@@ -903,6 +903,7 @@ async function openDetail(id) {
   const backdrop = document.getElementById('detail-backdrop');
   const content  = document.getElementById('detail-content');
 
+  _stopInvProfundaPolling();
   content.innerHTML = '<div class="loading-msg">Carregando…</div>';
   panel.classList.add('panel-open');
   backdrop.classList.add('backdrop-open');
@@ -1023,11 +1024,16 @@ async function openDetail(id) {
         <button type="button" id="btn-investigar-ia" class="btn-investigar" title="Gemma 4 local gera a narrativa; vereditos Gemma 4 e Gemini para comparação A/B">
           ✨ ${btnIaLabel}
         </button>
+        <button type="button" id="btn-investigar-profundo" class="btn-investigar-profundo" title="Agente ReAct coleta dados de múltiplas fontes e gera conclusão fundamentada">
+          🔍 Investigar Profundo
+        </button>
         <button type="button" id="btn-export-dossie" class="btn-dossie" title="Baixa dossiê Markdown deste alerta">
           📄 Exportar Dossiê
         </button>
         <span id="investigacao-status" class="investigacao-status" aria-live="polite"></span>
       </div>
+      <div id="inv-profunda-status" class="inv-profunda-status"></div>
+      <div id="inv-profunda-container"></div>
       <div id="narrativa-container" class="narrativa-block">
         <label>Narrativa IA</label>
         ${narrativaParts.html}
@@ -1056,6 +1062,10 @@ async function openDetail(id) {
     document.getElementById('btn-investigar-ia')?.addEventListener('click', () => {
       investigarComIa(id);
     });
+    document.getElementById('btn-investigar-profundo')?.addEventListener('click', () => {
+      investigarProfundo(id);
+    });
+    _pollInvProfunda(id);
     document.getElementById('btn-aplicar-veredito')?.addEventListener('click', () => {
       aplicarVereditoSugerido(id, narrativaParts.statusSugerido, narrativaParts.justificativa);
     });
@@ -1202,6 +1212,148 @@ async function investigarComIa(alertaId) {
     btn.disabled = false;
     if (dossieBtn) dossieBtn.disabled = false;
   }
+}
+
+// ── Investigação Profunda ──────────────────────────────────────────────────
+
+const INV_PROFUNDA_POLL_INTERVAL = 6000; // 6s
+let _invProfundaTimer = null;
+
+async function investigarProfundo(alertaId) {
+  const btn = document.getElementById('btn-investigar-profundo');
+  const statusEl = document.getElementById('inv-profunda-status');
+  if (!btn) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Iniciando…';
+  if (statusEl) statusEl.textContent = 'Iniciando investigação profunda…';
+
+  try {
+    const res = await fetch(`${BASE}/api/alertas/${alertaId}/investigar_profundo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+
+    if (!res.ok && res.status !== 202) {
+      throw new Error(data.error || res.statusText);
+    }
+
+    if (data.status === 'ja_rodando') {
+      if (statusEl) statusEl.textContent = 'Investigação já em andamento…';
+    } else {
+      if (statusEl) statusEl.textContent = 'Investigação iniciada — coletando dados…';
+    }
+
+    btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Investigando…';
+    _startInvProfundaPolling(alertaId);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '🔍 Investigar Profundo';
+    if (statusEl) statusEl.textContent = `Erro: ${e.message}`;
+  }
+}
+
+function _startInvProfundaPolling(alertaId) {
+  _stopInvProfundaPolling();
+  _invProfundaTimer = setInterval(() => _pollInvProfunda(alertaId), INV_PROFUNDA_POLL_INTERVAL);
+  _pollInvProfunda(alertaId);
+}
+
+function _stopInvProfundaPolling() {
+  if (_invProfundaTimer) {
+    clearInterval(_invProfundaTimer);
+    _invProfundaTimer = null;
+  }
+}
+
+async function _pollInvProfunda(alertaId) {
+  const btn = document.getElementById('btn-investigar-profundo');
+  const statusEl = document.getElementById('inv-profunda-status');
+  const containerEl = document.getElementById('inv-profunda-container');
+
+  try {
+    const res = await fetch(`${BASE}/api/investigacoes/${alertaId}/status`);
+    const data = await res.json();
+
+    if (data.status === 'nenhuma') {
+      return;
+    }
+
+    if (data.status === 'rodando') {
+      if (statusEl) {
+        statusEl.textContent = 'Agente coletando dados… (pode levar alguns minutos)';
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Investigando…';
+      }
+      if (!_invProfundaTimer) {
+        _startInvProfundaPolling(alertaId);
+      }
+      return;
+    }
+
+    _stopInvProfundaPolling();
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔍 Re-investigar';
+    }
+
+    if (data.status === 'erro') {
+      if (statusEl) statusEl.textContent = `Erro: ${data.erro || 'desconhecido'}`;
+      return;
+    }
+
+    if (containerEl) {
+      containerEl.innerHTML = renderInvProfundaHtml(data);
+    }
+    if (statusEl) {
+      const conf = data.grau_confianca ? ` · confiança ${data.grau_confianca}` : '';
+      statusEl.textContent = `Investigação concluída — ${data.conclusao || '?'}${conf}`;
+    }
+  } catch (e) {
+    console.warn('Polling inv profunda falhou:', e);
+  }
+}
+
+function renderInvProfundaHtml(data) {
+  const conclusaoCor = {
+    confirmar: '#f59e0b',
+    escalar: '#ef4444',
+    arquivar: '#22c55e',
+    inconclusivo: '#64748b',
+  }[data.conclusao] || '#64748b';
+
+  const resumos = data.resumos || {};
+  const linhasResumo = Object.entries(resumos)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `<li><strong>${k.replace(/_/g, ' ')}:</strong> ${escapeHtml(v)}</li>`)
+    .join('');
+
+  return `
+    <div class="inv-profunda-result">
+      <div class="inv-profunda-header">
+        <span class="inv-profunda-title">Investigação Profunda</span>
+        <span class="inv-profunda-badge" style="background:${conclusaoCor}20;border-color:${conclusaoCor};color:${conclusaoCor}">
+          ${data.conclusao || '?'} · ${data.grau_confianca || '?'}
+        </span>
+      </div>
+      ${linhasResumo ? `<ul class="inv-profunda-resumos">${linhasResumo}</ul>` : ''}
+      ${data.sintese ? `
+        <div class="inv-profunda-sintese">
+          <div class="inv-profunda-sintese-label">Síntese do Agente</div>
+          <div class="inv-profunda-sintese-text">${escapeHtml(data.sintese)}</div>
+        </div>
+      ` : ''}
+      ${data.recomendacao ? `
+        <div class="inv-profunda-rec">
+          <strong>Recomendação:</strong> ${escapeHtml(data.recomendacao)}
+        </div>
+      ` : ''}
+    </div>
+  `;
 }
 
 async function aplicarVereditoSugerido(alertaId, statusSugerido, justificativa) {

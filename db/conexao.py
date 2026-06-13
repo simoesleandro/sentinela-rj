@@ -78,6 +78,23 @@ _MIGRACOES_DDL = [
     """,
     "CREATE INDEX IF NOT EXISTS idx_transp_rj_fornecedor ON transparencia_rj_lancamentos(fornecedor_ni)",
     "CREATE INDEX IF NOT EXISTS idx_transp_rj_cruz_pncp ON transparencia_rj_cruzamentos(numero_controle_pncp)",
+    """
+    CREATE TABLE IF NOT EXISTS investigacoes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        alerta_id INTEGER NOT NULL REFERENCES alertas(id),
+        status TEXT DEFAULT 'pendente',
+        iniciado_em TEXT,
+        concluido_em TEXT,
+        evidencias TEXT,
+        sintese TEXT,
+        conclusao TEXT,
+        grau_confianca TEXT,
+        recomendacao TEXT,
+        erro TEXT,
+        criado_em TEXT DEFAULT (datetime('now'))
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_investigacoes_alerta ON investigacoes(alerta_id)",
 ]
 
 _MIGRACOES_COLUNAS = [

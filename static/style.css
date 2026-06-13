@@ -2153,6 +2153,123 @@ th.sort-active {
   cursor: not-allowed;
 }
 
+/* Investigação Profunda */
+.btn-investigar-profundo {
+  padding: 7px 14px;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.06em;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  color: #8b5cf6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-investigar-profundo:hover {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.btn-investigar-profundo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inv-profunda-status {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: #64748b;
+  margin-top: 6px;
+  min-height: 16px;
+}
+
+.inv-profunda-result {
+  margin-top: 20px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.inv-profunda-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(139, 92, 246, 0.06);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.12);
+}
+
+.inv-profunda-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b5cf6;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inv-profunda-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.06em;
+  text-transform: capitalize;
+}
+
+.inv-profunda-resumos {
+  list-style: none;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inv-profunda-resumos li {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.inv-profunda-resumos strong {
+  color: #94a3b8;
+}
+
+.inv-profunda-sintese {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.08);
+}
+
+.inv-profunda-sintese-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8b5cf6;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.inv-profunda-sintese-text {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.inv-profunda-rec {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.55;
+}
+
+.inv-profunda-rec strong {
+  color: #e2e8f0;
+}
+
 @media (max-width: 768px) {
   .comparacao-grid { grid-template-columns: 1fr; }
   .narrativa-col:first-child {

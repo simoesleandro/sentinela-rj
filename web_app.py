@@ -5,7 +5,8 @@ import json
 import math
 import os
 import sqlite3
-from datetime import datetime
+import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, request, render_template, Response
@@ -699,6 +700,174 @@ def alertas_investigar(alert_id: int):
         return jsonify({"error": str(exc)}), 422
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Investigação Profunda — Agente ReAct
+# ---------------------------------------------------------------------------
+
+@app.route("/api/alertas/<int:alert_id>/investigar_profundo", methods=["POST", "OPTIONS"])
+def alertas_investigar_profundo(alert_id: int):
+    if request.method == "OPTIONS":
+        return "", 204
+
+    db = get_db()
+    try:
+        row = db.execute(
+            """
+            SELECT a.id, a.tipo, a.severidade, a.descricao, a.metodologia,
+                   a.valor_referencia, a.numero_controle_pncp, a.status,
+                   COALESCE(c.objeto, '') AS objeto,
+                   COALESCE(c.valor_global, 0) AS valor_global,
+                   COALESCE(f.razao_social, '') AS fornecedor_nome,
+                   COALESCE(f.ni, '') AS fornecedor_ni,
+                   COALESCE(o.cnpj, '') AS orgao_cnpj,
+                   COALESCE(o.razao_social, '') AS orgao_nome
+            FROM alertas a
+            LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+            LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
+            LEFT JOIN orgaos o ON o.cnpj = c.orgao_cnpj
+            WHERE a.id = ?
+            """,
+            (alert_id,),
+        ).fetchone()
+
+        if row is None:
+            return jsonify({"error": "not found"}), 404
+
+        dados_alerta = dict(row)
+    finally:
+        db.close()
+
+    db2 = get_db()
+    try:
+        inv_existente = db2.execute(
+            """
+            SELECT id, status FROM investigacoes
+            WHERE alerta_id = ? AND status = 'rodando'
+            ORDER BY id DESC LIMIT 1
+            """,
+            (alert_id,),
+        ).fetchone()
+        if inv_existente:
+            return jsonify({"status": "ja_rodando", "alerta_id": alert_id}), 202
+    finally:
+        db2.close()
+
+    db3 = get_db()
+    try:
+        cur = db3.execute(
+            """
+            INSERT INTO investigacoes (alerta_id, status, iniciado_em)
+            VALUES (?, 'rodando', ?)
+            """,
+            (alert_id, datetime.now(timezone.utc).isoformat()),
+        )
+        inv_id = cur.lastrowid
+        db3.commit()
+    finally:
+        db3.close()
+
+    def _rodar_agente(alerta_id: int, inv_id: int, dados: dict) -> None:
+        from investigacao import AgenteInvestigador
+
+        resultado = AgenteInvestigador().investigar(alerta_id, dados)
+
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            conn.execute(
+                """
+                UPDATE investigacoes SET
+                    status = ?,
+                    concluido_em = ?,
+                    evidencias = ?,
+                    sintese = ?,
+                    conclusao = ?,
+                    grau_confianca = ?,
+                    recomendacao = ?,
+                    erro = ?
+                WHERE id = ?
+                """,
+                (
+                    resultado.status,
+                    datetime.now(timezone.utc).isoformat(),
+                    json.dumps(resultado.evidencias, ensure_ascii=False, default=str),
+                    resultado.sintese,
+                    resultado.conclusao,
+                    resultado.grau_confianca,
+                    resultado.recomendacao,
+                    resultado.erro,
+                    inv_id,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    thread = threading.Thread(
+        target=_rodar_agente,
+        args=(alert_id, inv_id, dados_alerta),
+        daemon=True,
+    )
+    thread.start()
+
+    return jsonify({
+        "status": "iniciado",
+        "alerta_id": alert_id,
+        "inv_id": inv_id,
+        "mensagem": "Investigação profunda iniciada em background.",
+    }), 202
+
+
+@app.route("/api/investigacoes/<int:alert_id>/status", methods=["GET"])
+def investigacao_status(alert_id: int):
+    """Retorna o status atual da investigação profunda do alerta."""
+    db = get_db()
+    try:
+        row = db.execute(
+            """
+            SELECT id, status, iniciado_em, concluido_em,
+                   sintese, conclusao, grau_confianca, recomendacao, erro,
+                   evidencias
+            FROM investigacoes
+            WHERE alerta_id = ?
+            ORDER BY id DESC LIMIT 1
+            """,
+            (alert_id,),
+        ).fetchone()
+
+        if row is None:
+            return jsonify({"status": "nenhuma"}), 200
+
+        dados = dict(row)
+
+        ev: dict = {}
+        try:
+            ev = json.loads(dados.get("evidencias") or "{}")
+        except Exception:
+            pass
+
+        return jsonify({
+            "id": dados["id"],
+            "alerta_id": alert_id,
+            "status": dados["status"],
+            "iniciado_em": dados["iniciado_em"],
+            "concluido_em": dados["concluido_em"],
+            "sintese": dados["sintese"],
+            "conclusao": dados["conclusao"],
+            "grau_confianca": dados["grau_confianca"],
+            "recomendacao": dados["recomendacao"],
+            "erro": dados["erro"],
+            "resumos": {
+                "cadastro": (ev.get("cadastro") or {}).get("resumo"),
+                "historico_fornecedor": (ev.get("historico_fornecedor") or {}).get("resumo"),
+                "historico_orgao": (ev.get("historico_orgao") or {}).get("resumo"),
+                "processos_tjrj": (ev.get("processos_tjrj") or {}).get("resumo"),
+                "decisoes_tcm": (ev.get("decisoes_tcm") or {}).get("resumo"),
+            },
+        })
     finally:
         db.close()
 
