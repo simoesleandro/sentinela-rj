@@ -8,6 +8,12 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# LIMITAÇÃO CONHECIDA (jun/2026):
+# A API pública do DataJud CNJ não expõe o campo 'partes' no índice TJRJ.
+# Buscas por CNPJ/nome de parte retornam zero resultados.
+# Alternativa futura: Playwright no site público do TJRJ
+# (https://www3.tjrj.jus.br/consultaprocessual) — issue aberta para Fase 3.
+
 _DATAJUD_BASE = "https://api-publica.datajud.cnj.jus.br"
 _TJRJ_ENDPOINT = f"{_DATAJUD_BASE}/api_publica_tjrj/_search"
 _TIMEOUT = 20
@@ -96,6 +102,18 @@ def buscar_processos_tjrj(cnpj: str) -> dict:
             "orgao": (src.get("orgaoJulgador") or {}).get("nome"),
             "grau": src.get("grau"),
         })
+
+    if total == 0:
+        return {
+            "processos": [],
+            "total": 0,
+            "resumo": (
+                "DataJud TJRJ: campo 'partes' não exposto na API pública — "
+                "busca por CNPJ indisponível nesta versão. "
+                "Fase 3 implementará via Playwright."
+            ),
+            "limitacao": True,
+        }
 
     resumo = (
         f"{total} processo(s) encontrado(s) no TJRJ. "
