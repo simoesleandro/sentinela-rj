@@ -1,11 +1,16 @@
 """
 Conexão e inicialização do banco de dados Sentinela RJ.
 """
+import os
 import sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "data" / "sentinela_rj.db"
+_DB_ENV = os.environ.get("DB_PATH", "")
+if _DB_ENV:
+    DB_PATH = Path(_DB_ENV)
+else:
+    DB_PATH = ROOT / "data" / "sentinela_rj.db"
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 
 _MIGRACOES_DDL = [

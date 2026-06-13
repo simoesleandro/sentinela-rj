@@ -1,0 +1,32 @@
+app = "sentinela-rj"
+primary_region = "gru"
+
+[build]
+
+[env]
+  PORT = "8080"
+  DB_PATH = "/data/sentinela_rj.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[mounts]]
+  source = "sentinela_data"
+  destination = "/data"
+  initial_size = "1gb"

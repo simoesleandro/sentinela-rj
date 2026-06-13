@@ -20,6 +20,12 @@ from db.conexao import DB_PATH, aplicar_migracoes
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
+
+@app.route("/api/health")
+def health():
+    return jsonify({"status": "ok", "app": "sentinela-rj"}), 200
+
+
 _SCORE_SQL = """(
     COALESCE(a.score, 0) * 0.35
     + CASE COALESCE(a.severidade, 'baixa')
@@ -1887,4 +1893,5 @@ def regras_alerta_detail(regra_id: int):
 if __name__ == "__main__":
     from waitress import serve
 
-    serve(app, host="0.0.0.0", port=5055)
+    port = int(os.environ.get("PORT", 5055))
+    serve(app, host="0.0.0.0", port=port)
