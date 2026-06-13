@@ -38,7 +38,8 @@ coletar → enriquecer → analisar → investigar → notificar (Discord)
 | `python __main__.py backfill --continuar` / `--status` | `extrator/backfill.py` | Retomada via `coletas_log` |
 | `python -m automacoes.pipeline --once\|--daemon` | `automacoes/pipeline.py` | Esteira agendada (APScheduler + cron) |
 | `scripts/pipeline.bat` + `scripts/agendar.ps1` | Windows | Task Scheduler segundas 08:00 |
-| `python web_app.py` / `waitress` | `web_app.py` | **UI canônica** Flask SPA + REST API (porta 5055) |
+| `python web_app.py` / `waitress` | `web_app.py` | **UI canônica** Flask SPA + REST API (`PORT` env, default 5055 local / 8080 Fly) |
+| **Produção Fly.io** | https://sentinela-rj.fly.dev/dashboard | `Dockerfile` + `fly.toml`; volume `/data/sentinela_rj.db` |
 | ~~Streamlit/Reflex~~ | removidos | Ver `DEPRECATED.md` |
 
 ## Módulos-chave
@@ -60,7 +61,9 @@ coletar → enriquecer → analisar → investigar → notificar (Discord)
 | `analise/motor_ia.py` | `InvestigadorIA`, `ResultadoInvestigacao` | **Gemma4 corpo + vereditos A/B** (Gemma4 + Gemini); fallback corpo: Gemini → Groq |
 | `analise/grafo.py` | `montar_grafo_fornecedor/alerta` | Rede fornecedor-órgão-sócios |
 | `relatorios/dossie.py` | `obter_dossie()` | Export investigativo MD/JSON por alerta |
-| `web_app.py` | REST | `/api/alertas`, `/api/municipios`, `/api/triagem`, `/api/dossie`; **`load_dotenv()` no topo** |
+| `web_app.py` | REST | `/api/alertas`, `/api/health`, `/api/municipios`, `/api/triagem`, `/api/dossie`; **`POST /api/alertas/<id>/investigar_profundo`** (thread bg) + **`GET /api/investigacoes/<id>/status`**; **`load_dotenv()` no topo** |
+| `investigacao/agente.py` | `AgenteInvestigador` | Investigação profunda ReAct (PNCP, BrasilAPI, TJRJ stub, TCM) |
+| `investigacao/ferramentas/tjrj.py` | `buscar_processos_tjrj()` | **Stub permanente** — SPA Angular + endpoint legado 404; issue #2 (credencial) |
 
 ## Detectores (6 + watchlist)
 
@@ -90,7 +93,9 @@ coletar → enriquecer → analisar → investigar → notificar (Discord)
 | `DISCORD_WEBHOOK_URL` | não** | Alertas pipeline + novos matches |
 | `PIPELINE_SKIP_INVESTIGAR` | não (true) | Protege API Gemini no agendador |
 | `PIPELINE_CRON` / `PIPELINE_TIMEZONE` | não | APScheduler |
-| `DB_PATH` | não | Default `data/sentinela_rj.db` |
+| `DB_PATH` | não | Default `data/sentinela_rj.db`; Fly: `/data/sentinela_rj.db` |
+| `PORT` | não | Waitress — default `5055` local, `8080` no Fly |
+| `DATAJUD_API_KEY` | não | DataJud CNJ — **índice TJRJ não expõe `partes`** (busca CNPJ = 0) |
 | `MUNICIPIO_IBGE` / `MUNICIPIO_NOME` | não | Override município monitorado |
 
 \* Necessária para veredito Gemini. \*\* Necessária para Discord.
@@ -108,20 +113,37 @@ coletar → enriquecer → analisar → investigar → notificar (Discord)
 
 ## Git (pushado para origin/main)
 
-Repo: `https://github.com/simoesleandro/sentinela-rj.git`
+Repo: `https://github.com/simoesleandro/sentinela-rj.git` — **Fly:** https://sentinela-rj.fly.dev
 
 | Commit | Entrega |
 |--------|---------|
+| `c8f5878` | **Fly.io deploy** — Dockerfile, fly.toml, `/api/health`, `PORT`/`DB_PATH` env, `.dockerignore`, `scripts/upload_db.sh` |
+| `b677768` | **Fase 4** — Investigar Profundo no dashboard (POST bg thread + polling 6s); tabela `investigacoes` em migrações |
+| `4b50fbc` | **TJRJ stub** — Playwright removido; issue #2 atualizada (credencial/API privada) |
 | `99ae8aa` | **UI A/B vereditos** — `renderComparacaoVereditoHtml`, `investigarComIa`, dois botões aplicar; cache `?v=20260613` |
 | `d4729e9` | **Refactor IA** — Gemma4 corpo + vereditos A/B; `ResultadoInvestigacao`; Llama removido de investigar |
-| `07710c7` / `78dfa6c` / `9022ba4` | Experimento Gemma4 paralelo (substituído pelo fluxo A/B) |
 | `27011d7` | Multi-município RM-RJ + seletor no header |
-| `3364a74` | UX loading IA (spinner, etapas, skeleton) |
-| `c76a309` | IA triagem — veredito Gemini + botão aplicar |
 | `2c853c4` | Fase 3 — backfill, CEIS/CNEP, Transparência RJ |
 | `e87e1b0` | Flask SPA canônica, IA on-demand |
 
 **Suite:** 101 testes passando (`pytest`).
+
+## Integridade de dados (auditoria jun/2026)
+
+**Sem duplicação nos dados principais:**
+- `contratos`: PK `numero_controle_pncp` + `INSERT OR REPLACE` — reprocessar backfill **atualiza**, não duplica
+- `alertas`: chave sync `(numero_controle_pncp, tipo, watchlist_id)` — zero duplicatas do mesmo tipo/contrato
+- `fornecedores`/`orgaos`: PK em `ni`/`cnpj`
+
+**Parece duplicado mas é esperado:**
+- Vários alertas no **mesmo contrato** = tipos diferentes (`fracionamento_ap` + `concentracao_fornecedor`, etc.)
+- Vários alertas no **mesmo fornecedor** (`evolucao_temporal_fornecedor`) = **1 alerta por contrato**; `valor_referencia` agregado do fornecedor repete na UI
+
+**Duplicação leve (metadados/histórico — não corrompe contratos):**
+- `coletas_log`: ~39 janelas com 2 linhas (re-run backfill/coleta sem UNIQUE no log)
+- `investigacoes`: múltiplos registros por `alerta_id` se «Investigar Profundo» clicado várias vezes (histórico de execuções)
+
+**Contagens ref. (jun/2026, local):** contratos ~4.775 | alertas ~236 | fornecedores ~1.797 | coletas_log ~88
 
 ## Fluxo IA — narrativa e veredito (atual)
 
@@ -141,11 +163,35 @@ Gemini (gemini-2.5-flash) → **[Recomendação de Veredito]** → embutido em n
 - Loading steps: `Gemma 4 gerando narrativa…` → `Gerando vereditos (Gemma 4 + Gemini)…`.
 - Regra UX: `.cursor/rules/sentinela-ux-loading.mdc`.
 
+## Investigação profunda — Agente ReAct (Fase 4)
+
+- CLI: `python __main__.py investigar_profundo <alerta_id>`
+- Dashboard: botão **🔍 Investigar Profundo** → `POST /api/alertas/<id>/investigar_profundo` (thread `daemon=True`) → polling `GET /api/investigacoes/<id>/status` a cada 6s
+- Persistência: tabela `investigacoes` (evidências JSON, síntese, conclusão, grau_confianca, recomendacao)
+- Ferramentas: PNCP histórico fornecedor/órgão, BrasilAPI, **TJRJ stub**, TCM (Playwright fail-soft)
+- **Fly.io:** sem Ollama/Gemma4/Playwright — IA via `GEMINI_API_KEY` + `SENTINELA_IA_PROVIDER=gemini`; cold start com `min_machines_running=0`
+
+## TJRJ / DataJud — limitações (jun/2026)
+
+- **DataJud API pública:** campo `partes` ausente no índice TJRJ → busca por CNPJ retorna 0
+- **Playwright SPA:** Angular não monta headless (testado 60s+)
+- **Endpoint legado** `www4.tjrj.jus.br/consultaProcessoNome/consultaProcesso.do` → **404**
+- **Issue #1:** fechada (Playwright abandonado) | **Issue #2:** aberta — requer credencial TJRJ ou API privada
+- `tjrj.py` = stub com `limitacao: True` + `url_manual`
+
+## Deploy Fly.io (jun/2026)
+
+- App: `sentinela-rj`, região `gru`, volume `sentinela_data` → `/data`
+- Secrets prod: `GEMINI_API_KEY`, `SENTINELA_IA_PROVIDER`, `SENTINELA_IA_REVISAO_GEMINI`
+- Upload DB local: `bash scripts/upload_db.sh` → `put data/sentinela_rj.db /data/sentinela_rj.db`
+- Health: `GET /api/health` | Cache UI: `?v=20260614`
+
 ## Pendências conhecidas
 
-- Backfill retomável: `extrator/backfill.py` + `tests/test_backfill_resume.py` — **não commitados** ainda (só flags `--continuar`/`--status` em `__main__.py` no commit `d4729e9`).
-- Scripts ad hoc na raiz: `check_gemma.py`, `compare_narrativas.py`, `migrate_gemma.py` — higiene pendente.
-- Tier 3 roadmap: Telegram, wizard backfill UI, auth.
+- Backfill retomável: `extrator/backfill.py` + `tests/test_backfill_resume.py` — alterações locais possivelmente **não commitadas**
+- Scripts ad hoc na raiz: `check_gemma*.py`, `debug_tjrj*.py`, `test_tjrj_api.py` — higiene pendente
+- `coletas_log`: considerar UNIQUE(fonte, data_inicial, data_final) ou dedup se quiser log limpo
+- Tier 3 roadmap: Telegram, wizard backfill UI, auth
 
 ## Fase 3 — concluída
 
@@ -154,11 +200,12 @@ Gemini (gemini-2.5-flash) → **[Recomendação de Veredito]** → embutido em n
 - `extrator/sancoes_ingestao.py` + CLI `sancoes` (CSV CEIS/CNEP)
 - `extrator/transparencia_rj.py` + CLI `transparencia` (cross-ref empenhos)
 
-## UI Flask (Fase 0 — concluída)
+## UI Flask (Fase 0–4)
 
-- SPA canônica: `web_app.py` + `static/app.js` + `templates/index.html` (porta 5055)
+- SPA canônica: `web_app.py` + `static/app.js` + `templates/index.html`
 - Narrativa IA on-demand: `POST /api/alertas/<id>/investigar` (botão ✨ «Investigar com IA»)
 - Comparação A/B vereditos: Gemini vs Gemma 4 + botões aplicar independentes
+- **Investigação profunda:** botão 🔍 + painel `inv-profunda-container` (cache `?v=20260614`)
 - Export dossiê: `GET /api/dossie/<id>?formato=md`
 - Triagem: `PATCH /api/alertas/<id>` — workflow + `motivo_descarte` obrigatório ao descartar
 - Seletor município no header: `GET /api/municipios`
