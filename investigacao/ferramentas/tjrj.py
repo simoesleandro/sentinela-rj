@@ -36,23 +36,30 @@ def buscar_processos_tjrj(cnpj: str) -> dict:
     query = {
         "size": _MAX_PROCESSOS,
         "query": {
-            "nested": {
-                "path": "partes",
-                "query": {
-                    "match": {
-                        "partes.documento": cnpj_limpo,
+            "bool": {
+                "should": [
+                    {
+                        "match": {
+                            "partes.documento": cnpj_limpo
+                        }
+                    },
+                    {
+                        "match_phrase": {
+                            "partes.nome": cnpj_limpo
+                        }
                     }
-                },
+                ],
+                "minimum_should_match": 1
             }
         },
         "sort": [{"dataAjuizamento": {"order": "desc"}}],
         "_source": [
             "numeroProcesso",
             "dataAjuizamento",
-            "classeProcessual",
+            "classe",
             "assuntos",
             "orgaoJulgador",
-            "situacao",
+            "grau",
             "partes",
         ],
     }
@@ -76,14 +83,18 @@ def buscar_processos_tjrj(cnpj: str) -> dict:
     processos = []
     for hit in hits:
         src = hit.get("_source", {})
-        assuntos = [a.get("nome", "") for a in src.get("assuntos", [])]
+        assuntos = [
+            a.get("nome", "")
+            for a in (src.get("assuntos") or [])
+        ]
+        data_ajuiz = src.get("dataAjuizamento")
         processos.append({
             "numero": src.get("numeroProcesso"),
-            "data_ajuizamento": src.get("dataAjuizamento"),
-            "classe": src.get("classeProcessual", {}).get("nome"),
-            "assuntos": assuntos,
-            "orgao": src.get("orgaoJulgador", {}).get("nome"),
-            "situacao": src.get("situacao", {}).get("nome"),
+            "data_ajuizamento": data_ajuiz[:10] if data_ajuiz else "",
+            "classe": (src.get("classe") or {}).get("nome"),
+            "assuntos": assuntos[:3],
+            "orgao": (src.get("orgaoJulgador") or {}).get("nome"),
+            "grau": src.get("grau"),
         })
 
     resumo = (
