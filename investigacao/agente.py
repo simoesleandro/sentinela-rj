@@ -8,6 +8,8 @@ from typing import Any
 from .ferramentas.brasilapi_enriquecido import buscar_cadastro_completo
 from .ferramentas.pncp_historico import buscar_historico_fornecedor
 from .ferramentas.pncp_orgao import buscar_historico_orgao
+from .ferramentas.tcm import buscar_decisoes_tcm
+from .ferramentas.tjrj import buscar_processos_tjrj
 from .resultado import ResultadoInvestigacaoProfunda
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,12 @@ CADASTRO COMPLETO (BrasilAPI):
 
 HISTÓRICO DO ÓRGÃO (PNCP):
 {historico_orgao}
+
+PROCESSOS JUDICIAIS (TJRJ via DataJud):
+{processos_tjrj}
+
+DECISÕES TCM-RJ:
+{decisoes_tcm}
 
 Com base nesses dados, responda APENAS com o bloco abaixo:
 
@@ -80,6 +88,26 @@ class AgenteInvestigador:
             historico_orgao = buscar_historico_orgao(orgao_cnpj)
             resultado.evidencias["historico_orgao"] = historico_orgao
 
+        processos_tjrj: dict[str, Any] = {}
+        if fornecedor_ni:
+            print("  [Agente] DataJud — processos TJRJ do fornecedor...")
+            processos_tjrj = buscar_processos_tjrj(fornecedor_ni)
+            resultado.evidencias["processos_tjrj"] = processos_tjrj
+
+        decisoes_tcm: dict[str, Any] = {}
+        orgao_nome = dados_alerta.get("orgao_nome", "")
+        fornecedor_nome_str = (
+            dados_alerta.get("fornecedor_nome", "")
+            or dados_alerta.get("razao_social", "")
+        )
+        if fornecedor_nome_str or orgao_nome:
+            print("  [Agente] TCM-RJ — decisões de auditoria...")
+            decisoes_tcm = buscar_decisoes_tcm(
+                orgao_nome=orgao_nome,
+                fornecedor_nome=fornecedor_nome_str,
+            )
+            resultado.evidencias["decisoes_tcm"] = decisoes_tcm
+
         print("  [Agente] Gemma4 sintetizando evidências...")
         try:
             from analise.motor_ia import _call_gemma4, _limpar_latex
@@ -89,6 +117,8 @@ class AgenteInvestigador:
                 historico_fornecedor=historico_fornecedor.get("resumo", "Sem dados"),
                 cadastro=cadastro.get("resumo", "Sem dados"),
                 historico_orgao=historico_orgao.get("resumo", "Sem dados"),
+                processos_tjrj=processos_tjrj.get("resumo", "Sem dados"),
+                decisoes_tcm=decisoes_tcm.get("resumo", "Sem dados"),
             )
             sintese_raw = _limpar_latex(_call_gemma4(prompt))
             resultado.sintese = sintese_raw

@@ -366,9 +366,34 @@ def _secao_investigacao_profunda(dados: DossieAlerta) -> str:
         "",
         str(inv.get("sintese") or ""),
         "",
-        "---",
-        "",
     ]
+
+    evidencias = inv.get("evidencias") or {}
+    if isinstance(evidencias, str):
+        try:
+            evidencias = json.loads(evidencias)
+        except json.JSONDecodeError:
+            evidencias = {}
+
+    processos = evidencias.get("processos_tjrj", {})
+    if processos.get("processos"):
+        linhas.append("\n### Processos Judiciais (TJRJ)\n")
+        for p in processos["processos"][:5]:
+            linhas.append(
+                f"- **{p.get('numero', '?')}** | {p.get('classe', '?')} | "
+                f"{p.get('data_ajuizamento', '?')} | {p.get('situacao', '?')}"
+            )
+
+    tcm = evidencias.get("decisoes_tcm", {})
+    if tcm.get("decisoes"):
+        linhas.append("\n### Decisões TCM-RJ\n")
+        for d in tcm["decisoes"][:5]:
+            linhas.append(
+                f"- **{d.get('numero', '?')}** | {d.get('assunto', '?')} | "
+                f"{d.get('situacao', '?')} | {d.get('data', '?')}"
+            )
+
+    linhas.extend(["", "---", ""])
     return "\n".join(linhas)
 
 
