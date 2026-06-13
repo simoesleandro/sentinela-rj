@@ -1,127 +1,146 @@
-"""Busca processos judiciais do fornecedor via DataJud CNJ."""
+"""Busca processos judiciais do fornecedor no TJRJ via Playwright (consulta pública por nome)."""
 from __future__ import annotations
 
 import logging
-import os
-
-import requests
 
 logger = logging.getLogger(__name__)
 
-# LIMITAÇÃO CONHECIDA (jun/2026):
-# A API pública do DataJud CNJ não expõe o campo 'partes' no índice TJRJ.
-# Buscas por CNPJ/nome de parte retornam zero resultados.
-# Alternativa futura: Playwright no site público do TJRJ
-# (https://www3.tjrj.jus.br/consultaprocessual) — issue aberta para Fase 3.
-
-_DATAJUD_BASE = "https://api-publica.datajud.cnj.jus.br"
-_TJRJ_ENDPOINT = f"{_DATAJUD_BASE}/api_publica_tjrj/_search"
-_TIMEOUT = 20
+# URLs do TJRJ
+_TJRJ_CONSULTA_URL = "https://www3.tjrj.jus.br/consultaprocessual/#/consultapornome"
+_TIMEOUT_NAV = 30000   # ms — navegação
+_TIMEOUT_EL = 15000   # ms — elementos
 _MAX_PROCESSOS = 10
 
+# LIMITAÇÃO CONHECIDA (jun/2026):
+# A consulta por CPF/CNPJ no TJRJ exige login (Consulta Processual Privada).
+# Esta implementação usa a consulta pública por nome da empresa — sem login.
+# Pode retornar falsos positivos para nomes comuns.
+# Issue #1 documenta a alternativa futura com credencial.
 
-def _get_api_key() -> str:
-    return os.environ.get(
-        "DATAJUD_API_KEY",
-        "cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw==",
-    )
 
+def buscar_processos_tjrj(
+    cnpj: str | None = None,
+    nome_empresa: str | None = None,
+) -> dict:
+    """Busca processos no TJRJ pela razão social do fornecedor via Playwright."""
+    termo = nome_empresa
+    if not termo:
+        return {
+            "processos": [],
+            "total": 0,
+            "resumo": "Nome da empresa não fornecido — busca TJRJ ignorada.",
+            "limitacao": True,
+        }
 
-def buscar_processos_tjrj(cnpj: str) -> dict:
-    """Busca processos no TJRJ onde o fornecedor é parte."""
-    if not cnpj:
-        return {"processos": [], "total": 0, "erro": "CNPJ vazio"}
-
-    cnpj_limpo = cnpj.replace(".", "").replace("/", "").replace("-", "")
-
-    headers = {
-        "Authorization": f"APIKey {_get_api_key()}",
-        "Content-Type": "application/json",
-    }
-
-    query = {
-        "size": _MAX_PROCESSOS,
-        "query": {
-            "bool": {
-                "should": [
-                    {
-                        "match": {
-                            "partes.documento": cnpj_limpo
-                        }
-                    },
-                    {
-                        "match_phrase": {
-                            "partes.nome": cnpj_limpo
-                        }
-                    }
-                ],
-                "minimum_should_match": 1
-            }
-        },
-        "sort": [{"dataAjuizamento": {"order": "desc"}}],
-        "_source": [
-            "numeroProcesso",
-            "dataAjuizamento",
-            "classe",
-            "assuntos",
-            "orgaoJulgador",
-            "grau",
-            "partes",
-        ],
-    }
+    termo_busca = termo.strip()[:60]
 
     try:
-        resp = requests.post(
-            _TJRJ_ENDPOINT,
-            headers=headers,
-            json=query,
-            timeout=_TIMEOUT,
-        )
-        resp.raise_for_status()
-        dados = resp.json()
-    except requests.RequestException as exc:
-        logger.warning("DataJud TJRJ falhou para CNPJ %s: %s", cnpj, exc)
-        return {"processos": [], "total": 0, "erro": str(exc)}
-
-    hits = dados.get("hits", {}).get("hits", [])
-    total = dados.get("hits", {}).get("total", {}).get("value", 0)
-
-    processos = []
-    for hit in hits:
-        src = hit.get("_source", {})
-        assuntos = [
-            a.get("nome", "")
-            for a in (src.get("assuntos") or [])
-        ]
-        data_ajuiz = src.get("dataAjuizamento")
-        processos.append({
-            "numero": src.get("numeroProcesso"),
-            "data_ajuizamento": data_ajuiz[:10] if data_ajuiz else "",
-            "classe": (src.get("classe") or {}).get("nome"),
-            "assuntos": assuntos[:3],
-            "orgao": (src.get("orgaoJulgador") or {}).get("nome"),
-            "grau": src.get("grau"),
-        })
-
-    if total == 0:
+        from playwright.sync_api import TimeoutError as PWTimeout
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        logger.warning("Playwright não instalado — TJRJ indisponível")
         return {
             "processos": [],
             "total": 0,
             "resumo": (
-                "DataJud TJRJ: campo 'partes' não exposto na API pública — "
-                "busca por CNPJ indisponível nesta versão. "
-                "Fase 3 implementará via Playwright."
+                "Playwright não instalado. Execute: "
+                "pip install playwright && playwright install chromium"
             ),
             "limitacao": True,
         }
 
-    resumo = (
-        f"{total} processo(s) encontrado(s) no TJRJ. "
-        f"Mostrando {len(processos)}."
-    ) if processos else "Nenhum processo encontrado no TJRJ."
+    processos = []
+    erro = None
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            )
+            page = context.new_page()
+
+            logger.info("TJRJ — abrindo consulta por nome: %s", termo_busca)
+            page.goto(_TJRJ_CONSULTA_URL, timeout=_TIMEOUT_NAV)
+            page.wait_for_load_state("networkidle", timeout=_TIMEOUT_NAV)
+
+            campo_nome = page.locator(
+                "input[placeholder*='nome'], input[id*='nome'], input[name*='nome']"
+            ).first
+            campo_nome.wait_for(timeout=_TIMEOUT_EL)
+            campo_nome.fill(termo_busca)
+
+            try:
+                campo_ano_ini = page.locator(
+                    "input[placeholder*='Ano Inicial'], "
+                    "input[id*='anoIni'], input[name*='anoIni']"
+                ).first
+                campo_ano_ini.fill("2020")
+            except Exception:
+                pass
+
+            page.locator(
+                "button:has-text('Pesquisar'), "
+                "input[type='submit'][value*='Pesquisar']"
+            ).first.click()
+
+            try:
+                page.wait_for_selector(
+                    "table tbody tr, .resultado-consulta, .processo-item, "
+                    "[class*='processo']",
+                    timeout=_TIMEOUT_EL,
+                )
+            except PWTimeout:
+                logger.info("TJRJ — sem resultados visíveis para '%s'", termo_busca)
+                browser.close()
+                return {
+                    "processos": [],
+                    "total": 0,
+                    "resumo": f"Nenhum processo encontrado no TJRJ para '{termo_busca}'.",
+                }
+
+            linhas = page.locator("table tbody tr").all()
+            for linha in linhas[:_MAX_PROCESSOS]:
+                cols = linha.locator("td").all_text_contents()
+                if not cols or len(cols) < 2:
+                    continue
+                processos.append({
+                    "numero": cols[0].strip() if len(cols) > 0 else "",
+                    "classe": cols[1].strip() if len(cols) > 1 else "",
+                    "assunto": cols[2].strip() if len(cols) > 2 else "",
+                    "data": cols[3].strip() if len(cols) > 3 else "",
+                    "situacao": cols[4].strip() if len(cols) > 4 else "",
+                    "orgao": cols[5].strip() if len(cols) > 5 else "",
+                })
+
+            browser.close()
+
+    except PWTimeout as exc:
+        erro = f"Timeout navegando no TJRJ: {exc}"
+        logger.warning("TJRJ timeout para '%s': %s", termo_busca, exc)
+    except Exception as exc:
+        erro = str(exc)
+        logger.warning("TJRJ scraping falhou para '%s': %s", termo_busca, exc)
+
+    total = len(processos)
+    if total > 0:
+        resumo = (
+            f"{total} processo(s) encontrado(s) no TJRJ para '{termo_busca}'. "
+            f"Nota: busca por nome — verificar se são do mesmo fornecedor."
+        )
+    elif erro:
+        resumo = f"TJRJ indisponível: {erro}"
+    else:
+        resumo = f"Nenhum processo encontrado no TJRJ para '{termo_busca}'."
 
     return {
         "processos": processos,
         "total": total,
         "resumo": resumo,
+        "erro": erro,
+        "termo_buscado": termo_busca,
     }

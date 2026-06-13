@@ -91,7 +91,15 @@ class AgenteInvestigador:
         processos_tjrj: dict[str, Any] = {}
         if fornecedor_ni:
             print("  [Agente] DataJud — processos TJRJ do fornecedor...")
-            processos_tjrj = buscar_processos_tjrj(fornecedor_ni)
+            fornecedor_nome_busca = (
+                dados_alerta.get("fornecedor_nome")
+                or dados_alerta.get("razao_social")
+                or ""
+            )
+            processos_tjrj = buscar_processos_tjrj(
+                cnpj=fornecedor_ni,
+                nome_empresa=fornecedor_nome_busca,
+            )
             resultado.evidencias["processos_tjrj"] = processos_tjrj
 
         decisoes_tcm: dict[str, Any] = {}
