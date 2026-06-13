@@ -876,6 +876,7 @@ async function openDetail(id) {
     const res = await fetch(`${BASE}/api/alertas/${id}`);
     if (!res.ok) throw new Error(res.statusText);
     const d = await res.json();
+    console.log('narrativa_gemma:', d.narrativa_gemma);
 
     const vigencia = [d.data_vigencia_inicio, d.data_vigencia_fim]
       .map(formatDate).filter(v => v !== '—').join(' → ') || '—';

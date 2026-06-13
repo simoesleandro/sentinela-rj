@@ -88,6 +88,8 @@ _MIGRACOES_COLUNAS = [
     "ALTER TABLE fornecedores ADD COLUMN capital_social REAL",
     "ALTER TABLE fornecedores ADD COLUMN data_inicio_atividade TEXT",
     "ALTER TABLE alertas ADD COLUMN score REAL",
+    "ALTER TABLE alertas ADD COLUMN narrativa_gemma TEXT",
+    "ALTER TABLE alertas ADD COLUMN gemma_utilizado INTEGER DEFAULT 0",
 ]
 
 
