@@ -522,7 +522,11 @@ def cmd_investigar_profundo(args) -> int:
     try:
         row = conn.execute(
             """
-            SELECT a.*, f.ni AS fornecedor_ni, o.cnpj AS orgao_cnpj
+            SELECT a.*,
+                   f.razao_social AS fornecedor_nome,
+                   f.ni AS fornecedor_ni,
+                   o.cnpj AS orgao_cnpj,
+                   o.razao_social AS orgao_nome
             FROM alertas a
             LEFT JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
             LEFT JOIN fornecedores f ON f.ni = c.fornecedor_ni
