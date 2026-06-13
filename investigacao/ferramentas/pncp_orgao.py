@@ -7,8 +7,8 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 15
-_MAX_PAGINAS = 3
+_TIMEOUT = 30
+_MAX_PAGINAS = 1
 _TAMANHO_PAGINA = 20
 
 
