@@ -21,7 +21,7 @@ Variáveis `SCRAPER_FOLDER_PATH`, `VBOX_*`, `VM_*` **não pertencem** ao `.env` 
 
 ```
 PNCP → coletar → enriquecer (BrasilAPI) → analisar (6 detectores + watchlists)
-    → alertas_sync → [opcional] InvestigadorIA (Ollama → revisão Gemini) → narrativa_ia
+    → alertas_sync → [opcional] InvestigadorIA (Gemma4 corpo + vereditos A/B) → narrativa_ia
     → regras_alerta (filtro Discord) → Flask SPA / CLI / relatórios
 ```
 
@@ -34,7 +34,8 @@ coletar → enriquecer → analisar → investigar → notificar (Discord)
 
 | Comando | Arquivo | Função |
 |---------|---------|--------|
-| `python __main__.py status\|coletar\|analisar\|relatorio\|dossie\|publicar\|investigar\|enriquecer\|pipeline` | `__main__.py` | CLI principal PNCP |
+| `python __main__.py status\|coletar\|analisar\|relatorio\|dossie\|publicar\|investigar\|enriquecer\|pipeline\|backfill` | `__main__.py` | CLI principal PNCP |
+| `python __main__.py backfill --continuar` / `--status` | `extrator/backfill.py` | Retomada via `coletas_log` |
 | `python -m automacoes.pipeline --once\|--daemon` | `automacoes/pipeline.py` | Esteira agendada (APScheduler + cron) |
 | `scripts/pipeline.bat` + `scripts/agendar.ps1` | Windows | Task Scheduler segundas 08:00 |
 | `python web_app.py` / `waitress` | `web_app.py` | **UI canônica** Flask SPA + REST API (porta 5055) |
@@ -46,18 +47,20 @@ coletar → enriquecer → analisar → investigar → notificar (Discord)
 |---------|---------------|------------------|
 | `analisador/engine.py` | `executar_e_persistir()` | Orquestra 6 detectores + watchlists pós-sync |
 | `analisador/watchlists.py` | `detectar()`, `executar_watchlists_e_persistir()` | Detector `watchlist_match` case-insensitive |
-| `db/alertas_sync.py` | `sincronizar_alertas()` | Upsert incremental; chave `(pncp, tipo, watchlist_id)`; escopos `detectores`/`watchlist` |
-| `db/watchlists.py` | CRUD | Tabela `watchlists` (fornecedor, órgão, palavra-chave) |
+| `db/alertas_sync.py` | `sincronizar_alertas()` | Upsert incremental; chave `(pncp, tipo, watchlist_id)` |
+| `db/watchlists.py` | CRUD | Tabela `watchlists` |
 | `db/regras_alerta.py` | `filtrar_para_notificacao()` | Filtro OR de regras; fallback sem regras = só `alta` |
-| `db/triagem.py` | `atualizar_status_alerta()` | Workflow aberto→investigando→confirmado/descartado |
+| `db/triagem.py` | `atualizar_status_alerta()` | Workflow aberto→investigando→confirmado/descartado + `motivo_descarte` |
+| `db/narrativa.py` | `GerenciadorNarrativa` | `narrativa_ia`, `narrativa_gemma`, `gemma_utilizado` |
 | `db/conexao.py` | `init_db()`, `aplicar_migracoes()` | Schema + migrações idempotentes |
-| `automacoes/pipeline.py` | `executar_pipeline()` | Fail-soft; dual-mode APScheduler |
+| `extrator/config_municipio.py` | lista RM-RJ | Multi-município automático na coleta PNCP |
+| `extrator/backfill.py` | `executar_backfill()`, `status_backfill()` | Backfill mensal retomável |
+| `automacoes/pipeline.py` | `executar_pipeline()` | Fail-soft; `PIPELINE_SKIP_INVESTIGAR=true` default |
 | `automacoes/utils/notificador.py` | `NotificadorAlertas` | Discord embeds + resumo pipeline |
-| `analise/motor_ia.py` | `InvestigadorIA` | Ollama rascunho → revisão Gemini (se `GEMINI_API_KEY`); seção `[Recomendação de Veredito]`; fallback Groq |
+| `analise/motor_ia.py` | `InvestigadorIA`, `ResultadoInvestigacao` | **Gemma4 corpo + vereditos A/B** (Gemma4 + Gemini); fallback corpo: Gemini → Groq |
 | `analise/grafo.py` | `montar_grafo_fornecedor/alerta` | Rede fornecedor-órgão-sócios |
 | `relatorios/dossie.py` | `obter_dossie()` | Export investigativo MD/JSON por alerta |
-| `relatorios/builder.py` | narrativa IA | Auto-preenche `{NARRATIVA}` no relatório |
-| `web_app.py` | REST | `/api/alertas`, `/api/triagem`, `/api/watchlists`, `/api/regras-alerta`, `/api/grafo`, `/api/dossie`; **`load_dotenv()` no topo** |
+| `web_app.py` | REST | `/api/alertas`, `/api/municipios`, `/api/triagem`, `/api/dossie`; **`load_dotenv()` no topo** |
 
 ## Detectores (6 + watchlist)
 
@@ -71,31 +74,26 @@ coletar → enriquecer → analisar → investigar → notificar (Discord)
 | `socios` | `socio_compartilhado` |
 | `watchlists` (pós-processamento) | `watchlist_match` |
 
-## Schema — tabelas novas (Fase 2.2)
-
-```sql
-watchlists (id, fornecedor_ni, orgao_cnpj, palavra_chave_objeto, rotulo, ativo, criado_em)
-regras_alerta (id, tipo, severidade_min, valor_min, ativo, criado_em)
-```
-
-Match watchlist: critérios não-nulos em AND; várias linhas = vários alertas; dedup por `(pncp, watchlist_match, watchlist_id)`.
-
 ## Variáveis de ambiente
 
 | Variável | Obrigatória | Uso |
 |----------|-------------|-----|
-| `OLLAMA_BASE_URL` | não | Padrão `http://localhost:11434` |
-| `OLLAMA_MODEL` | não | Padrão `llama3.1` |
-| `SENTINELA_IA_PROVIDER` | não | `ollama` (padrão), `gemini`, `groq` |
-| `GEMINI_API_KEY` | não* | Revisão superior pós-Ollama + veredito de triagem; fallback se Ollama falhar |
-| `SENTINELA_IA_REVISAO_GEMINI` | não (true) | Auditoria Gemini do rascunho Llama (inclui status sugerido) |
+| `OLLAMA_BASE_URL` | não | Padrão `http://localhost:11434` — Gemma4 via Ollama |
+| `GEMMA4_MODEL` | não | Padrão `gemma4:12b` — corpo + veredito local |
+| `GEMMA4_TIMEOUT` | não | Padrão `180` |
+| `SENTINELA_IA_REVISAO_GEMMA4` | não (true) | Veredito Gemma4 local |
+| `SENTINELA_IA_REVISAO_GEMINI` | não (true) | Veredito Gemini (comparação A/B) |
+| `GEMINI_API_KEY` | não* | Veredito Gemini; fallback corpo se Gemma4 falhar |
+| `GROQ_API_KEY` | não | Fallback corpo se Gemma4 + Gemini falharem |
+| `OLLAMA_MODEL` | não | Legado — **não usado em `investigar_anomalia`** |
+| `SENTINELA_IA_PROVIDER` | não | Legado em `_gerar_narrativa` |
 | `DISCORD_WEBHOOK_URL` | não** | Alertas pipeline + novos matches |
-| `PIPELINE_CRON` | não | Cron APScheduler (default seg 08:00) |
-| `PIPELINE_TIMEZONE` | não | Ex: `America/Sao_Paulo` |
-| `PIPELINE_SKIP_INVESTIGAR` / `SKIP_NOTIFICAR` / `SKIP_ENRIQUECER` | não | Etapas opcionais |
+| `PIPELINE_SKIP_INVESTIGAR` | não (true) | Protege API Gemini no agendador |
+| `PIPELINE_CRON` / `PIPELINE_TIMEZONE` | não | APScheduler |
 | `DB_PATH` | não | Default `data/sentinela_rj.db` |
+| `MUNICIPIO_IBGE` / `MUNICIPIO_NOME` | não | Override município monitorado |
 
-\* Necessária para IA se provider=gemini. \*\* Necessária para Discord.
+\* Necessária para veredito Gemini. \*\* Necessária para Discord.
 
 ## Convenções de código
 
@@ -105,7 +103,7 @@ Match watchlist: critérios não-nulos em AND; várias linhas = vários alertas;
 - **Funções ≤ 25 linhas** quando possível; helpers `_nome`
 - **Logging nativo** — `INFO` estados, `ERROR` falhas; pipeline usa `[pipeline]`
 - **Injeção de dependência:** URL/engine/webhook passados no `__init__`, fallback para env
-- **`load_dotenv()`** no topo de módulos que leem env vars (`web_app.py`, `motor_ia.py`, pipeline, extrator, etc.)
+- **`load_dotenv()`** no topo de módulos que leem env vars
 - **Testes:** `pytest`; SQLite `:memory:` + `SCHEMA_PATH` + `aplicar_migracoes`
 
 ## Git (pushado para origin/main)
@@ -114,53 +112,56 @@ Repo: `https://github.com/simoesleandro/sentinela-rj.git`
 
 | Commit | Entrega |
 |--------|---------|
-| `c76a309` | **IA triagem** — `load_dotenv` no Flask/motor_ia; UI separa veredito Gemini + botão «Aplicar status sugerido» |
-| `635b302` | Prompt Gemini exige `[Recomendação de Veredito]` (Aberto/Investigando/Confirmado/Descartado) |
-| `36453aa` | Revisão Gemini do rascunho Ollama antes de salvar narrativa |
-| `2c853c4` | **Fase 3** — multi-município, backfill, CEIS/CNEP, Transparência RJ |
-| `e87e1b0` | **Fase 0** — Flask SPA canônica, IA on-demand, remoção Streamlit/Reflex |
-| `8529fb3` / `114d382` | **Fase 2.2** — watchlists, regras_alerta, detector, API CRUD |
-| `286c4a7` | Pipeline agendado PNCP + Discord + APScheduler |
-| `fcf369a` | Foundation: engine unificado, score, Ollama default |
+| `99ae8aa` | **UI A/B vereditos** — `renderComparacaoVereditoHtml`, `investigarComIa`, dois botões aplicar; cache `?v=20260613` |
+| `d4729e9` | **Refactor IA** — Gemma4 corpo + vereditos A/B; `ResultadoInvestigacao`; Llama removido de investigar |
+| `07710c7` / `78dfa6c` / `9022ba4` | Experimento Gemma4 paralelo (substituído pelo fluxo A/B) |
+| `27011d7` | Multi-município RM-RJ + seletor no header |
+| `3364a74` | UX loading IA (spinner, etapas, skeleton) |
+| `c76a309` | IA triagem — veredito Gemini + botão aplicar |
+| `2c853c4` | Fase 3 — backfill, CEIS/CNEP, Transparência RJ |
+| `e87e1b0` | Flask SPA canônica, IA on-demand |
 
-**Suite:** 56+ testes passando (`pytest`).
+**Suite:** 101 testes passando (`pytest`).
 
-## Fluxo IA — narrativa e veredito
+## Fluxo IA — narrativa e veredito (atual)
 
 ```
-Ollama (llama3.1) → rascunho parágrafo
-    ↓ (se GEMINI_API_KEY + SENTINELA_IA_REVISAO_GEMINI=true)
-Gemini (gemini-2.5-flash) → revisão + **[Recomendação de Veredito]**
-    Status sugerido: Aberto | Investigando | Confirmado | Descartado
-    Justificativa: 1–2 linhas
+Gemma4 (gemma4:12b via Ollama) → corpo do parágrafo investigativo
+    ↓ (paralelo / sequencial)
+Gemma4 → **[Recomendação de Veredito]** → narrativa_gemma (só veredito)
+Gemini (gemini-2.5-flash) → **[Recomendação de Veredito]** → embutido em narrativa_ia
 ```
 
-- **Veredito só vem do Gemini**, não do Llama. Se revisão falhar → fail-soft usa rascunho Ollama sem veredito.
-- **`web_app.py` e `motor_ia.py` chamam `load_dotenv()`** — reiniciar `python web_app.py` após alterar `.env`.
-- API `POST /api/alertas/<id>/investigar` retorna `{ narrativa_ia, chars, revisao_gemini }`.
-- UI (`static/app.js`): `parseVereditoIa()` separa corpo e veredito; botão **Aplicar status sugerido** chama PATCH triagem.
-- Triagem manual continua no topo do painel Detalhes: select status + **Salvar triagem**.
+- **`ResultadoInvestigacao`** (`motor_ia.py`): `corpo`, `narrativa_ia` (= corpo + veredito Gemini), `narrativa_gemma` (= só veredito Gemma4), `veredito_gemini`, `veredito_gemma` (dicts parseados).
+- **Llama removido** do fluxo `investigar_anomalia`. `_call_ollama` mantido para outros contextos legados.
+- **Fallback corpo:** Gemma4 falha → Gemini corpo → Groq.
+- **`enriquecer` / `analisar` não usam Gemini** — só `investigar` / botão «Investigar com IA».
+- API `POST /api/alertas/<id>/investigar` retorna `{ narrativa_ia, narrativa_gemma, corpo, veredito_gemini, veredito_gemma, gemini_utilizado, gemma4_utilizado, chars }`.
+- UI (`static/app.js`): `investigarComIa()`; `renderComparacaoVereditoHtml()` — grid A/B com **dois botões** «Aplicar este veredito» (escolha do usuário); `wireComparacaoVereditoButtons()` → `aplicarVereditoSugerido()` → PATCH triagem.
+- Loading steps: `Gemma 4 gerando narrativa…` → `Gerando vereditos (Gemma 4 + Gemini)…`.
+- Regra UX: `.cursor/rules/sentinela-ux-loading.mdc`.
 
 ## Pendências conhecidas
 
-(nenhuma fase crítica pendente — evoluções futuras: UI CRUD watchlists na SPA)
+- Backfill retomável: `extrator/backfill.py` + `tests/test_backfill_resume.py` — **não commitados** ainda (só flags `--continuar`/`--status` em `__main__.py` no commit `d4729e9`).
+- Scripts ad hoc na raiz: `check_gemma.py`, `compare_narrativas.py`, `migrate_gemma.py` — higiene pendente.
+- Tier 3 roadmap: Telegram, wizard backfill UI, auth.
 
 ## Fase 3 — concluída
 
-- `extrator/config_municipio.py` — `MUNICIPIO_IBGE`, `MUNICIPIO_ESFERA`, `MUNICIPIO_NOME`
-- `extrator/backfill.py` + CLI `backfill`
+- `extrator/config_municipio.py` — RM-RJ (10 municípios, Rio prioridade 1)
+- `extrator/backfill.py` + CLI `backfill --continuar --status`
 - `extrator/sancoes_ingestao.py` + CLI `sancoes` (CSV CEIS/CNEP)
 - `extrator/transparencia_rj.py` + CLI `transparencia` (cross-ref empenhos)
-- Tabelas `transparencia_rj_lancamentos`, `transparencia_rj_cruzamentos`
 
 ## UI Flask (Fase 0 — concluída)
 
 - SPA canônica: `web_app.py` + `static/app.js` + `templates/index.html` (porta 5055)
-- Narrativa IA on-demand: `POST /api/alertas/<id>/investigar` (botão «Investigar com IA» / «Regenerar narrativa»)
-- Veredito Gemini: bloco separado na narrativa + **Aplicar status sugerido** (preenche triagem e salva)
-- Export dossiê: `GET /api/dossie/<id>?formato=md` (botão «Exportar Dossiê»)
-- Triagem: `PATCH /api/alertas/<id>` — workflow aberto→investigando→confirmado/descartado + histórico
-- Legados removidos: `app.py`, `sentinela_web/`, `rxconfig.py`
+- Narrativa IA on-demand: `POST /api/alertas/<id>/investigar` (botão ✨ «Investigar com IA»)
+- Comparação A/B vereditos: Gemini vs Gemma 4 + botões aplicar independentes
+- Export dossiê: `GET /api/dossie/<id>?formato=md`
+- Triagem: `PATCH /api/alertas/<id>` — workflow + `motivo_descarte` obrigatório ao descartar
+- Seletor município no header: `GET /api/municipios`
 
 ## Artefatos a NÃO versionar
 
