@@ -1,9 +1,5 @@
 <div align="center">
 
-<img src="docs/screenshot.png" alt="Sentinela RJ Dashboard" width="100%">
-
-<br/>
-
 # Sentinela RJ
 
 **PT:** Monitor autônomo de contratos públicos do município do Rio de Janeiro — detecção de anomalias com IA, investigação multi-fonte e dashboard em tempo real.  
@@ -16,6 +12,7 @@
 [![Gemini](https://img.shields.io/badge/Gemini-2.5--Flash-4285F4?style=flat-square&logo=google)](https://aistudio.google.com)
 [![Gemma](https://img.shields.io/badge/Gemma4-12B--local-8b5cf6?style=flat-square)](https://ollama.ai)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org)
+<br/>
 [![Deploy](https://img.shields.io/badge/deploy-Fly.io-7C3AED?style=flat-square&logo=fly.io)](https://sentinela-rj.fly.dev/dashboard)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/simoesleandro/sentinela-rj?style=flat-square&color=8b5cf6)](https://github.com/simoesleandro/sentinela-rj/commits)
@@ -27,6 +24,10 @@
 [📖 Documentação](docs/) &nbsp;·&nbsp;
 [🐛 Reportar bug](https://github.com/simoesleandro/sentinela-rj/issues) &nbsp;·&nbsp;
 [💡 Sugerir feature](https://github.com/simoesleandro/sentinela-rj/issues)
+
+<br/>
+
+<img src="docs/screenshot.png" alt="Sentinela RJ Dashboard" width="920">
 
 </div>
 
