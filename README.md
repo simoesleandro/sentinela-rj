@@ -1,339 +1,377 @@
+<div align="center">
+
+<img src="docs/screenshot.png" alt="Sentinela RJ Dashboard" width="100%">
+
+<br/>
+
 # Sentinela RJ
 
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/leandro-sim%C3%B5es-7a0b3537b/)
-[![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/simoesleandro)
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+**PT:** Monitor autônomo de contratos públicos do município do Rio de Janeiro — detecção de anomalias com IA, investigação multi-fonte e dashboard em tempo real.  
+**EN:** Autonomous public contracts monitor for Rio de Janeiro — AI-powered anomaly detection, multi-source investigation and real-time dashboard.
+
+<br/>
+
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-3.x-lightgrey?style=flat-square&logo=flask)](https://flask.palletsprojects.com)
+[![Gemini](https://img.shields.io/badge/Gemini-2.5--Flash-4285F4?style=flat-square&logo=google)](https://aistudio.google.com)
+[![Gemma](https://img.shields.io/badge/Gemma4-12B--local-8b5cf6?style=flat-square)](https://ollama.ai)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org)
+[![Deploy](https://img.shields.io/badge/deploy-Fly.io-7C3AED?style=flat-square&logo=fly.io)](https://sentinela-rj.fly.dev/dashboard)
+[![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/simoesleandro/sentinela-rj?style=flat-square&color=8b5cf6)](https://github.com/simoesleandro/sentinela-rj/commits)
+[![Issues](https://img.shields.io/github/issues/simoesleandro/sentinela-rj?style=flat-square&color=f59e0b)](https://github.com/simoesleandro/sentinela-rj/issues)
 
-> Sistema de monitoramento automatizado de contratos públicos do município do Rio de Janeiro, com detecção de anomalias e geração de relatórios investigativos.
+<br/>
+
+[🔗 Demo ao vivo](https://sentinela-rj.fly.dev/dashboard) &nbsp;·&nbsp;
+[📖 Documentação](docs/) &nbsp;·&nbsp;
+[🐛 Reportar bug](https://github.com/simoesleandro/sentinela-rj/issues) &nbsp;·&nbsp;
+[💡 Sugerir feature](https://github.com/simoesleandro/sentinela-rj/issues)
+
+</div>
 
 ---
 
-## O que é
+## 📋 Índice / Table of Contents
 
-O Sentinela RJ coleta contratos publicados no [Portal Nacional de Contratações Públicas (PNCP)](https://pncp.gov.br), filtra os do município do Rio de Janeiro e aplica seis detectores estatísticos e cadastrais. O painel Flask (`/dashboard`) concentra triagem de alertas, dossiês, grafo investigativo e exportações.
-
-**Caso de uso real:** na base de 328 contratos coletados (mar/2023–mai/2026, R$ 1,24 bilhão), o sistema identificou automaticamente a suspensão judicial do contrato de R$ 315,9 milhões da MJRE Construtora (13 desvios-padrão acima da média da categoria), a inexigibilidade de R$ 45 milhões do Bonus Track Entretenimento e a concentração de R$ 86,4 milhões em 4 contratos para a Construtora Entre os Rios em 30 dias.
+- [Sobre](#-sobre--about)
+- [Números atuais](#-números-atuais--current-stats)
+- [Caso real documentado](#-caso-real-documentado--real-case)
+- [Funcionalidades](#-funcionalidades--features)
+- [Detectores de anomalia](#-detectores-de-anomalia--anomaly-detectors)
+- [Pipeline de IA](#-pipeline-de-ia--ai-pipeline)
+- [Agente Investigador](#-agente-investigador--investigation-agent)
+- [Stack](#-stack)
+- [Instalação](#-instalação--setup)
+- [Uso](#-uso--usage)
+- [Variáveis de Ambiente](#-variáveis-de-ambiente--environment-variables)
+- [Arquitetura](#-arquitetura--architecture)
+- [Deploy Fly.io](#-deploy-flyio)
+- [Testes](#-testes--tests)
+- [Roadmap](#-roadmap)
+- [Autor](#-autor--author)
 
 ---
 
-## Arquitetura
+## 📌 Sobre / About
+
+**PT:**  
+O Sentinela RJ coleta automaticamente contratos públicos do Portal Nacional de Contratações Públicas (PNCP), aplica 9 detectores estatísticos e cadastrais para identificar anomalias, e usa IA local (Gemma 4) + Gemini para gerar narrativas investigativas com comparação A/B de vereditos. Um agente ReAct cruza múltiplas fontes externas para investigação profunda. Tudo disponível em dashboard público com dados abertos.
+
+**EN:**  
+Sentinela RJ automatically collects public contracts from Brazil's PNCP portal, applies 9 statistical and registry detectors to identify anomalies, and uses local AI (Gemma 4) + Gemini to generate investigative narratives with A/B verdict comparison. A ReAct agent crosses multiple external sources for deep investigation. All available on a public dashboard with open data.
+
+---
+
+## 📊 Números atuais / Current Stats
+
+| Indicador | Valor |
+|-----------|-------|
+| 📄 Contratos analisados | **4.925+** |
+| 💰 Valor total monitorado | **R$ 11,28 bilhões+** |
+| 🚨 Anomalias detectadas | **1.497+** |
+| 🔴 Risco alto | **174+** |
+| 🏢 Fornecedores distintos | **1.549+** |
+| 📅 Período coberto | Jul/2022 → hoje |
+
+---
+
+## 🔍 Caso real documentado / Real Case
+
+> **MJRE Construtora** — contrato de R$ 315,9 milhões suspenso judicialmente 11 dias após assinatura
+
+| Fato | Detalhe |
+|------|---------|
+| 🤖 Detecção automática | Outlier estatístico — 13 desvios padrão acima da média da categoria |
+| ⚖️ Decisão judicial | 3ª Vara da Fazenda Pública do TJRJ — juíza Mirela Erbisti, 03/04/2026 |
+| 💸 Prejuízo evitado | Concorrente R$ 25 milhões mais barato foi desclassificado sem análise |
+| 📂 Fonte | Dados públicos PNCP + decisão judicial TJRJ |
+
+---
+
+## ✨ Funcionalidades / Features
+
+- ✅ **Coleta automática** via API PNCP com pipeline agendado (cron)
+- ✅ **9 detectores de anomalia** estatísticos e cadastrais
+- ✅ **Narrativa investigativa** — Gemma 4 12B gera o corpo da análise
+- ✅ **Vereditos A/B** — Gemini e Gemma4 emitem vereditos independentes para comparação
+- ✅ **Agente Investigador ReAct** — coleta BrasilAPI, PNCP histórico, DataJud CNJ, TCM-RJ
+- ✅ **Investigação profunda** em background com polling em tempo real
+- ✅ **Dashboard interativo** — triagem, linha do tempo, rede de fornecedores
+- ✅ **Dossiê exportável** — Markdown, PDF e JSON por alerta
+- ✅ **Deploy público** — Fly.io com SQLite persistente em volume
+- ✅ **Dados abertos** — export CSV de contratos e alertas
+- ✅ **Multi-município** — monitoramento configurável por IBGE
+- 🚧 **TJRJ processos** — aguardando API pública com campo `partes` (issue #2)
+
+---
+
+## 🔎 Detectores de anomalia / Anomaly Detectors
+
+| Detector | O que detecta |
+|----------|--------------|
+| `outlier_valor` | Contratos com valor estatisticamente atípico (IQR + Z-score por categoria) |
+| `concentracao_fornecedor` | Fornecedor concentrando contratos em janela de 90 dias |
+| `fracionamento_ap` | Possível fracionamento por Área de Planejamento |
+| `inexigibilidade` | Contratações sem licitação com valor elevado |
+| `emergencia` | Contratações de emergência acima do limiar legal |
+| `aceleracao_contratual` | Crescimento atípico de contratos por fornecedor |
+| `capital_social_baixo` | Capital incompatível com valor contratado |
+| `empresa_jovem_contrato_grande` | Empresa nova com contrato de alto valor |
+| `socios_compartilhados` | Fornecedores com sócios em comum |
+
+---
+
+## 🤖 Pipeline de IA / AI Pipeline
 
 ```
-PNCP API → extrator/pncp.py → data/sentinela_rj.db
-                                    ↓
-              analisador/engine.py (6 detectores + sync de alertas)
-                                    ↓
-         alertas + triagem + narrativa_ia (Ollama/Gemini/Groq)
-                                    ↓
-    web_app.py (Flask)  |  relatorios/builder.py  |  relatorios/dossie.py
-    /dashboard          |  CLI publicar           |  PATCH triagem
+Alerta detectado
+      ↓
+Gemma 4 12B (Ollama local) — gera corpo da narrativa investigativa
+      ↓
+┌──────────────────┬──────────────────┐
+│  Gemma4 veredito  │  Gemini veredito  │  ← comparação A/B
+│  (local, grátis)  │  (API, preciso)   │
+└──────────────────┴──────────────────┘
+      ↓
+Auditor humano aplica o veredito preferido com 1 clique
 ```
-
-**Detectores:** outliers, concentração, licitação, fracionamento, sanções, sócios compartilhados.
 
 ---
 
-## Stack
+## 🕵️ Agente Investigador / Investigation Agent
+
+ReAct loop com 5 ferramentas — roda em background, resultado via polling:
+
+| Ferramenta | Fonte | Dados coletados |
+|------------|-------|-----------------|
+| `brasilapi_enriquecido` | BrasilAPI | Cadastro, sócios, capital social, CNAE |
+| `pncp_historico` | PNCP API | Histórico completo de contratos do fornecedor |
+| `pncp_orgao` | PNCP API | Contratos recentes do órgão contratante |
+| `datajud_tjrj` | DataJud CNJ | Processos judiciais (campo `partes` não exposto na API pública) |
+| `tcm` | TCM-RJ | Decisões de auditoria via Playwright |
+
+Gemma 4 sintetiza as evidências e emite conclusão estruturada:
+- **Status:** `confirmar` / `arquivar` / `escalar` / `inconclusivo`
+- **Grau de confiança:** `alto` / `medio` / `baixo`
+- **Recomendação:** ação concreta baseada nos dados
+
+---
+
+## 🛠 Stack
 
 | Camada | Tecnologia |
-|--------|-----------|
-| Core | Python 3.10+, SQLite, `requests` |
-| Análise | `statistics`, regex — sem Pandas no pipeline |
-| UI canônica | Flask + SPA estática (`web_app.py`) |
-| IA | Ollama `llama3.1` (padrão), fallback Gemini/Groq |
-| CLI | `python __main__.py` |
-| Testes | `pytest` |
-
-Dashboards Streamlit/Reflex estão **deprecados** — ver [DEPRECATED.md](DEPRECATED.md).
+|--------|------------|
+| Backend | Python 3.11+ · Flask · Waitress |
+| Frontend | HTML/CSS/JS vanilla |
+| Banco | SQLite (`data/sentinela_rj.db`) + Volume Fly.io |
+| IA narrativa | Gemma 4 12B via Ollama (local) |
+| IA veredito | Gemini 2.5 Flash + Gemma 4 (A/B) |
+| Coleta | PNCP API REST (dados abertos) |
+| Enriquecimento | BrasilAPI · DataJud CNJ |
+| Scraping | Playwright (TCM-RJ) |
+| Deploy | Fly.io · região gru · SQLite volume 1GB |
+| Testes | pytest — 101+ testes |
 
 ---
 
-## Instalação
+## 🚀 Instalação / Setup
+
+### Pré-requisitos / Prerequisites
+
+- Python 3.11+
+- [Ollama](https://ollama.ai) com `gemma4:12b` — `ollama pull gemma4:12b`
+- Chave Gemini (gratuita em [aistudio.google.com](https://aistudio.google.com))
+
+### Instalação / Installation
 
 ```bash
+# Clone o repositório
 git clone https://github.com/simoesleandro/sentinela-rj
 cd sentinela-rj
-pip install -r requirements-web.txt   # core + Flask + fpdf2 (PDF dossiê)
-pip install -r requirements-ia.txt    # opcional: Gemini/Groq
-cp .env.example .env                  # opcional
-```
 
----
+# Instale as dependências
+pip install -r requirements-web.txt
+pip install -r requirements-ia.txt   # opcional: Gemini/Groq
 
-## Uso
+# Configure as variáveis de ambiente
+cp .env.example .env
+# Edite .env com sua GEMINI_API_KEY
 
-### CLI
-
-```bash
-python __main__.py status
-python __main__.py coletar [data_ini data_fim]
-python __main__.py analisar              # sync incremental — preserva triagem
-python __main__.py investigar [--limite N]
-python __main__.py relatorio [--dir DIR]
-python __main__.py dossie --alerta ID [--formato md|json|pdf] [--gerar-ia]
-python __main__.py publicar [--dir DIR] [--limite-ia N]
-python __main__.py enriquecer [--reset]
-python __main__.py painel
-```
-
-### Dashboard Flask
-
-```bash
+# Rode o dashboard
 python web_app.py
 # → http://localhost:5055/dashboard
 ```
 
-| Aba | Função |
-|-----|--------|
-| **Visão Geral** | KPIs, gráficos e card de status do pipeline (`GET /api/pipeline/status`) |
-| **Triagem** | Fila de alertas + `PATCH /api/alertas/{id}` com `{ "status", "nota" }` |
-| **Monitoramento** | CRUD de watchlists e regras de alerta (filtros Discord) |
-| **Rede** | Comparador multi-fornecedor, sócios compartilhados e grafo investigativo |
+---
 
-Export dossiê na API: `GET /api/dossie/{id}?formato=md|json|pdf`.
+## 💻 Uso / Usage
 
-### Testes
+### Pipeline completo
 
 ```bash
-python -m pytest
+python __main__.py coletar          # coleta contratos do PNCP
+python __main__.py enriquecer       # enriquece com BrasilAPI
+python __main__.py analisar         # detecta anomalias
+python __main__.py investigar       # gera narrativas IA (Gemma4 + Gemini)
 ```
 
-### Pipeline agendado (monitoramento contínuo)
+### Investigação profunda de um alerta
 
 ```bash
-python -m automacoes.pipeline --once      # uma execucao (Task Scheduler)
-python __main__.py pipeline --once        # alias CLI
-python -m automacoes.pipeline --daemon    # APScheduler embutido
+python __main__.py investigar_profundo <alerta_id>
 ```
 
-Esteira: **coletar → enriquecer → analisar → investigar (Top N Ollama) → Discord**.
+### Pipeline automático (agendado)
 
-Logs em `logs/pipeline_YYYYMMDD.txt`. Agendar no Windows: `scripts\agendar.ps1`.
-
-Variáveis principais do pipeline (`.env`):
-
-| Variável | Uso |
-|----------|-----|
-| `PIPELINE_CRON` | Expressão cron (modo `--daemon`) |
-| `PIPELINE_JANELA_DIAS` | Janela retroativa de coleta |
-| `PIPELINE_INVESTIGAR_LIMITE` | Top N alertas para narrativa IA |
-| `DISCORD_WEBHOOK_URL` | Notificações filtradas por regras de alerta |
-| `MUNICIPIO_IBGE` | Código IBGE do município monitorado |
-
----
-
-## Exemplos de output
-
-### `status`
-
-```
---------------------------------------------------------
-  SENTINELA RJ  |  status
---------------------------------------------------------
-
-  Banco        : data/sentinela_rj.db
-  Contratos    : 327  |  R$ 1,245,655,956.52
-  Fornecedores : 191  |  Orgaos: 4
-  Periodo      : 2023-03-20 -> 2026-05-05
-
-  Ultima coleta: nao registrada (coletas_log vazio)
-
-  Alertas abertos: 48
+```bash
+python -m automacoes.pipeline --once    # uma execução
+python -m automacoes.pipeline --daemon  # APScheduler contínuo
 ```
 
-### `analisar`
+### Dossiê de um alerta
 
-```
---------------------------------------------------------
-  SENTINELA RJ  |  analisar
---------------------------------------------------------
-
-  ..   Executando detectores...
-  OK   outliers        21 anomalias
-  OK   concentracao     3 anomalias
-  OK   licitacao       16 anomalias
-
---------------------------------------------------------
-  RESUMO DA ANALISE
---------------------------------------------------------
-  Total de anomalias : 40
-  ALTA               : 8
-  MEDIA              : 4
-  BAIXA              : 28
-
-  Por tipo:
-     21  outlier valor
-     11  inexigibilidade
-      3  dispensa
-      3  concentracao fornecedor
-      2  emergencia
-
-  Alertas salvos no banco: 48
-
-  Top anomalias:
-     1. 0.891  [ALTA ]  Inexigibilidade — R$ 45,000,000 — BONUS TRACK ENTRETENIMENTO
-     2. 0.884  [ALTA ]  Valor atipico — PRODUMIX COMERCIO E SERVICOS LTDA
-     3. 0.878  [ALTA ]  Contrato emergencial — R$ 12,928,979 — AZOS VIGILANCIA
-     4. 0.873  [ALTA ]  Dispensa — R$ 8,018,696 — MATRIZ CONSTRUCOES E SERVICOS
-     5. 0.827  [ALTA ]  Valor atipico — GAIA COMERCIO E PRODUTOS QUIMICOS LTDA
-     6. 0.820  [ALTA ]  Concentracao: 4 contratos em 90 dias — ENTRE OS RIOS LTDA
-     7. 0.796  [ALTA ]  Valor atipico — PRONTO EXPRESS LOGISTICA SA
-     8. 0.777  [ALTA ]  Valor atipico — BONUS TRACK ENTRETENIMENTO LTDA
-
-  Tempo total: 24ms
+```bash
+python __main__.py dossie --alerta 42 --formato md
+python __main__.py dossie --alerta 42 --formato pdf
 ```
 
 ---
 
-## Metodologia
+## 🔐 Variáveis de Ambiente / Environment Variables
 
-### Por que análise por categoria?
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `GEMINI_API_KEY` | Gemini API (narrativas e vereditos) | — |
+| `SENTINELA_IA_PROVIDER` | `gemini` no deploy, `ollama` local | `ollama` |
+| `GROQ_API_KEY` | Groq (fallback opcional) | — |
+| `DB_PATH` | Caminho do SQLite | `data/sentinela_rj.db` |
+| `DATAJUD_API_KEY` | DataJud CNJ (chave pública disponível na wiki) | — |
+| `SENTINELA_IA_REVISAO_GEMINI` | Habilita veredito Gemini | `true` |
+| `SENTINELA_IA_REVISAO_GEMMA4` | Habilita veredito Gemma4 | `true` |
+| `GEMMA4_MODEL` | Modelo Gemma4 no Ollama | `gemma4:12b` |
+| `MUNICIPIO_IBGE` | Código IBGE do município | `3304557` (Rio) |
+| `PIPELINE_CRON` | Expressão cron do pipeline | `0 8 * * 1` |
 
-Contratos de diferentes categorias têm distribuições de valor completamente distintas. Na base do Rio, a mediana de "Compras" é ~R$ 10 mil; a de "Serviços de Engenharia" é ~R$ 15 milhões. Usar um limiar global único geraria centenas de falsos positivos em engenharia e cegaria o sistema para anomalias em compras.
-
-A solução é calcular os limiares dentro de cada categoria — o que um contrato de R$ 5 milhões significa em "Compras" (500× a mediana, anomalia crítica) é completamente diferente do que significa em "Serviços de Engenharia" (abaixo da média, normal).
-
----
-
-### Tipo 1 — Outlier de valor (`outlier_valor`)
-
-**Método:** IQR de Tukey com Z-score como calibrador de severidade.
-
-```
-Q1, Q3  = quartis da distribuição de valor_global na categoria
-IQR     = Q3 - Q1
-fence   = Q3 + 1,5 × IQR          (limiar clássico de Tukey)
-zscore  = (valor - média) / desvio_padrão
-
-Flagrado se: valor > fence  E  zscore > 1,0
-Severidade: alta se zscore ≥ 5 | média se zscore ≥ 3 | baixa caso contrário
-```
-
-O requisito duplo (acima da fence **e** zscore positivo) descarta falsos positivos gerados pela assimetria das distribuições — situações onde a média é puxada pelos próprios outliers e fica acima da fence.
-
-Categorias com menos de 4 contratos usam as estatísticas globais como fallback.
+> Lista completa em: [`.env.example`](.env.example)
 
 ---
 
-### Tipo 2 — Concentração de fornecedor (`concentracao_fornecedor`)
-
-**Método:** janela deslizante de 90 dias por fornecedor.
+## 🏗 Arquitetura / Architecture
 
 ```
-Para cada fornecedor com 2+ contratos:
-  Para cada data de assinatura como âncora:
-    janela = contratos nos próximos 90 dias
-    se len(janela) >= 3  e  total >= R$ 1.000.000:
-      score = 0,30 × min(qtd, 10)/10  +  0,70 × min(total / R$50M, 1,0)
-
-Flagrada a janela de maior score por fornecedor.
-```
-
-Os pesos (30% quantidade, 70% valor) foram calibrados para distinguir dois padrões reais presentes na base:
-
-| Fornecedor | Contratos | Total | Score |
-|-----------|-----------|-------|-------|
-| Cristália (farmacêutica) | 20 em 60 dias | R$ 316K | 0,13 (baixa) — filtrado |
-| Entre os Rios (construtora) | 4 em 30 dias | R$ 86,4M | 0,82 (alta) — flagrado |
-
-O limite de R$ 1 milhão descarta compras rotineiras fracionadas (medicamentos, materiais de escritório) que são operacionalmente normais.
-
----
-
-### Tipo 3 — Sem licitação competitiva (`sem_licitacao_*`)
-
-**Método:** detecção por expressão regular nos campos `informacao_complementar` e `objeto`.
-
-A API do PNCP não retorna diretamente a modalidade licitatória no endpoint `/contratos`. A modalidade é inferida pelo texto das justificativas legais registradas no contrato.
-
-| Subtipo | Padrões detectados | Lei de referência |
-|---------|-------------------|-------------------|
-| `inexigibilidade` | `art. 74`, `inexigibilidade`, `inviabilidade de competição` | Lei 14.133/2021, art. 74 |
-| `emergencia` | `emergência`, `calamidade`, `art. 75 VIII` | Lei 14.133/2021, art. 75, VIII |
-| `dispensa` | `dispensa`, `art. 75` | Lei 14.133/2021, art. 75 |
-
-Limiares de severidade por subtipo (baseados nos limites legais da Lei 14.133/2021):
-
-| Subtipo | Alta | Média | Baixa |
-|---------|------|-------|-------|
-| Inexigibilidade | ≥ R$ 10M | ≥ R$ 1M | < R$ 1M |
-| Emergência | ≥ R$ 5M | ≥ R$ 500K | < R$ 500K |
-| Dispensa | ≥ R$ 1M | ≥ R$ 200K | < R$ 200K |
-
----
-
-## Estrutura do projeto
-
-```
-sentinela/
-├── __main__.py              # CLI: coletar, analisar, dossie, pipeline…
-├── web_app.py               # Flask SPA — UI canônica (:5055/dashboard)
-├── automacoes/
-│   ├── pipeline.py          # Coleta agendada + Discord
-│   └── utils/notificador.py
-├── db/
-│   ├── schema.sql           # DDL SQLite
-│   ├── conexao.py           # get_conn(), init_db()
-│   ├── alertas_sync.py      # Sync incremental (preserva triagem)
-│   ├── triagem.py           # Workflow de status
-│   ├── watchlists.py        # CRUD watchlists
-│   ├── regras_alerta.py     # Filtros de notificação
-│   └── narrativa.py         # Persistência narrativa IA
-├── extrator/
-│   ├── pncp.py              # Coleta PNCP paginada
-│   ├── enriquecedor.py      # BrasilAPI cadastral
-│   ├── sancoes_ingestao.py  # CEIS/CNEP
-│   └── transparencia_rj.py  # Cruzamento empenhos RJ
-├── analisador/
-│   ├── engine.py            # Orquestração dos detectores
-│   ├── outliers.py          # IQR por categoria
-│   ├── concentracao.py      # Janela 90 dias
-│   ├── licitacao.py         # Regex modalidade
-│   ├── fracionamento.py     # Fracionamento por AP
-│   ├── sancoes.py           # Empresas inativas
-│   ├── socios.py            # Sócios compartilhados
-│   └── watchlists.py        # Detector de matches
+sentinela-rj/
+├── web_app.py              # Dashboard Flask (:5055/dashboard)
+├── __main__.py             # CLI (coletar, analisar, investigar...)
 ├── analise/
-│   ├── motor_ia.py          # Ollama / Gemini / Groq
-│   └── grafo.py             # Rede investigativa
+│   └── motor_ia.py         # Gemma4 + Gemini — narrativas e vereditos A/B
+├── analisador/             # 9 detectores de anomalia
+├── investigacao/           # Agente ReAct
+│   ├── agente.py           # ReAct loop principal
+│   └── ferramentas/        # BrasilAPI, PNCP, DataJud, TCM
+├── automacoes/
+│   └── pipeline.py         # Pipeline agendado
+├── db/                     # SQLite — conexão e migrações
 ├── relatorios/
-│   ├── builder.py           # Relatório Markdown
-│   └── dossie.py            # Dossiê MD/JSON/PDF
-├── static/ + templates/     # SPA do dashboard
-├── tests/                   # pytest
-└── data/sentinela_rj.db     # SQLite local (.gitignore)
+│   └── dossie.py           # Dossiê exportável (MD/PDF/JSON)
+├── static/                 # UI web (HTML/CSS/JS)
+├── tests/                  # 101+ testes pytest
+├── Dockerfile              # Container para Fly.io
+├── fly.toml                # Config deploy
+└── .env.example            # Variáveis documentadas
+```
+
+**Fluxo principal:**
+
+```
+PNCP API → extrator → SQLite
+                ↓
+         9 detectores → alertas
+                ↓
+    Gemma4 (narrativa) + Gemini/Gemma4 (veredito A/B)
+                ↓
+         Dashboard Flask → Auditor humano
+                ↓
+    Agente ReAct (investigação profunda) → Dossiê
 ```
 
 ---
 
-## Roadmap
+## ☁️ Deploy Fly.io
 
-- [x] Dashboard Flask com triagem, dossiê, grafo e narrativa IA on-demand
-- [x] Sync incremental de alertas (preserva triagem e narrativa IA)
-- [x] Pipeline agendado (`coletar → enriquecer → analisar → investigar → notificar`)
-- [x] Watchlists e alertas Discord (backend + UI na aba Monitoramento)
-- [x] Card de status do pipeline na Visão Geral
-- [x] Export PDF do dossiê (`?formato=pdf`)
-- [x] Multi-município via env + backfill histórico + CEIS/CNEP + Transparência RJ
-- [x] Cross-ref Transparência RJ no painel de detalhes do alerta
-- [x] Comparador multi-fornecedor com lista de fornecedores investigados (`GET /api/fornecedores/investigados`)
-- [x] Detector de evolução temporal (`evolucao_temporal_fornecedor`)
-- [x] Score composto na listagem de alertas (coluna Prioridade + ordenação padrão)
-- [x] Feedback estruturado ao descartar alertas (`motivo_descarte` + `GET /api/alertas/feedback/descartes`)
-- [x] Seletor de município no dashboard (`GET /api/municipios` + filtro `municipio_ibge`)
-- [x] Coleta automática multi-município RM-RJ (`MUNICIPIOS_MONITORADOS` ou lista padrão; IA off no pipeline)
+```bash
+fly auth login
+fly launch --no-deploy --name sentinela-rj --region gru
+fly volumes create sentinela_data --region gru --size 1
+fly secrets set GEMINI_API_KEY=... SENTINELA_IA_PROVIDER=gemini
+fly deploy
 
----
+# Upload do banco local
+fly sftp shell
+# >> put data/sentinela_rj.db /data/sentinela_rj.db
+```
 
-## Fonte de dados
-
-**PNCP — Portal Nacional de Contratações Públicas**
-`GET https://pncp.gov.br/api/consulta/v1/contratos`
-
-Filtros aplicados via env: `MUNICIPIO_IBGE` (padrão `3304557` — Rio de Janeiro) + `MUNICIPIO_ESFERA=M` (Municipal).
-A API é pública e não requer autenticação.
+> ⚠️ Ollama/Gemma4 não disponíveis no Fly.io — IA via Gemini em produção.
 
 ---
 
-*Sentinela RJ — monitoramento independente de contratos públicos municipais*
+## 🧪 Testes / Tests
+
+```bash
+# Rodar todos os testes
+pytest
+
+# Com cobertura
+pytest --cov=analise --cov-report=term-missing
+
+# Teste específico
+pytest tests/test_motor_ia.py -v
+```
+
+> **101+ testes** cobrindo motor IA, detectores, pipeline, dashboard e dossiê.
+
+---
+
+## 🗺 Roadmap
+
+- [x] Dashboard Flask com triagem, dossiê, grafo e narrativa IA
+- [x] 9 detectores de anomalia (IQR, concentração, fracionamento, etc.)
+- [x] Pipeline agendado com notificações Discord
+- [x] Gemma 4 12B como gerador principal de narrativas
+- [x] Comparação A/B de vereditos Gemini vs Gemma4
+- [x] Agente Investigador ReAct com 5 ferramentas
+- [x] Investigação profunda em background com polling
+- [x] Deploy público Fly.io com SQLite persistente
+- [x] Multi-município via env
+- [ ] TJRJ processos via Playwright com credencial (issue #2)
+- [ ] Transparência RJ empenhos reais
+- [ ] Busca natural em linguagem humana
+- [ ] Alertas Telegram para cidadãos
+- [ ] Mapa geográfico de contratos por bairro
+
+---
+
+## 👤 Autor / Author
+
+<div align="center">
+
+**Leandro Simões**
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://linkedin.com/in/leandro-sim%C3%B5es-7a0b3537b)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/simoesleandro)
+[![Portfolio](https://img.shields.io/badge/Portfolio-06b6d4?style=flat-square&logo=safari&logoColor=white)](https://simoesleandro.github.io/portfolio)
+
+*Fullstack · IA Aplicada · Civic Tech*
+
+</div>
+
+---
+
+<div align="center">
+
+Feito com ☕ e IA em / Made with ☕ and AI in 🇧🇷 Rio de Janeiro
+
+> *Todos os dados são públicos e obtidos de fontes oficiais do governo brasileiro.*  
+> *All data is public and sourced from official Brazilian government portals.*
+
+</div>
