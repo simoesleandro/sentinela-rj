@@ -2847,6 +2847,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   const alertaId = urlParams.get('alerta');
   if (alertaId) openDetail(parseInt(alertaId, 10));
 
+  // Pre-fill empenhos tab from fornecedor page link
+  const empenhoNi = urlParams.get('empenho_ni');
+  if (empenhoNi) {
+    document.querySelector('.tab-btn[data-tab="empenhos"]')?.click();
+    const qInput = document.getElementById('empenhos-filter-q');
+    if (qInput) {
+      qInput.value = empenhoNi;
+      empenhoState.page = 1;
+      loadEmpenhos();
+    }
+  }
+
   // Auto-start tour on first visit
   setTimeout(() => {
     if (!localStorage.getItem('sentinela_tour_seen')) startTour();

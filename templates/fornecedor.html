@@ -268,6 +268,12 @@
         </div>
       </section>
 
+      <!-- Empenhos Monitorados (PNCP) -->
+      <section class="forn-section" id="empenhos-section">
+        <h2 class="section-title">Empenhos Monitorados (PNCP)</h2>
+        <div id="empenhos-content"></div>
+      </section>
+
       <!-- Fornecedores relacionados -->
       <section class="forn-section relacionados-section">
         <h2 class="section-title">Fornecedores com contratos similares</h2>
@@ -374,6 +380,7 @@
         renderOrgaos(d.orgaos_contratantes);
         renderAnomalias(d.anomalias);
         renderContratos(d.contratos);
+        renderEmpenhos(d.empenhos, ni);
         renderRelacionados(d.fornecedores_relacionados);
 
         document.getElementById('loading-state').style.display = 'none';
@@ -580,6 +587,68 @@
             <td>${pncpLink}</td>
           </tr>`;
       }).join('');
+    }
+
+    function renderEmpenhos(empenhos, ni) {
+      const el = document.getElementById('empenhos-content');
+      if (!el) return;
+
+      const total = empenhos?.total || 0;
+      const valorTotal = empenhos?.valor_total || 0;
+      const recentes = empenhos?.recentes || [];
+
+      if (!total) {
+        el.innerHTML = '<div class="forn-empty">Nenhum empenho coletado ainda para este fornecedor.</div>';
+        return;
+      }
+
+      const dashboardLink = `/dashboard?empenho_ni=${encodeURIComponent(ni)}`;
+
+      const rows = recentes.map(e => `
+        <tr>
+          <td style="white-space:nowrap;color:var(--muted)">${formatDate(e.data_lancamento)}</td>
+          <td style="white-space:nowrap;font-weight:500">${formatCurrency(e.valor)}</td>
+          <td style="font-size:0.8rem;color:#d4d4d4" title="${escapeHtml(e.descricao || '')}">${escapeHtml(truncate(e.descricao || '—', 80))}</td>
+          <td style="font-size:0.78rem;font-family:monospace;color:var(--muted);word-break:break-all">${escapeHtml(e.documento || '—')}</td>
+        </tr>`).join('');
+
+      el.innerHTML = `
+        <div class="kpi-grid" style="margin-bottom:1.25rem">
+          <div class="kpi-card">
+            <div class="kpi-value">${total.toLocaleString('pt-BR')}</div>
+            <div class="kpi-label">Total de Empenhos</div>
+            <div class="kpi-hint">Via PNCP (coleta diária)</div>
+          </div>
+          <div class="kpi-card highlight">
+            <div class="kpi-value" style="font-size:1.75rem">${formatCurrency(valorTotal)}</div>
+            <div class="kpi-label">Valor Total Monitorado</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Valor (R$)</th>
+                <th>Descrição</th>
+                <th>Documento PNCP</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        ${total > recentes.length
+          ? `<div style="margin-top:0.75rem">
+               <a href="${escapeHtml(dashboardLink)}" class="contratos-link">
+                 Ver todos os ${total.toLocaleString('pt-BR')} empenhos no dashboard →
+               </a>
+             </div>`
+          : `<div style="margin-top:0.75rem">
+               <a href="${escapeHtml(dashboardLink)}" class="contratos-link">
+                 Ver empenhos no dashboard →
+               </a>
+             </div>`
+        }`;
     }
 
     function renderRelacionados(rel) {

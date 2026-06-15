@@ -1387,6 +1387,21 @@ def fornecedor_dossie(fornecedor_ni: str):
                     except Exception:
                         cadastro[campo] = []
 
+        empenho_agg = db.execute(
+            """SELECT COUNT(*) AS total, COALESCE(SUM(valor), 0) AS valor_total
+               FROM transparencia_rj_lancamentos
+               WHERE fornecedor_ni = ?""",
+            (fornecedor_ni,),
+        ).fetchone()
+        empenhos_recentes = db.execute(
+            """SELECT valor, data_lancamento, descricao, orgao, documento
+               FROM transparencia_rj_lancamentos
+               WHERE fornecedor_ni = ?
+               ORDER BY data_lancamento DESC
+               LIMIT 10""",
+            (fornecedor_ni,),
+        ).fetchall()
+
         return jsonify({
             "identidade": dict(forn),
             "cadastro": cadastro,
@@ -1408,6 +1423,11 @@ def fornecedor_dossie(fornecedor_ni: str):
                 "labels": [r["periodo"] for r in timeline_rows],
                 "contratos": [r["contratos"] for r in timeline_rows],
                 "valor": [r["valor"] for r in timeline_rows],
+            },
+            "empenhos": {
+                "total": empenho_agg["total"],
+                "valor_total": empenho_agg["valor_total"],
+                "recentes": [dict(r) for r in empenhos_recentes],
             },
         })
     except Exception as e:
