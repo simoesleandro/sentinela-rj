@@ -1,0 +1,14 @@
+﻿<service>
+  <id>SentinelaRJ</id>
+  <name>Sentinela RJ</name>
+  <description>Monitor de contratos publicos do municipio do RJ</description>
+  <executable>C:\Users\stife\AppData\Local\Programs\Python\Python312\python.exe</executable>
+  <arguments>web_app.py</arguments>
+  <workingdirectory>C:\Meus_projetos\sentinela-rj</workingdirectory>
+  <logmode>rotate</logmode>
+  <logpath>C:\Meus_projetos\sentinela-rj\logs</logpath>
+  <startmode>Automatic</startmode>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="none"/>
+</service>

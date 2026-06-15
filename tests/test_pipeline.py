@@ -99,6 +99,10 @@ def test_pipeline_ordem_etapas(monkeypatch: pytest.MonkeyPatch) -> None:
         ordem.append("coletar")
         return EtapaResult(True, "ok")
 
+    def _empenhos(_cfg: PipelineConfig) -> EtapaResult:
+        ordem.append("empenhos_diarios")
+        return EtapaResult(True, "ok")
+
     def _enriquecer(_cfg: PipelineConfig) -> EtapaResult:
         ordem.append("enriquecer")
         return EtapaResult(True, "ok")
@@ -116,13 +120,15 @@ def test_pipeline_ordem_etapas(monkeypatch: pytest.MonkeyPatch) -> None:
         return EtapaResult(True, "ok")
 
     with patch("automacoes.pipeline._etapa_coletar", _coletar), patch(
-        "automacoes.pipeline._etapa_enriquecer", _enriquecer
-    ), patch("automacoes.pipeline._etapa_analisar", _analisar), patch(
-        "automacoes.pipeline._etapa_investigar", _investigar
-    ), patch("automacoes.pipeline._etapa_notificar", _notificar):
+        "automacoes.pipeline._etapa_empenhos_diarios", _empenhos
+    ), patch("automacoes.pipeline._etapa_enriquecer", _enriquecer), patch(
+        "automacoes.pipeline._etapa_analisar", _analisar
+    ), patch("automacoes.pipeline._etapa_investigar", _investigar), patch(
+        "automacoes.pipeline._etapa_notificar", _notificar
+    ):
         resultado = executar_pipeline(config)
 
-    assert ordem == ["coletar", "enriquecer", "analisar", "investigar", "notificar"]
+    assert ordem == ["coletar", "empenhos_diarios", "enriquecer", "analisar", "investigar", "notificar"]
     assert resultado.sucesso
 
 
@@ -131,6 +137,9 @@ def test_pipeline_fail_soft_enriquecer(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with patch(
         "automacoes.pipeline._etapa_coletar",
+        return_value=EtapaResult(True, "ok"),
+    ), patch(
+        "automacoes.pipeline._etapa_empenhos_diarios",
         return_value=EtapaResult(True, "ok"),
     ), patch(
         "automacoes.pipeline._etapa_enriquecer",

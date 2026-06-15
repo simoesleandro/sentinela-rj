@@ -15,7 +15,9 @@ from analisador.engine import AnomaliaResult
 _MIN_AMOSTRA = 4   # mínimo de contratos por categoria para IQR local
 
 
-def _stats(valores: list[float]) -> dict:
+def _stats(valores: list[float]) -> dict | None:
+    if len(valores) < 2:
+        return None
     n = len(valores)
     media = statistics.mean(valores)
     std = statistics.pstdev(valores)      # população completa, não amostra
@@ -54,8 +56,10 @@ def detectar(conn: sqlite3.Connection) -> list[AnomaliaResult]:
 
     # Pré-calcula stats por categoria (fallback: global)
     global_stats = _stats([r["valor_global"] for r in rows])
+    if global_stats is None:
+        return []
     cat_stats: dict[str, dict] = {
-        cat: _stats(vals) if len(vals) >= _MIN_AMOSTRA else global_stats
+        cat: (_stats(vals) if len(vals) >= _MIN_AMOSTRA else global_stats) or global_stats
         for cat, vals in por_cat.items()
     }
 

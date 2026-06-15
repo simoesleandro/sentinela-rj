@@ -1,0 +1,16 @@
+2026-06-14 17:18:12,225 DEBUG - Starting WinSW in console mode
+2026-06-14 17:18:14,194 DEBUG - Starting WinSW in console mode
+2026-06-14 17:18:14,226 INFO  - Installing service 'Sentinela RJ (SentinelaRJ)'...
+2026-06-14 17:18:14,274 INFO  - Service 'Sentinela RJ (SentinelaRJ)' was installed successfully.
+2026-06-14 17:18:14,675 DEBUG - Starting WinSW in console mode
+2026-06-14 17:18:16,392 DEBUG - Starting WinSW in console mode
+2026-06-14 17:18:16,428 INFO  - Starting service 'Sentinela RJ (SentinelaRJ)'...
+2026-06-14 17:18:16,785 DEBUG - Starting WinSW in service mode
+2026-06-14 17:18:16,817 INFO  - Service 'Sentinela RJ (SentinelaRJ)' started successfully.
+2026-06-14 17:18:16,922 INFO  - Starting C:\Users\stife\AppData\Local\Programs\Python\Python312\python.exe web_app.py
+2026-06-14 17:18:16,949 INFO  - Started process 17548
+2026-06-14 17:18:16,960 DEBUG - Forwarding logs of the process System.Diagnostics.Process (python) to WinSW.SizeBasedRollingLogAppender
+2026-06-14 17:44:16,569 DEBUG - Starting WinSW in service mode
+2026-06-14 17:44:16,823 INFO  - Starting C:\Users\stife\AppData\Local\Programs\Python\Python312\python.exe web_app.py
+2026-06-14 17:44:16,872 INFO  - Started process 5300
+2026-06-14 17:44:16,887 DEBUG - Forwarding logs of the process System.Diagnostics.Process (python) to WinSW.SizeBasedRollingLogAppender

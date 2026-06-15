@@ -99,6 +99,9 @@ class PipelineResult:
     analisar: EtapaResult
     investigar: EtapaResult
     notificar: EtapaResult
+    empenhos_diarios: EtapaResult = field(
+        default_factory=lambda: EtapaResult(False, "nao executado")
+    )
     novos_alta: list[dict[str, Any]] = field(default_factory=list)
     erros: list[str] = field(default_factory=list)
     duracao_s: float = 0.0
@@ -316,6 +319,63 @@ def _etapa_notificar(
         return EtapaResult(False, "falha no Discord", erro=str(exc))
 
 
+def _notificar_empenhos_telegram(metricas: dict[str, Any], data_ini: str, data_fim: str) -> None:
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        logger.debug("[pipeline] Telegram não configurado — notificação empenhos ignorada")
+        return
+    texto = (
+        f"🔔 <b>Sentinela RJ — Novos Empenhos PNCP</b>\n"
+        f"Período: {data_ini} → {data_fim}\n"
+        f"Contratos PNCP varridos: {metricas['total_pncp']}\n"
+        f"Fornecedores monitorados atingidos: {metricas['novos_monitorados']}\n"
+        f"Lançamentos salvos: {metricas['salvos']}"
+    )
+    import requests as _req
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        r = _req.post(
+            url,
+            json={"chat_id": chat_id, "text": texto, "parse_mode": "HTML"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        logger.info("[pipeline] Telegram empenhos enviado — %d lançamentos", metricas["salvos"])
+    except Exception as exc:
+        logger.warning("[pipeline] Telegram falhou: %s", exc)
+
+
+def _etapa_empenhos_diarios(config: PipelineConfig) -> EtapaResult:
+    from extrator.empenhos_diarios import coletar_empenhos_novos
+
+    hoje = date.today()
+    data_ini = (hoje - timedelta(days=2)).strftime("%Y%m%d")
+    data_fim = hoje.strftime("%Y%m%d")
+    logger.info("[pipeline] empenhos_diarios iniciado %s -> %s", data_ini, data_fim)
+    try:
+        metricas = coletar_empenhos_novos(data_ini, data_fim)
+        msg = (
+            f"total_pncp={metricas['total_pncp']} "
+            f"novos_monitorados={metricas['novos_monitorados']} "
+            f"salvos={metricas['salvos']}"
+        )
+        logger.info("[pipeline] empenhos_diarios OK — %s", msg)
+        if metricas["salvos"] > 0:
+            _notificar_empenhos_telegram(metricas, data_ini, data_fim)
+        return EtapaResult(True, msg, metricas=metricas)
+    except Exception as exc:
+        logger.exception("[pipeline] empenhos_diarios FALHOU")
+        return EtapaResult(False, "falha na coleta de empenhos", erro=str(exc))
+
+
+def executar_empenhos_diarios(config: PipelineConfig | None = None) -> EtapaResult:
+    """Executa somente a etapa de empenhos diários (usada pelo cron EMPENHOS_CRON)."""
+    config = config or PipelineConfig.from_env()
+    return _etapa_empenhos_diarios(config)
+
+
 def _notificar_falha_critica(erro: str) -> None:
     if not os.getenv("DISCORD_WEBHOOK_URL", "").strip():
         return
@@ -346,6 +406,10 @@ def executar_pipeline(config: PipelineConfig | None = None) -> PipelineResult:
         )
     if not coletar.ok:
         erros.append(f"coletar: {coletar.erro}")
+
+    empenhos_diarios = _etapa_empenhos_diarios(config)
+    if not empenhos_diarios.ok:
+        erros.append(f"empenhos_diarios: {empenhos_diarios.erro}")
 
     enriquecer = _etapa_enriquecer(config)
     if not enriquecer.ok:
@@ -385,6 +449,7 @@ def executar_pipeline(config: PipelineConfig | None = None) -> PipelineResult:
     duracao_s = time.perf_counter() - t0
     resumo_discord = {
         "coletar": coletar.mensagem,
+        "empenhos_diarios": empenhos_diarios.mensagem,
         "enriquecer": enriquecer.mensagem,
         "analisar": analisar.mensagem,
         "investigar": investigar.mensagem,
@@ -402,6 +467,7 @@ def executar_pipeline(config: PipelineConfig | None = None) -> PipelineResult:
         analisar=analisar,
         investigar=investigar,
         notificar=notificar,
+        empenhos_diarios=empenhos_diarios,
         novos_alta=novos_alta,
         erros=erros,
         duracao_s=duracao_s,
@@ -430,9 +496,18 @@ def iniciar_scheduler(config: PipelineConfig | None = None) -> None:
         id="sentinela_pipeline",
         name="Sentinela RJ Pipeline",
     )
+    empenhos_cron = os.getenv("EMPENHOS_CRON", "0 6 * * *").strip()
+    scheduler.add_job(
+        executar_empenhos_diarios,
+        CronTrigger.from_crontab(empenhos_cron, timezone=config.timezone),
+        kwargs={"config": config},
+        id="sentinela_empenhos",
+        name="Sentinela RJ Empenhos Diários",
+    )
     logger.info(
-        "[pipeline] daemon iniciado cron=%s tz=%s",
+        "[pipeline] daemon iniciado cron=%s empenhos_cron=%s tz=%s",
         config.cron,
+        empenhos_cron,
         config.timezone,
     )
     if config.run_on_start:
