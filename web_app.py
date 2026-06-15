@@ -1743,6 +1743,78 @@ def socios_compartilhados():
 
 
 # ---------------------------------------------------------------------------
+# Empenhos — lançamentos diários PNCP
+# ---------------------------------------------------------------------------
+
+@app.route("/api/empenhos")
+def empenhos_list():
+    db = get_db()
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = min(200, max(1, int(request.args.get("per_page", 50))))
+        fornecedor_ni = request.args.get("fornecedor_ni", "").strip()
+        data_ini = request.args.get("data_ini", "").strip()
+        data_fim = request.args.get("data_fim", "").strip()
+        q = request.args.get("q", "").strip()
+
+        base = """
+            FROM transparencia_rj_lancamentos l
+            LEFT JOIN fornecedores f ON f.ni = l.fornecedor_ni
+        """
+        conditions: list[str] = []
+        params: list = []
+
+        if fornecedor_ni:
+            conditions.append("l.fornecedor_ni = ?")
+            params.append(fornecedor_ni)
+        if q:
+            cnpj_q = q.replace(".", "").replace("/", "").replace("-", "")
+            conditions.append("(f.razao_social LIKE ? OR l.fornecedor_ni LIKE ?)")
+            params.extend([f"%{q}%", f"%{cnpj_q}%"])
+        if data_ini:
+            conditions.append("l.data_lancamento >= ?")
+            params.append(data_ini)
+        if data_fim:
+            conditions.append("l.data_lancamento <= ?")
+            params.append(data_fim)
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        total = db.execute(
+            f"SELECT COUNT(*) {base} {where}", params
+        ).fetchone()[0]
+        valor_total = db.execute(
+            f"SELECT COALESCE(SUM(l.valor), 0) {base} {where}", params
+        ).fetchone()[0]
+        offset = (page - 1) * per_page
+
+        rows = db.execute(
+            f"""
+            SELECT l.id, l.fornecedor_ni,
+                   COALESCE(f.razao_social, l.fornecedor_ni) AS razao_social,
+                   l.valor, l.data_lancamento, l.descricao,
+                   l.orgao, l.documento, l.coletado_em
+            {base} {where}
+            ORDER BY l.data_lancamento DESC, l.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            params + [per_page, offset],
+        ).fetchall()
+
+        return jsonify({
+            "total": total,
+            "valor_total": valor_total,
+            "page": page,
+            "per_page": per_page,
+            "items": [dict(r) for r in rows],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Watchlists — CRUD
 # ---------------------------------------------------------------------------
 

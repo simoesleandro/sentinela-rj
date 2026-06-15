@@ -35,6 +35,7 @@
     <button class="tab-btn" data-tab="orgaos">Órgãos</button>
     <button class="tab-btn" data-tab="rede">Rede</button>
     <button class="tab-btn" data-tab="monitoramento">Monitoramento</button>
+    <button class="tab-btn" data-tab="empenhos">Empenhos</button>
     <button class="tab-btn" data-tab="sobre">Sobre</button>
   </nav>
 
@@ -299,6 +300,44 @@
             <button type="button" id="config-form-save" class="btn-primary-sm">Salvar</button>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Section: Empenhos PNCP -->
+    <section id="tab-empenhos" class="tab-section">
+      <h2 class="section-heading">Empenhos Monitorados (PNCP)</h2>
+      <p class="section-note">Contratos da Prefeitura do Rio vinculados a fornecedores já cadastrados no Sentinela, coletados diariamente do PNCP.</p>
+      <div id="empenhos-resumo-cards" class="kpi-grid" style="margin-bottom:1.5rem">
+        <div class="loading-msg">Carregando…</div>
+      </div>
+      <div class="filter-bar">
+        <input type="text" id="empenhos-filter-q" placeholder="Fornecedor (nome ou CNPJ)…">
+        <input type="date" id="empenhos-filter-ini" title="Data inicial" aria-label="Data inicial">
+        <input type="date" id="empenhos-filter-fim" title="Data final" aria-label="Data final">
+        <button type="button" id="empenhos-buscar" class="btn-primary-sm">Buscar</button>
+      </div>
+      <div id="empenhos-counter" class="resultados-counter"></div>
+      <div class="table-wrap">
+        <table id="empenhos-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Fornecedor</th>
+              <th>Valor (R$)</th>
+              <th>Descrição</th>
+              <th>Órgão (CNPJ)</th>
+              <th>Documento PNCP</th>
+            </tr>
+          </thead>
+          <tbody id="empenhos-tbody">
+            <tr><td colspan="6" class="loading-msg">Selecione filtros e clique em Buscar, ou aguarde o carregamento inicial.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="empenhos-pagination" style="display:flex;align-items:center;gap:1rem;margin-top:1rem">
+        <button id="empenhos-btn-prev" class="btn-page" disabled>← Anterior</button>
+        <span id="empenhos-page-indicator" style="font-size:0.875rem;color:var(--muted)">Página 1</span>
+        <button id="empenhos-btn-next" class="btn-page" disabled>Próxima →</button>
       </div>
     </section>
 

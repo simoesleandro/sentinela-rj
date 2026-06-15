@@ -525,6 +525,9 @@ function loadTab(name) {
     case 'monitoramento':
       loadMonitoramento();
       break;
+    case 'empenhos':
+      loadEmpenhos();
+      break;
   }
 }
 
@@ -2663,6 +2666,121 @@ async function _salvarConfigForm() {
   }
 }
 
+// ─── Empenhos ──────────────────────────────────────────────────────────────
+
+const empenhoState = {
+  page: 1,
+  perPage: 50,
+  total: 0,
+  valorTotal: 0,
+};
+
+async function loadEmpenhos(page) {
+  if (page !== undefined) empenhoState.page = page;
+
+  const q      = (document.getElementById('empenhos-filter-q')?.value || '').trim();
+  const ini    = (document.getElementById('empenhos-filter-ini')?.value || '').trim();
+  const fim    = (document.getElementById('empenhos-filter-fim')?.value || '').trim();
+
+  const tbody     = document.getElementById('empenhos-tbody');
+  const counter   = document.getElementById('empenhos-counter');
+  const indicator = document.getElementById('empenhos-page-indicator');
+  const btnPrev   = document.getElementById('empenhos-btn-prev');
+  const btnNext   = document.getElementById('empenhos-btn-next');
+
+  if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="loading-msg">Carregando…</td></tr>';
+
+  const params = new URLSearchParams({
+    page: empenhoState.page,
+    per_page: empenhoState.perPage,
+  });
+  if (q)   params.set('q', q);
+  if (ini) params.set('data_ini', ini);
+  if (fim) params.set('data_fim', fim);
+
+  try {
+    const data = await api(`/api/empenhos?${params}`);
+    empenhoState.total      = data.total || 0;
+    empenhoState.valorTotal = data.valor_total || 0;
+
+    _renderEmpenhoResumoCards(empenhoState.total, empenhoState.valorTotal);
+
+    const items = data.items || [];
+    const totalPages = Math.max(1, Math.ceil(empenhoState.total / empenhoState.perPage));
+
+    if (counter) {
+      counter.textContent = empenhoState.total > 0
+        ? `${empenhoState.total.toLocaleString('pt-BR')} registro(s) encontrado(s)`
+        : 'Nenhum registro encontrado';
+    }
+    if (indicator) {
+      indicator.textContent = `Página ${empenhoState.page} de ${totalPages}`;
+    }
+    if (btnPrev) btnPrev.disabled = empenhoState.page <= 1;
+    if (btnNext) btnNext.disabled = empenhoState.page >= totalPages;
+
+    if (!tbody) return;
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Nenhum empenho encontrado para os filtros selecionados.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = items.map(e => `
+      <tr>
+        <td style="white-space:nowrap">${formatDate(e.data_lancamento)}</td>
+        <td>
+          <span title="${esc(e.fornecedor_ni || '')}">${esc(truncate(e.razao_social || e.fornecedor_ni || '—', 40))}</span>
+        </td>
+        <td style="white-space:nowrap;text-align:right">${formatCurrency(e.valor)}</td>
+        <td title="${esc(e.descricao || '')}">${esc(truncate(e.descricao || '—', 72))}</td>
+        <td style="white-space:nowrap;font-family:monospace;font-size:0.78rem">${esc(e.orgao || '—')}</td>
+        <td style="font-size:0.8rem;word-break:break-all">${esc(e.documento || '—')}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger,#ef4444);text-align:center;padding:1.5rem">Erro ao carregar empenhos: ${esc(err.message)}</td></tr>`;
+    if (counter) counter.textContent = '';
+  }
+}
+
+function _renderEmpenhoResumoCards(total, valorTotal) {
+  const container = document.getElementById('empenhos-resumo-cards');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-value">${(total || 0).toLocaleString('pt-BR')}</div>
+      <div class="kpi-label">Empenhos Coletados</div>
+      <div class="kpi-hint">Lançamentos via PNCP</div>
+    </div>
+    <div class="kpi-card highlight">
+      <div class="kpi-value" style="font-size:1.75rem">${formatCurrency(valorTotal)}</div>
+      <div class="kpi-label">Valor Total Monitorado</div>
+      <div class="kpi-hint">Soma dos empenhos filtrados</div>
+    </div>
+  `;
+}
+
+function setupEmpenhos() {
+  const buscar  = document.getElementById('empenhos-buscar');
+  const btnPrev = document.getElementById('empenhos-btn-prev');
+  const btnNext  = document.getElementById('empenhos-btn-next');
+  const qInput  = document.getElementById('empenhos-filter-q');
+
+  buscar?.addEventListener('click', () => {
+    empenhoState.page = 1;
+    loadEmpenhos();
+  });
+  qInput?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { empenhoState.page = 1; loadEmpenhos(); }
+  });
+  btnPrev?.addEventListener('click', () => {
+    if (empenhoState.page > 1) loadEmpenhos(empenhoState.page - 1);
+  });
+  btnNext?.addEventListener('click', () => {
+    loadEmpenhos(empenhoState.page + 1);
+  });
+}
+
 // ─── Bootstrap ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -2749,6 +2867,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('config-form-modal')?.addEventListener('click', (ev) => {
     if (ev.target.id === 'config-form-modal') _closeConfigModal();
   });
+
+  setupEmpenhos();
 
   document.getElementById('comparador-btn')?.addEventListener('click', executarComparador);
   document.getElementById('comparador-limpar')?.addEventListener('click', limparComparadorSelecao);
