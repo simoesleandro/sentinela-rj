@@ -10,6 +10,7 @@ from extrator.empenhos_diarios import (
     _fornecedores_monitorados,
     _salvar_lancamento,
     coletar_empenhos_novos,
+    coletar_empenhos_retroativo,
 )
 
 
@@ -227,3 +228,77 @@ def test_coletar_duplicados_contam_uma_vez(monkeypatch: pytest.MonkeyPatch):
     assert resultado["total_pncp"] == 2
     assert resultado["novos_monitorados"] == 2
     assert resultado["salvos"] == 1  # segundo insert rejeitado por UNIQUE
+
+
+# ──────────────────────────── coletar_empenhos_retroativo ────────────────────
+
+
+def test_retroativo_1_chunk_sem_sleep(monkeypatch: pytest.MonkeyPatch):
+    """dias=6 cabe em 1 chunk de 7 dias → coletar_empenhos_novos chamado 1 vez, sem sleep."""
+    chamadas: list[tuple[str, str]] = []
+    sleeps: list[float] = []
+
+    def _fake_coletar(data_ini, data_fim):
+        chamadas.append((data_ini, data_fim))
+        return {"total_pncp": 3, "novos_monitorados": 1, "salvos": 1}
+
+    monkeypatch.setattr("extrator.empenhos_diarios.coletar_empenhos_novos", _fake_coletar)
+    monkeypatch.setattr("extrator.empenhos_diarios.time.sleep", lambda s: sleeps.append(s))
+
+    resultado = coletar_empenhos_retroativo(dias=6)
+
+    assert len(chamadas) == 1
+    assert sleeps == []
+    assert resultado["chunks_processados"] == 1
+
+
+def test_retroativo_acumula_metricas_por_chunk(monkeypatch: pytest.MonkeyPatch):
+    """dias=13 → 2 chunks; métricas de cada chunk são somadas no retorno."""
+
+    def _fake_coletar(data_ini, data_fim):
+        return {"total_pncp": 10, "novos_monitorados": 4, "salvos": 2}
+
+    monkeypatch.setattr("extrator.empenhos_diarios.coletar_empenhos_novos", _fake_coletar)
+    monkeypatch.setattr("extrator.empenhos_diarios.time.sleep", lambda _: None)
+
+    resultado = coletar_empenhos_retroativo(dias=13)
+
+    assert resultado["chunks_processados"] == 2
+    assert resultado["total_pncp"] == 20
+    assert resultado["novos_monitorados"] == 8
+    assert resultado["salvos"] == 4
+
+
+def test_retroativo_dorme_1s_apenas_entre_chunks(monkeypatch: pytest.MonkeyPatch):
+    """dias=13 → 2 chunks → time.sleep(1) chamado exatamente 1 vez (não após o último)."""
+    sleeps: list[float] = []
+
+    monkeypatch.setattr(
+        "extrator.empenhos_diarios.coletar_empenhos_novos",
+        lambda d_ini, d_fim: {"total_pncp": 0, "novos_monitorados": 0, "salvos": 0},
+    )
+    monkeypatch.setattr("extrator.empenhos_diarios.time.sleep", lambda s: sleeps.append(s))
+
+    coletar_empenhos_retroativo(dias=13)
+
+    assert sleeps == [1]
+
+
+def test_retroativo_formato_data_yyyymmdd(monkeypatch: pytest.MonkeyPatch):
+    """As strings de data passadas a coletar_empenhos_novos seguem o formato YYYYMMDD."""
+    import re
+
+    datas_recebidas: list[str] = []
+
+    def _fake_coletar(data_ini, data_fim):
+        datas_recebidas.extend([data_ini, data_fim])
+        return {"total_pncp": 0, "novos_monitorados": 0, "salvos": 0}
+
+    monkeypatch.setattr("extrator.empenhos_diarios.coletar_empenhos_novos", _fake_coletar)
+    monkeypatch.setattr("extrator.empenhos_diarios.time.sleep", lambda _: None)
+
+    coletar_empenhos_retroativo(dias=6)
+
+    assert len(datas_recebidas) == 2
+    for data in datas_recebidas:
+        assert re.fullmatch(r"\d{8}", data), f"Formato inválido: {data}"

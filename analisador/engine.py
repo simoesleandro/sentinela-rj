@@ -36,6 +36,7 @@ def _carregar_detectores() -> _Detectores:
         concentracao,
         evolucao_temporal,
         fracionamento,
+        fracionamento_empenhos,
         licitacao,
         outliers,
         sancoes,
@@ -48,6 +49,7 @@ def _carregar_detectores() -> _Detectores:
         ("evolucao_temporal", evolucao_temporal.detectar),
         ("licitacao", licitacao.detectar),
         ("fracionamento", fracionamento.detectar),
+        ("fracionamento_empenhos", fracionamento_empenhos.detectar),
         ("sancoes", sancoes.detectar),
         ("socios", socios.detectar),
     ]
