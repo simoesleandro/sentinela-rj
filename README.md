@@ -36,6 +36,8 @@
 ## 📋 Índice / Table of Contents
 
 - [Sobre](#-sobre--about)
+- [Por que importa](#-por-que-importa--why-it-matters)
+- [Competências demonstradas](#-competências-demonstradas--skills-demonstrated)
 - [Números atuais](#-números-atuais--current-stats)
 - [Caso real documentado](#-caso-real-documentado--real-case)
 - [Funcionalidades](#-funcionalidades--features)
@@ -49,6 +51,7 @@
 - [Arquitetura](#-arquitetura--architecture)
 - [Deploy Fly.io](#-deploy-flyio)
 - [Testes](#-testes--tests)
+- [O que aprendi](#-o-que-aprendi--what-i-learned)
 - [Roadmap](#-roadmap)
 - [Autor](#-autor--author)
 
@@ -61,6 +64,34 @@ O Sentinela RJ coleta automaticamente contratos públicos do Portal Nacional de 
 
 **EN:**  
 Sentinela RJ automatically collects public contracts from Brazil's PNCP portal, applies 9 statistical and registry detectors to identify anomalies, and uses local AI (Gemma 4) + Gemini to generate investigative narratives with A/B verdict comparison. A ReAct agent crosses multiple external sources for deep investigation. All available on a public dashboard with open data.
+
+---
+
+## 🎯 Por que importa / Why it matters
+
+**PT:**  
+Contratos públicos são dados abertos, mas raramente são fáceis de analisar. O Sentinela RJ transforma milhares de registros do PNCP em alertas acionáveis, destacando valores atípicos, concentração de fornecedores, possíveis fracionamentos e sinais cadastrais que merecem auditoria humana.
+
+O objetivo não é substituir controle institucional ou análise jurídica. É criar uma camada técnica de triagem: coletar, normalizar, cruzar, priorizar e explicar indícios para que pessoas consigam investigar mais rápido.
+
+**EN:**  
+Public contracts are open data, but they are rarely easy to analyze. Sentinela RJ turns thousands of PNCP records into actionable alerts, surfacing outliers, supplier concentration, possible contract splitting and registry signals that deserve human review.
+
+The goal is not to replace institutional oversight or legal analysis. It is a technical triage layer: collect, normalize, cross-check, prioritize and explain signals so people can investigate faster.
+
+---
+
+## 🧠 Competências demonstradas / Skills demonstrated
+
+| Área | Evidência no projeto |
+|------|---------------------|
+| Backend Python | CLI, Flask dashboard, pipeline agendado e serviços de análise |
+| Dados e SQL | SQLite persistente, migrações, consultas para contratos, alertas e fornecedores |
+| Análise de anomalias | Detectores estatísticos, cadastrais e regras de negócio aplicadas a dados reais |
+| IA aplicada | Narrativas investigativas, comparação A/B de vereditos e fallback entre provedores |
+| Civic tech | Uso de dados públicos para transparência e priorização de investigação |
+| Deploy | Fly.io com volume SQLite persistente e configuração por variáveis de ambiente |
+| Testes | Pytest cobrindo detectores, banco, pipeline, dashboard, dossiê e triagem |
 
 ---
 
@@ -181,7 +212,7 @@ Gemma 4 sintetiza as evidências e emite conclusão estruturada:
 ### Pré-requisitos / Prerequisites
 
 - Python 3.11+
-- [Ollama](https://ollama.ai) com `gemma4:12b` — `ollama pull gemma4:12b`
+- [Ollama](https://ollama.ai) para IA local — `ollama pull llama3.1` e/ou `ollama pull gemma4:12b`
 - Chave Gemini (gratuita em [aistudio.google.com](https://aistudio.google.com))
 
 ### Instalação / Installation
@@ -330,6 +361,17 @@ pytest tests/test_motor_ia.py -v
 ```
 
 > **101+ testes** cobrindo motor IA, detectores, pipeline, dashboard e dossiê.
+
+---
+
+## 📚 O que aprendi / What I learned
+
+- Modelar um pipeline de dados públicos ponta a ponta: coleta, persistência, enriquecimento, análise e apresentação.
+- Separar sinais estatísticos de conclusões: o sistema aponta indícios, mas mantém a decisão final como auditoria humana.
+- Trabalhar com limitações reais de APIs públicas, dados incompletos e diferenças entre ambiente local e produção.
+- Usar LLMs como apoio explicativo, não como única fonte de decisão.
+- Criar testes para regras de negócio sensíveis, como detectores de anomalia, score composto, dossiês e triagem.
+- Fazer deploy de uma aplicação orientada a dados com SQLite persistente em produção.
 
 ---
 
