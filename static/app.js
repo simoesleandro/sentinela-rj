@@ -784,49 +784,18 @@ async function loadAlertas() {
 
         const tipoColor = TIPO_COLORS[grupo.tipo] || '#6b7280';
         grupo.alertas.forEach(a => {
-          const pncpLink = a.numero_controle_pncp
+          const pncpBtn = a.numero_controle_pncp
             ? `<a href="https://pncp.gov.br/app/contratos/${a.numero_controle_pncp}" target="_blank" rel="noopener" class="btn-pncp">PNCP ↗</a>`
             : '';
           html.push(`
             <tr class="row-detail" data-grupo="${gid}">
               <td colspan="9">
-                <div class="detail-inner" style="border-left-color:${tipoColor}">
-                  <div class="detail-meta" style="margin-bottom:0.5rem">
-                    <div class="detail-item">
-                      <span class="detail-label">Status</span>
-                      <span class="detail-value">${statusBadge(a.status)}</span>
-                    </div>
-                  </div>
-                  <div class="detail-objeto">
-                    <span class="detail-label">Objeto</span>
-                    <span class="detail-value">
-                      <span class="obj-preview">${truncate(a.objeto || '—', 80)}</span>
-                      ${a.objeto && a.objeto.length > 80 ? `
-                        <span class="obj-full" hidden>${a.objeto}</span>
-                        <button class="btn-expand-obj" onclick="toggleObj(this)">Ver mais</button>
-                      ` : ''}
-                    </span>
-                  </div>
-                  <div class="detail-meta">
-                    <div class="detail-item">
-                      <span class="detail-label">Valor</span>
-                      <span class="detail-value" style="white-space:nowrap;font-weight:500">${formatCurrency(a.valor_referencia)}</span>
-                    </div>
-                    <div class="detail-item">
-                      <span class="detail-label">Data</span>
-                      <span class="detail-value" style="white-space:nowrap">${formatDate(a.data_assinatura)}</span>
-                    </div>
-                    <div class="detail-item">
-                      <span class="detail-label">Órgão</span>
-                      <span class="detail-value">${truncate(a.orgao || '—', 40)}</span>
-                    </div>
-                    <div class="detail-item" style="grid-column:1/-1">
-                      <span class="detail-label">Anomalia</span>
-                      <span class="detail-value" style="font-size:0.8rem;color:#d4d4d4">${a.descricao || '—'}</span>
-                    </div>
-                  </div>
-                  <div class="detail-actions">
-                    ${pncpLink}
+                <div class="detail-compact" style="border-left-color:${tipoColor}">
+                  <span class="detail-compact-valor">${formatCurrency(a.valor_referencia)}</span>
+                  <span class="detail-compact-data">${formatDate(a.data_assinatura)}</span>
+                  <span class="detail-compact-objeto" title="${esc(a.objeto || '')}">${esc(truncate(a.objeto || '—', 60))}</span>
+                  <div class="detail-compact-actions">
+                    ${pncpBtn}
                     <button class="btn-ver-detalhes btn-acao-principal" data-id="${a.id}">Detalhes e IA</button>
                   </div>
                 </div>
