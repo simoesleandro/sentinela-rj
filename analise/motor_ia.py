@@ -83,6 +83,18 @@ _OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "120"))
 _GEMMA4_MODEL = os.environ.get("GEMMA4_MODEL", "gemma4:12b")
 _GEMMA4_TIMEOUT = int(os.environ.get("GEMMA4_TIMEOUT", "180"))
 
+_GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
+
+
+def _gemini_retryable(exc: Exception) -> bool:
+    """True para erros de quota/sobrecarga que justificam tentar o próximo modelo."""
+    msg = str(exc).lower()
+    return any(kw in msg for kw in ("429", "503", "quota", "resource_exhausted", "unavailable", "overloaded"))
+
 
 def _serializar_anomalia(anomalia: dict[str, Any]) -> str:
     return json.dumps(anomalia, ensure_ascii=False, default=str)
@@ -208,22 +220,34 @@ def _call_ollama(prompt: str) -> str:
 
 def _call_gemini(prompt: str) -> str:
     try:
-        import google.generativeai as genai
+        from google import genai
     except ImportError as exc:
         raise ValueError(
-            "Pacote google-generativeai não instalado (pip install google-generativeai)."
+            "Pacote google-genai não instalado (pip install google-genai)."
         ) from exc
 
     chave = os.environ.get("GEMINI_API_KEY", "").strip()
     if not chave:
         raise ValueError("GEMINI_API_KEY não definida.")
-    genai.configure(api_key=chave)
-    modelo = genai.GenerativeModel("gemini-2.5-flash")
-    resposta = modelo.generate_content(prompt)
-    texto = (resposta.text or "").strip()
-    if not texto:
-        raise ValueError("Resposta da API Gemini sem conteúdo textual.")
-    return texto
+
+    client = genai.Client(api_key=chave)
+    last_exc: Exception | None = None
+    for model in _GEMINI_MODELS:
+        try:
+            resposta = client.models.generate_content(model=model, contents=prompt)
+            texto = (resposta.text or "").strip()
+            if not texto:
+                raise ValueError(f"Resposta do modelo {model} sem conteúdo textual.")
+            if model != _GEMINI_MODELS[0]:
+                logger.info("Gemini cascade: respondeu com %s", model)
+            return texto
+        except Exception as exc:
+            if _gemini_retryable(exc):
+                logger.warning("Gemini %s indisponível (%s) — tentando próximo modelo", model, exc)
+                last_exc = exc
+                continue
+            raise
+    raise ValueError(f"Todos os modelos Gemini falharam. Último erro: {last_exc}") from last_exc
 
 
 def _call_groq(prompt: str) -> str:
