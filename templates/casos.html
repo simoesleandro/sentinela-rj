@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casos Investigados — Sentinela RJ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=20260624">
+  <style>
+    .casos-hero {
+      padding: 3rem max(2rem, calc((100% - 1200px) / 2 + 2rem)) 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .casos-hero h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+    .casos-hero p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      max-width: 560px;
+    }
+    .hero-stats {
+      display: flex;
+      gap: 2rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .hero-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .hero-stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .hero-stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .casos-container {
+      padding: 2rem max(2rem, calc((100% - 1200px) / 2 + 2rem));
+    }
+    .casos-loading {
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 2rem 0;
+    }
+    .casos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .caso-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: border-color 0.15s;
+    }
+    .caso-card:hover {
+      border-color: #3f3f46;
+    }
+
+    .caso-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .caso-card-badges {
+      display: flex;
+      gap: 0.4rem;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .caso-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.4;
+    }
+
+    .caso-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .caso-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .caso-meta-row strong {
+      color: var(--text);
+    }
+    .caso-meta-row .valor {
+      color: #f97316;
+      font-weight: 600;
+    }
+    .caso-cnpj {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #52525b;
+    }
+
+    .caso-resumo {
+      font-size: 0.85rem;
+      color: #a1a1aa;
+      line-height: 1.6;
+    }
+
+    .caso-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .btn-ver-detalhes {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 0.9rem;
+      background: #18181b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-ver-detalhes:hover {
+      background: #27272a;
+      border-color: #3f3f46;
+    }
+    .btn-ver-detalhes:disabled,
+    .btn-ver-detalhes.disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .badge-red    { background: rgba(239,68,68,.15);  color: #ef4444; }
+    .badge-orange { background: rgba(249,115,22,.15); color: #f97316; }
+    .badge-yellow { background: rgba(234,179,8,.15);  color: #eab308; }
+    .badge-blue   { background: rgba(59,130,246,.15); color: #3b82f6; }
+    .badge-purple { background: rgba(168,85,247,.15); color: #a855f7; }
+    .badge-green  { background: rgba(34,197,94,.15);  color: #22c55e; }
+    .badge-gray   { background: rgba(113,113,122,.15); color: #71717a; }
+
+    /* Header nav links */
+    .header-nav-links {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .header-nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .header-nav-links a:hover {
+      color: var(--text);
+      background: #18181b;
+    }
+    .header-nav-links a.active {
+      color: var(--text);
+    }
+
+    .aviso-beta {
+      margin: 0 max(2rem, calc((100% - 1200px) / 2 + 2rem));
+      margin-top: 1.5rem;
+      padding: 0.75rem 1rem;
+      background: rgba(234,179,8,.08);
+      border: 1px solid rgba(234,179,8,.25);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: #a16207;
+    }
+
+    @media (max-width: 640px) {
+      .casos-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero-stats {
+        gap: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1>Sentinela RJ</h1>
+      <p class="subtitle">Monitoramento independente de contratos públicos municipais</p>
+    </div>
+    <nav class="header-nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/casos" class="active">Casos</a>
+    </nav>
+  </header>
+
+  <div class="casos-hero">
+    <h2>Casos Investigados</h2>
+    <p>Contratos com anomalias detectadas pelo Sentinela RJ e submetidos a análise aprofundada. Todos os dados são públicos e provenientes do PNCP.</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="stat-contratos">{{ "{:,}".format(total_contratos).replace(",", ".") }}</span>
+        <span class="hero-stat-label">Contratos monitorados</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="stat-valor">R$ {{ "%.1f" % (valor_total / 1e9) }}bi</span>
+        <span class="hero-stat-label">Valor total monitorado</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="stat-casos">—</span>
+        <span class="hero-stat-label">Casos documentados</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="aviso-beta">
+    Esta página está em construção. Os casos exibidos são baseados no Relatório #01 do Sentinela RJ e serão atualizados conforme novas análises forem concluídas.
+  </div>
+
+  <div class="casos-container">
+    <div id="casos-grid" class="casos-grid">
+      <p class="casos-loading">Carregando casos…</p>
+    </div>
+  </div>
+
+  <script>
+    const TIPO_LABELS = {
+      outlier_valor: 'Outlier de Valor',
+      concentracao_fornecedor: 'Concentração',
+      sem_licitacao_inexigibilidade: 'Inexigibilidade',
+      sem_licitacao_emergencia: 'Emergência',
+      sem_licitacao_dispensa: 'Dispensa',
+      fracionamento: 'Fracionamento',
+      fracionamento_empenhos: 'Frac. Empenhos',
+      asfalto_fatiado: 'Asfalto Fatiado',
+      evolucao_temporal_fornecedor: 'Aceleração',
+      socios_compartilhados: 'Sócios Comuns',
+    };
+
+    const TIPO_BADGE = {
+      outlier_valor: 'blue',
+      concentracao_fornecedor: 'blue',
+      sem_licitacao_inexigibilidade: 'orange',
+      sem_licitacao_emergencia: 'red',
+      sem_licitacao_dispensa: 'yellow',
+      fracionamento: 'purple',
+      fracionamento_empenhos: 'purple',
+      asfalto_fatiado: 'orange',
+      evolucao_temporal_fornecedor: 'yellow',
+      socios_compartilhados: 'purple',
+    };
+
+    const STATUS_LABEL = {
+      suspenso: { label: 'Suspenso', color: 'red', dot: '🔴' },
+      investigando: { label: 'Investigando', color: 'orange', dot: '🟠' },
+      ativo: { label: 'Ativo', color: 'yellow', dot: '🟡' },
+    };
+
+    function formatValor(v) {
+      if (!v) return '—';
+      if (v >= 1e9) return `R$ ${(v / 1e9).toFixed(1).replace('.', ',')}bi`;
+      if (v >= 1e6) return `R$ ${(v / 1e6).toFixed(1).replace('.', ',')}mi`;
+      return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+    }
+
+    function formatCnpj(s) {
+      if (!s || s.length !== 14) return s || '';
+      return `${s.slice(0,2)}.${s.slice(2,5)}.${s.slice(5,8)}/${s.slice(8,12)}-${s.slice(12)}`;
+    }
+
+    function renderBadge(cls, text) {
+      return `<span class="badge badge-${cls}">${text}</span>`;
+    }
+
+    function renderCard(caso) {
+      const st = STATUS_LABEL[caso.status] || { label: caso.status, color: 'gray', dot: '⚪' };
+      const tipoCls  = TIPO_BADGE[caso.tipo_anomalia] || 'gray';
+      const tipoLabel = TIPO_LABELS[caso.tipo_anomalia] || caso.tipo_anomalia || '';
+      const valor = formatValor(caso.valor);
+      const cnpj = formatCnpj(caso.fornecedor_cnpj);
+      const temFornecedor = caso.fornecedor_cnpj && caso.fornecedor_cnpj.length === 14;
+      const linkBtn = temFornecedor
+        ? `<a href="/fornecedor/${caso.fornecedor_cnpj}" class="btn-ver-detalhes">Ver detalhes →</a>`
+        : `<span class="btn-ver-detalhes disabled">Ver detalhes →</span>`;
+
+      return `
+        <article class="caso-card">
+          <div class="caso-card-top">
+            <h3>${caso.titulo}</h3>
+            <div class="caso-card-badges">
+              ${renderBadge(`badge-${st.color}`, `${st.dot} ${st.label}`)}
+              ${tipoLabel ? renderBadge(tipoCls, tipoLabel) : ''}
+            </div>
+          </div>
+          <div class="caso-meta">
+            ${caso.fornecedor_nome ? `
+            <div class="caso-meta-row">
+              <span>Empresa:</span>
+              <strong>${caso.fornecedor_nome}</strong>
+            </div>` : ''}
+            ${cnpj ? `
+            <div class="caso-meta-row">
+              <span>CNPJ:</span>
+              <span class="caso-cnpj">${cnpj}</span>
+            </div>` : ''}
+            ${caso.valor ? `
+            <div class="caso-meta-row">
+              <span>Valor:</span>
+              <span class="valor">${valor}</span>
+            </div>` : ''}
+          </div>
+          ${caso.resumo ? `<p class="caso-resumo">${caso.resumo}</p>` : ''}
+          <div class="caso-footer">
+            ${linkBtn}
+          </div>
+        </article>
+      `;
+    }
+
+    async function carregarCasos() {
+      const grid = document.getElementById('casos-grid');
+      try {
+        const res = await fetch('/api/casos');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const casos = await res.json();
+        document.getElementById('stat-casos').textContent = casos.length;
+        if (!casos.length) {
+          grid.innerHTML = '<p class="casos-loading">Nenhum caso documentado ainda.</p>';
+          return;
+        }
+        grid.innerHTML = casos.map(renderCard).join('');
+      } catch (e) {
+        grid.innerHTML = `<p class="casos-loading">Erro ao carregar casos: ${e.message}</p>`;
+      }
+    }
+
+    carregarCasos();
+  </script>
+</body>
+</html>

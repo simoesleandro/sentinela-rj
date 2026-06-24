@@ -1992,6 +1992,203 @@ def regras_alerta_detail(regra_id: int):
 
 
 # ---------------------------------------------------------------------------
+# Casos investigados — página pública + admin CRUD
+# ---------------------------------------------------------------------------
+
+_CASOS_SEED = [
+    {
+        "titulo": "MJRE Construtora — Suspensão Judicial",
+        "fornecedor_nome": "MJRE Construtora Ltda",
+        "fornecedor_cnpj": "05851921000181",
+        "valor": 315_900_000.0,
+        "tipo_anomalia": "asfalto_fatiado",
+        "status": "suspenso",
+        "resumo": (
+            "Contrato de R$ 315,9 milhões para recapeamento asfáltico suspenso judicialmente "
+            "após identificação de sobreposição geográfica com outros contratos do mesmo grupo "
+            "econômico. Empresa integra o padrão Asfalto Fatiado com Hydra e Metropolitana, "
+            "cobrindo conjuntamente R$ 582 mi em obras de pavimentação nas cinco APs do Rio."
+        ),
+        "ordem": 1,
+    },
+    {
+        "titulo": "Bonus Track — Inexigibilidade Shows Copacabana",
+        "fornecedor_nome": "Bonus Track Produções Ltda",
+        "fornecedor_cnpj": "07072702000120",
+        "valor": 45_000_000.0,
+        "tipo_anomalia": "sem_licitacao_inexigibilidade",
+        "status": "investigando",
+        "resumo": (
+            "Contratação direta por inexigibilidade de R$ 45 milhões para produção de shows "
+            "em Copacabana sem processo licitatório. A inexigibilidade foi justificada como "
+            "fornecedor exclusivo, porém o mercado de entretenimento possui múltiplos "
+            "competidores habilitados. Caso encaminhado ao TCM-RJ para análise."
+        ),
+        "ordem": 2,
+    },
+    {
+        "titulo": "Construtora Entre os Rios — Concentração Atípica",
+        "fornecedor_nome": "Construtora Entre os Rios Ltda",
+        "fornecedor_cnpj": "30307631000119",
+        "valor": 86_500_000.0,
+        "tipo_anomalia": "concentracao_fornecedor",
+        "status": "investigando",
+        "resumo": (
+            "Fornecedor concentra R$ 86,5 milhões em contratos com um único órgão municipal "
+            "nos últimos 24 meses, representando mais de 40% do total contratado pela unidade. "
+            "Padrão de concentração atípica combinado com sócios em comum com outro fornecedor "
+            "da mesma secretaria eleva o risco de direcionamento."
+        ),
+        "ordem": 3,
+    },
+    {
+        "titulo": "Padrão Asfalto Fatiado — R$ 582mi em Pavimentação",
+        "fornecedor_nome": "Múltiplos fornecedores (MJRE, Hydra, Metropolitana, Santa Luzia)",
+        "fornecedor_cnpj": None,
+        "valor": 582_000_000.0,
+        "tipo_anomalia": "asfalto_fatiado",
+        "status": "investigando",
+        "resumo": (
+            "Cinco empresas distintas dividiram R$ 582 milhões em contratos de recapeamento "
+            "asfáltico distribuídos pelas cinco Áreas de Planejamento (AP1-AP5) do Rio de "
+            "Janeiro. O padrão é consistente com fracionamento geográfico para evitar "
+            "concorrência pública única: individualmente, cada contrato fica abaixo dos "
+            "limiares de licitação, mas o conjunto configuraria obra de grande vulto."
+        ),
+        "ordem": 4,
+    },
+]
+
+
+def _seed_casos(db: sqlite3.Connection) -> None:
+    """Insere os casos iniciais se a tabela estiver vazia."""
+    n = db.execute("SELECT COUNT(*) FROM casos").fetchone()[0]
+    if n > 0:
+        return
+    for c in _CASOS_SEED:
+        db.execute(
+            """INSERT INTO casos (titulo, fornecedor_nome, fornecedor_cnpj, valor,
+               tipo_anomalia, status, resumo, ordem)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (c["titulo"], c["fornecedor_nome"], c["fornecedor_cnpj"], c["valor"],
+             c["tipo_anomalia"], c["status"], c["resumo"], c["ordem"]),
+        )
+    db.commit()
+
+
+@app.route("/casos")
+def casos_page():
+    db = get_db()
+    try:
+        _seed_casos(db)
+        stats_row = db.execute(
+            "SELECT COUNT(*), COALESCE(SUM(valor_global),0) FROM contratos WHERE valor_global > 0"
+        ).fetchone()
+        return render_template(
+            "casos.html",
+            total_contratos=stats_row[0],
+            valor_total=stats_row[1],
+        )
+    finally:
+        db.close()
+
+
+@app.route("/admin/casos")
+def admin_casos_page():
+    return render_template("admin_casos.html")
+
+
+@app.route("/api/casos", methods=["GET"])
+def api_casos_list():
+    db = get_db()
+    try:
+        _seed_casos(db)
+        rows = db.execute(
+            "SELECT * FROM casos ORDER BY ordem ASC, id ASC"
+        ).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        db.close()
+
+
+@app.route("/api/casos", methods=["POST"])
+def api_casos_create():
+    data = request.get_json(force=True)
+    required = ("titulo", "status")
+    for field_name in required:
+        if not data.get(field_name):
+            return jsonify({"error": f"Campo obrigatório: {field_name}"}), 422
+    db = get_db()
+    try:
+        cur = db.execute(
+            """INSERT INTO casos (titulo, fornecedor_nome, fornecedor_cnpj, valor,
+               tipo_anomalia, status, resumo, ordem)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (
+                data["titulo"],
+                data.get("fornecedor_nome"),
+                data.get("fornecedor_cnpj", "").replace(".", "").replace("/", "").replace("-", "") or None,
+                data.get("valor"),
+                data.get("tipo_anomalia"),
+                data["status"],
+                data.get("resumo"),
+                int(data.get("ordem", 0)),
+            ),
+        )
+        db.commit()
+        row = db.execute("SELECT * FROM casos WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return jsonify(dict(row)), 201
+    except sqlite3.IntegrityError as e:
+        return jsonify({"error": str(e)}), 422
+    finally:
+        db.close()
+
+
+@app.route("/api/casos/<int:caso_id>", methods=["PATCH"])
+def api_casos_update(caso_id: int):
+    data = request.get_json(force=True)
+    db = get_db()
+    try:
+        row = db.execute("SELECT id FROM casos WHERE id = ?", (caso_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "Caso não encontrado"}), 404
+        fields = ["titulo", "fornecedor_nome", "fornecedor_cnpj", "valor",
+                  "tipo_anomalia", "status", "resumo", "ordem"]
+        sets, vals = [], []
+        for f in fields:
+            if f in data:
+                v = data[f]
+                if f == "fornecedor_cnpj" and v:
+                    v = str(v).replace(".", "").replace("/", "").replace("-", "") or None
+                sets.append(f"{f} = ?")
+                vals.append(v)
+        if not sets:
+            return jsonify({"error": "Nenhum campo para atualizar"}), 422
+        sets.append("atualizado_em = datetime('now')")
+        vals.append(caso_id)
+        db.execute(f"UPDATE casos SET {', '.join(sets)} WHERE id = ?", vals)
+        db.commit()
+        updated = db.execute("SELECT * FROM casos WHERE id = ?", (caso_id,)).fetchone()
+        return jsonify(dict(updated))
+    finally:
+        db.close()
+
+
+@app.route("/api/casos/<int:caso_id>", methods=["DELETE"])
+def api_casos_delete(caso_id: int):
+    db = get_db()
+    try:
+        row = db.execute("SELECT id FROM casos WHERE id = ?", (caso_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "Caso não encontrado"}), 404
+        db.execute("DELETE FROM casos WHERE id = ?", (caso_id,))
+        db.commit()
+        return jsonify({"ok": True})
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

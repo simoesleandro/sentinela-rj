@@ -100,6 +100,34 @@ _MIGRACOES_DDL = [
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_investigacoes_alerta ON investigacoes(alerta_id)",
+    """
+    CREATE TABLE IF NOT EXISTS casos (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo          TEXT NOT NULL,
+        fornecedor_nome TEXT,
+        fornecedor_cnpj TEXT,
+        valor           REAL,
+        tipo_anomalia   TEXT,
+        status          TEXT NOT NULL DEFAULT 'ativo'
+                            CHECK (status IN ('ativo', 'investigando', 'suspenso')),
+        resumo          TEXT,
+        ordem           INTEGER NOT NULL DEFAULT 0,
+        criado_em       TEXT DEFAULT (datetime('now')),
+        atualizado_em   TEXT DEFAULT (datetime('now'))
+    )
+    """,
+]
+
+_MIGRACOES_CASOS_CNPJ = [
+    ("UPDATE casos SET fornecedor_cnpj = '05851921000181' "
+     "WHERE fornecedor_cnpj IN ('12345678000190') "
+     "OR (fornecedor_cnpj IS NULL AND titulo LIKE '%MJRE%')"),
+    ("UPDATE casos SET fornecedor_cnpj = '07072702000120' "
+     "WHERE fornecedor_cnpj IN ('98765432000155') "
+     "OR (fornecedor_cnpj IS NULL AND titulo LIKE '%Bonus Track%')"),
+    ("UPDATE casos SET fornecedor_cnpj = '30307631000119' "
+     "WHERE fornecedor_cnpj IN ('11223344000177') "
+     "OR (fornecedor_cnpj IS NULL AND titulo LIKE '%Entre os Rios%')"),
 ]
 
 _MIGRACOES_COLUNAS = [
@@ -120,6 +148,11 @@ def aplicar_migracoes(conn: sqlite3.Connection) -> None:
     for stmt in _MIGRACOES_DDL:
         conn.execute(stmt)
     for stmt in _MIGRACOES_COLUNAS:
+        try:
+            conn.execute(stmt)
+        except sqlite3.OperationalError:
+            pass
+    for stmt in _MIGRACOES_CASOS_CNPJ:
         try:
             conn.execute(stmt)
         except sqlite3.OperationalError:

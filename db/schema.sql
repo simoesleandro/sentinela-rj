@@ -196,6 +196,21 @@ CREATE TABLE IF NOT EXISTS transparencia_rj_cruzamentos (
     UNIQUE(numero_controle_pncp, lancamento_id)
 );
 
+CREATE TABLE IF NOT EXISTS casos (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo          TEXT NOT NULL,
+    fornecedor_nome TEXT,
+    fornecedor_cnpj TEXT,
+    valor           REAL,
+    tipo_anomalia   TEXT,
+    status          TEXT NOT NULL DEFAULT 'ativo'
+                        CHECK (status IN ('ativo', 'investigando', 'suspenso')),
+    resumo          TEXT,
+    ordem           INTEGER NOT NULL DEFAULT 0,
+    criado_em       TEXT DEFAULT (datetime('now')),
+    atualizado_em   TEXT DEFAULT (datetime('now'))
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_sancoes_fornecedor    ON fornecedor_sancoes(fornecedor_ni);
 CREATE INDEX IF NOT EXISTS idx_contratos_fornecedor  ON contratos(fornecedor_ni);

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Casos Investigados · Sentinela RJ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=20260624">
+  <style>
+    .admin-wrap {
+      padding: 2rem max(2rem, calc((100% - 900px) / 2 + 2rem));
+    }
+    .admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.75rem;
+    }
+    .admin-header h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .admin-header p {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    /* Form card */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .form-card h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem;
+    }
+    .form-col-full { grid-column: 1 / -1; }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .form-group label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      background: #18181b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 0.5rem 0.7rem;
+      font-size: 0.85rem;
+      font-family: inherit;
+      width: 100%;
+      resize: vertical;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 2px rgba(99,102,241,.15);
+    }
+    .form-group textarea { min-height: 90px; }
+
+    .form-actions {
+      display: flex;
+      gap: 0.65rem;
+      margin-top: 1rem;
+      align-items: center;
+    }
+    .btn-primary {
+      padding: 0.5rem 1.1rem;
+      background: #6366f1;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.83rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-secondary {
+      padding: 0.5rem 1rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.83rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-secondary:hover { color: var(--text); border-color: #3f3f46; }
+    .form-msg {
+      font-size: 0.8rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 5px;
+    }
+    .form-msg.ok { background: rgba(34,197,94,.12); color: #22c55e; }
+    .form-msg.err { background: rgba(239,68,68,.12); color: #ef4444; }
+
+    /* Table */
+    .casos-table-wrap { overflow-x: auto; }
+    .casos-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+    }
+    .casos-table th {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+    .casos-table td {
+      padding: 0.7rem 0.75rem;
+      border-bottom: 1px solid #1c1c1e;
+      vertical-align: top;
+    }
+    .casos-table tr:hover td { background: #18181b; }
+    .casos-table .titulo-cell { max-width: 260px; }
+    .casos-table .resumo-cell {
+      max-width: 300px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-red    { background: rgba(239,68,68,.15);  color: #ef4444; }
+    .badge-orange { background: rgba(249,115,22,.15); color: #f97316; }
+    .badge-yellow { background: rgba(234,179,8,.15);  color: #eab308; }
+    .badge-blue   { background: rgba(59,130,246,.15); color: #3b82f6; }
+    .badge-purple { background: rgba(168,85,247,.15); color: #a855f7; }
+    .badge-gray   { background: rgba(113,113,122,.15); color: #71717a; }
+
+    .actions-cell {
+      display: flex;
+      gap: 0.4rem;
+    }
+    .btn-edit, .btn-del {
+      padding: 0.3rem 0.65rem;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      transition: background 0.1s;
+    }
+    .btn-edit { color: #a1a1aa; }
+    .btn-edit:hover { background: #27272a; color: var(--text); }
+    .btn-del  { color: #ef4444; border-color: rgba(239,68,68,.3); }
+    .btn-del:hover { background: rgba(239,68,68,.1); }
+
+    .empty-row td { color: var(--muted); text-align: center; padding: 2rem; }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      margin-bottom: 1.25rem;
+      padding: 0.3rem 0;
+    }
+    .back-link:hover { color: var(--text); }
+
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-col-full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1>Sentinela RJ</h1>
+      <p class="subtitle">Admin — Casos Investigados</p>
+    </div>
+    <a href="/casos" style="color:var(--muted);text-decoration:none;font-size:0.82rem;">← Ver página pública</a>
+  </header>
+
+  <div class="admin-wrap">
+    <a href="/casos" class="back-link">← Voltar para Casos</a>
+
+    <div class="admin-header">
+      <div>
+        <h2 id="form-title">Adicionar Caso</h2>
+        <p id="form-subtitle">Preencha os campos e clique em Salvar.</p>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="form-card">
+      <h3 id="form-heading">Novo caso</h3>
+      <input type="hidden" id="editing-id" value="">
+      <div class="form-grid">
+        <div class="form-group form-col-full">
+          <label for="f-titulo">Título *</label>
+          <input id="f-titulo" type="text" placeholder="Ex: MJRE Construtora — Suspensão Judicial">
+        </div>
+        <div class="form-group">
+          <label for="f-fornecedor-nome">Nome do fornecedor</label>
+          <input id="f-fornecedor-nome" type="text" placeholder="Razão social">
+        </div>
+        <div class="form-group">
+          <label for="f-fornecedor-cnpj">CNPJ (só números)</label>
+          <input id="f-fornecedor-cnpj" type="text" placeholder="00000000000000" maxlength="18">
+        </div>
+        <div class="form-group">
+          <label for="f-valor">Valor (R$)</label>
+          <input id="f-valor" type="number" min="0" step="1000" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label for="f-tipo">Tipo de anomalia</label>
+          <select id="f-tipo">
+            <option value="">— nenhum —</option>
+            <option value="asfalto_fatiado">Asfalto Fatiado</option>
+            <option value="concentracao_fornecedor">Concentração de Fornecedor</option>
+            <option value="sem_licitacao_inexigibilidade">Inexigibilidade</option>
+            <option value="sem_licitacao_emergencia">Emergência</option>
+            <option value="sem_licitacao_dispensa">Dispensa</option>
+            <option value="fracionamento">Fracionamento</option>
+            <option value="fracionamento_empenhos">Frac. Empenhos</option>
+            <option value="outlier_valor">Outlier de Valor</option>
+            <option value="socios_compartilhados">Sócios Compartilhados</option>
+            <option value="evolucao_temporal_fornecedor">Aceleração Contratual</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="f-status">Status *</label>
+          <select id="f-status">
+            <option value="ativo">🟡 Ativo</option>
+            <option value="investigando">🟠 Investigando</option>
+            <option value="suspenso">🔴 Suspenso</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="f-ordem">Ordem de exibição</label>
+          <input id="f-ordem" type="number" min="0" step="1" value="0">
+        </div>
+        <div class="form-group form-col-full">
+          <label for="f-resumo">Resumo</label>
+          <textarea id="f-resumo" placeholder="Descrição em 2-4 frases do caso, evidências e riscos identificados."></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" id="btn-salvar" onclick="salvar()">Salvar caso</button>
+        <button class="btn-secondary" id="btn-cancelar" style="display:none" onclick="cancelarEdicao()">Cancelar edição</button>
+        <span id="form-msg" class="form-msg" style="display:none"></span>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="casos-table-wrap">
+      <table class="casos-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Título</th>
+            <th>Fornecedor</th>
+            <th>Valor</th>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Resumo</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="casos-tbody">
+          <tr class="empty-row"><td colspan="8">Carregando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const TIPO_LABELS = {
+      outlier_valor: 'Outlier',
+      concentracao_fornecedor: 'Concentração',
+      sem_licitacao_inexigibilidade: 'Inexigibilidade',
+      sem_licitacao_emergencia: 'Emergência',
+      sem_licitacao_dispensa: 'Dispensa',
+      fracionamento: 'Fracionamento',
+      fracionamento_empenhos: 'Frac. Empenhos',
+      asfalto_fatiado: 'Asfalto Fatiado',
+      evolucao_temporal_fornecedor: 'Aceleração',
+      socios_compartilhados: 'Sócios Comuns',
+    };
+    const TIPO_BADGE = {
+      outlier_valor: 'blue', concentracao_fornecedor: 'blue',
+      sem_licitacao_inexigibilidade: 'orange', sem_licitacao_emergencia: 'red',
+      sem_licitacao_dispensa: 'yellow', fracionamento: 'purple',
+      fracionamento_empenhos: 'purple', asfalto_fatiado: 'orange',
+      evolucao_temporal_fornecedor: 'yellow', socios_compartilhados: 'purple',
+    };
+    const STATUS_BADGE = {
+      suspenso: { cls: 'red', dot: '🔴', label: 'Suspenso' },
+      investigando: { cls: 'orange', dot: '🟠', label: 'Investigando' },
+      ativo: { cls: 'yellow', dot: '🟡', label: 'Ativo' },
+    };
+
+    function fmt(v) {
+      if (!v) return '—';
+      if (v >= 1e9) return `R$ ${(v/1e9).toFixed(1).replace('.', ',')}bi`;
+      if (v >= 1e6) return `R$ ${(v/1e6).toFixed(1).replace('.', ',')}mi`;
+      return `R$ ${v.toLocaleString('pt-BR')}`;
+    }
+
+    let todosOsCasos = [];
+
+    async function carregarCasos() {
+      const tbody = document.getElementById('casos-tbody');
+      try {
+        const res = await fetch('/api/casos');
+        todosOsCasos = await res.json();
+        renderTabela();
+      } catch (e) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="8">Erro: ${e.message}</td></tr>`;
+      }
+    }
+
+    function renderTabela() {
+      const tbody = document.getElementById('casos-tbody');
+      if (!todosOsCasos.length) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Nenhum caso cadastrado.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = todosOsCasos.map(c => {
+        const st = STATUS_BADGE[c.status] || { cls: 'gray', dot: '⚪', label: c.status };
+        const tipoCls = TIPO_BADGE[c.tipo_anomalia] || 'gray';
+        const tipoLbl = TIPO_LABELS[c.tipo_anomalia] || c.tipo_anomalia || '—';
+        return `
+          <tr>
+            <td style="color:var(--muted)">${c.ordem}</td>
+            <td class="titulo-cell"><strong>${c.titulo}</strong></td>
+            <td style="font-size:0.78rem">${c.fornecedor_nome || '—'}</td>
+            <td style="color:#f97316;white-space:nowrap">${fmt(c.valor)}</td>
+            <td><span class="badge badge-${tipoCls}">${tipoLbl}</span></td>
+            <td><span class="badge badge-${st.cls}">${st.dot} ${st.label}</span></td>
+            <td class="resumo-cell" title="${(c.resumo || '').replace(/"/g, '&quot;')}">${c.resumo || '—'}</td>
+            <td>
+              <div class="actions-cell">
+                <button class="btn-edit" onclick="editarCaso(${c.id})">Editar</button>
+                <button class="btn-del" onclick="deletarCaso(${c.id})">Remover</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function showMsg(text, type) {
+      const el = document.getElementById('form-msg');
+      el.textContent = text;
+      el.className = `form-msg ${type}`;
+      el.style.display = '';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+
+    function limparForm() {
+      document.getElementById('editing-id').value = '';
+      document.getElementById('f-titulo').value = '';
+      document.getElementById('f-fornecedor-nome').value = '';
+      document.getElementById('f-fornecedor-cnpj').value = '';
+      document.getElementById('f-valor').value = '';
+      document.getElementById('f-tipo').value = '';
+      document.getElementById('f-status').value = 'ativo';
+      document.getElementById('f-ordem').value = '0';
+      document.getElementById('f-resumo').value = '';
+    }
+
+    function cancelarEdicao() {
+      limparForm();
+      document.getElementById('form-heading').textContent = 'Novo caso';
+      document.getElementById('btn-salvar').textContent = 'Salvar caso';
+      document.getElementById('btn-cancelar').style.display = 'none';
+    }
+
+    function editarCaso(id) {
+      const c = todosOsCasos.find(x => x.id === id);
+      if (!c) return;
+      document.getElementById('editing-id').value = id;
+      document.getElementById('f-titulo').value = c.titulo || '';
+      document.getElementById('f-fornecedor-nome').value = c.fornecedor_nome || '';
+      document.getElementById('f-fornecedor-cnpj').value = c.fornecedor_cnpj || '';
+      document.getElementById('f-valor').value = c.valor || '';
+      document.getElementById('f-tipo').value = c.tipo_anomalia || '';
+      document.getElementById('f-status').value = c.status || 'ativo';
+      document.getElementById('f-ordem').value = c.ordem ?? 0;
+      document.getElementById('f-resumo').value = c.resumo || '';
+      document.getElementById('form-heading').textContent = `Editando: ${c.titulo}`;
+      document.getElementById('btn-salvar').textContent = 'Atualizar caso';
+      document.getElementById('btn-cancelar').style.display = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function salvar() {
+      const titulo = document.getElementById('f-titulo').value.trim();
+      const status = document.getElementById('f-status').value;
+      if (!titulo) { showMsg('Título é obrigatório.', 'err'); return; }
+
+      const payload = {
+        titulo,
+        fornecedor_nome: document.getElementById('f-fornecedor-nome').value.trim() || null,
+        fornecedor_cnpj: document.getElementById('f-fornecedor-cnpj').value.replace(/\D/g, '') || null,
+        valor: parseFloat(document.getElementById('f-valor').value) || null,
+        tipo_anomalia: document.getElementById('f-tipo').value || null,
+        status,
+        ordem: parseInt(document.getElementById('f-ordem').value) || 0,
+        resumo: document.getElementById('f-resumo').value.trim() || null,
+      };
+
+      const editId = document.getElementById('editing-id').value;
+      const url = editId ? `/api/casos/${editId}` : '/api/casos';
+      const method = editId ? 'PATCH' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        showMsg(editId ? 'Caso atualizado.' : 'Caso adicionado.', 'ok');
+        cancelarEdicao();
+        await carregarCasos();
+      } catch (e) {
+        showMsg(`Erro: ${e.message}`, 'err');
+      }
+    }
+
+    async function deletarCaso(id) {
+      const c = todosOsCasos.find(x => x.id === id);
+      if (!confirm(`Remover o caso "${c?.titulo}"? Esta ação não pode ser desfeita.`)) return;
+      try {
+        const res = await fetch(`/api/casos/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showMsg('Caso removido.', 'ok');
+        await carregarCasos();
+      } catch (e) {
+        showMsg(`Erro: ${e.message}`, 'err');
+      }
+    }
+
+    carregarCasos();
+  </script>
+</body>
+</html>
