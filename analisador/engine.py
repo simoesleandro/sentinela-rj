@@ -33,6 +33,7 @@ class AnomaliaResult:
 
 def _carregar_detectores() -> _Detectores:
     from analisador import (
+        asfalto_fatiado,
         concentracao,
         evolucao_temporal,
         fracionamento,
@@ -50,6 +51,7 @@ def _carregar_detectores() -> _Detectores:
         ("licitacao", licitacao.detectar),
         ("fracionamento", fracionamento.detectar),
         ("fracionamento_empenhos", fracionamento_empenhos.detectar),
+        ("asfalto_fatiado", asfalto_fatiado.detectar),
         ("sancoes", sancoes.detectar),
         ("socios", socios.detectar),
     ]
