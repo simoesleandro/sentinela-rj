@@ -35,6 +35,7 @@ def _carregar_detectores() -> _Detectores:
     from analisador import (
         asfalto_fatiado,
         concentracao,
+        empenhos_risk,
         evolucao_temporal,
         fracionamento,
         fracionamento_empenhos,
@@ -52,6 +53,7 @@ def _carregar_detectores() -> _Detectores:
         ("fracionamento", fracionamento.detectar),
         ("fracionamento_empenhos", fracionamento_empenhos.detectar),
         ("asfalto_fatiado", asfalto_fatiado.detectar),
+        ("empenhos_risk", empenhos_risk.detectar),
         ("sancoes", sancoes.detectar),
         ("socios", socios.detectar),
     ]
