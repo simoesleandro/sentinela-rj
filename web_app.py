@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, request, render_template, Response
+from flask import Flask, jsonify, request, render_template, Response, redirect
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -48,9 +48,13 @@ def get_db() -> sqlite3.Connection:
 def dashboard():
     return render_template('index.html')
 
-@app.route('/fornecedor/<fornecedor_ni>')
+@app.route('/fornecedor/<path:fornecedor_ni>')
 def fornecedor_page(fornecedor_ni: str):
-    return render_template('fornecedor.html', ni=fornecedor_ni)
+    # aceita CNPJ formatado (42.498.733/0001-90) e redireciona para forma canônica
+    ni = fornecedor_ni.replace('.', '').replace('/', '').replace('-', '')
+    if ni != fornecedor_ni:
+        return redirect(f'/fornecedor/{ni}', 301)
+    return render_template('fornecedor.html', ni=ni)
 
 @app.after_request
 def add_cors(response):
@@ -1298,6 +1302,14 @@ def fornecedor_dossie(fornecedor_ni: str):
         ).fetchall()
         anomalias = [dict(r) for r in anomalias_rows]
 
+        alertas_abertos = db.execute(
+            """SELECT COUNT(*) FROM alertas a
+               JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
+               WHERE c.fornecedor_ni = ?
+                 AND COALESCE(a.status, 'aberto') IN ('aberto', 'investigando')""",
+            (fornecedor_ni,),
+        ).fetchone()[0]
+
         severidades = [a["severidade"] for a in anomalias]
         tipos_a = [a["tipo"] for a in anomalias]
         risk_score = _calcular_score(len(anomalias), valor_total, severidades, tipos_a)
@@ -1409,6 +1421,7 @@ def fornecedor_dossie(fornecedor_ni: str):
                 "total_contratos": total_contratos,
                 "valor_total": valor_total,
                 "valor_medio": valor_medio,
+                "alertas_abertos": alertas_abertos,
                 "primeiro_contrato": min(datas) if datas else None,
                 "ultimo_contrato": max(datas) if datas else None,
                 "risk_score": risk_score,

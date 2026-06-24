@@ -291,7 +291,8 @@
       sem_licitacao_inexigibilidade: 'Inexigibilidade',
       sem_licitacao_emergencia: 'Emergência',
       sem_licitacao_dispensa: 'Dispensa',
-      fracionamento_ap: 'Fracionamento',
+      fracionamento_ap: 'Fracionamento AP',
+      asfalto_fatiado: 'Asfalto Fatiado',
     };
 
     const TIPO_BADGE_CLASS = {
@@ -301,6 +302,7 @@
       sem_licitacao_emergencia: 'yellow',
       sem_licitacao_dispensa: 'blue',
       fracionamento_ap: 'green',
+      asfalto_fatiado: 'orange',
     };
 
     const TIPO_TOOLTIPS = {
@@ -310,6 +312,7 @@
       sem_licitacao_emergencia: 'Contrato emergencial sem licitação. Emergências reais existem, mas o uso excessivo é suspeito.',
       sem_licitacao_dispensa: 'Contrato dispensado de licitação por valor baixo ou outras condições legais.',
       fracionamento_ap: 'Mesmo serviço dividido entre várias empresas por região. Pode ser tentativa de driblar o limite de licitação.',
+      asfalto_fatiado: 'Múltiplas empresas distintas recebem contratos do mesmo tipo de obra para Áreas de Planejamento diferentes. Padrão clássico de fracionamento geográfico.',
     };
 
     function formatCNPJ(ni) {
@@ -411,8 +414,7 @@
         ? `<span class="badge badge-green">${escapeHtml(cadastro.descricao_situacao || 'ATIVA')}</span>`
         : `<span class="badge badge-red">⚠ ${escapeHtml(cadastro.descricao_situacao || 'INATIVA')}</span>`;
 
-      let socios = [];
-      try { socios = JSON.parse(cadastro.socios || '[]'); } catch (_) {}
+      const socios = Array.isArray(cadastro.socios) ? cadastro.socios : [];
       const sociosHtml = socios.length
         ? socios.map(s => `<li style="font-size:0.8rem;color:#d4d4d4;margin-bottom:2px">${escapeHtml(s.nome_socio || s.nome || '—')} <span style="color:var(--muted);font-size:0.75rem">${escapeHtml(s.qualificacao_socio || '')}</span></li>`).join('')
         : '<li style="color:var(--muted);font-size:0.8rem">Não informado</li>';
@@ -466,6 +468,8 @@
     }
 
     function renderResumo(r) {
+      const alertasAbertos = r.alertas_abertos || 0;
+      const alertasColor = alertasAbertos > 0 ? 'var(--red)' : 'var(--muted)';
       document.getElementById('forn-resumo').innerHTML = `
         <div class="kpi-card">
           <div class="kpi-value">${(r.total_contratos || 0).toLocaleString('pt-BR')}</div>
@@ -474,6 +478,10 @@
         <div class="kpi-card highlight">
           <div class="kpi-value" style="font-size:1.75rem">${formatCurrency(r.valor_total)}</div>
           <div class="kpi-label">Valor Total</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" style="color:${alertasColor}">${alertasAbertos.toLocaleString('pt-BR')}</div>
+          <div class="kpi-label">Alertas Abertos</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-value" style="font-size:1.4rem">${formatDate(r.primeiro_contrato)}</div>
