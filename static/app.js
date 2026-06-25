@@ -351,7 +351,7 @@ async function reenviarConfirmacao() {
     const res = await fetch(`${BASE}/api/auth/reenviar`, { method: 'POST' });
     const data = await res.json();
     if (data.email_enviado) {
-      alert('Link de confirmação reenviado! Verifique seu email.');
+      alert('Link de confirmação reenviado! Verifique seu email — e confira a pasta de SPAM se não chegar.');
     } else if (data.email_erro) {
       alert('Não consegui enviar o email: ' + data.email_erro);
     } else {

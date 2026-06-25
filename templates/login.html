@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Entrar — Sentinela RJ</title>
-  <link rel="stylesheet" href="/static/style.css?v=20260615">
+  <link rel="stylesheet" href="/static/style.css?v=20260625">
   <style>
     .auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
     .auth-card { width: 100%; max-width: 420px; background: #111827; border: 1px solid #1f2937;
@@ -41,6 +41,8 @@
       <div class="auth-info">
         Navegar o painel é livre. O login só é necessário para disparar
         <strong>investigações de IA ao vivo</strong>, limitadas a algumas por dia por conta.
+        Ao criar conta, você recebe um email de confirmação —
+        <strong>se não chegar em 1 min, confira o spam</strong> e marque como "não é spam".
       </div>
 
       <div class="auth-tabs">
@@ -113,7 +115,7 @@
         if (mode === 'registrar') {
           let txt = '✅ Conta criada! ';
           if (data.email_enviado) {
-            txt += `Enviamos um link de confirmação para ${body.email}. Confirme para liberar a IA.`;
+            txt += `Enviamos um link de confirmação para ${body.email} — confirme para liberar a IA. ⚠️ Se não chegar em 1 min, confira a pasta de SPAM.`;
           } else if (data.email_erro) {
             txt += `Mas houve um problema ao enviar o email (${data.email_erro}). Você pode reenviar no painel.`;
           } else {
