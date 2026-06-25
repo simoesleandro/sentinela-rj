@@ -2189,6 +2189,29 @@ def api_casos_delete(caso_id: int):
 
 
 # ---------------------------------------------------------------------------
+# Relatório PDF
+# ---------------------------------------------------------------------------
+
+@app.route("/relatorio/pdf")
+def relatorio_pdf():
+    from relatorios.pdf_export import gerar_pdf_bytes
+    db = get_db()
+    try:
+        pdf_bytes = gerar_pdf_bytes(db)
+    finally:
+        db.close()
+    hoje = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="sentinela-rj-{hoje}.pdf"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

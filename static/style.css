@@ -993,6 +993,14 @@ tr:last-child td {
   background: #333;
 }
 
+.btn-pdf {
+  background: #1e3fa0;
+}
+
+.btn-pdf:hover {
+  background: #1e40af;
+}
+
 .download-hint {
   color: #737373;
   font-size: 0.75rem;
