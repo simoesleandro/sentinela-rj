@@ -2000,14 +2000,18 @@ _CASOS_SEED = [
         "titulo": "MJRE Construtora — Suspensão Judicial",
         "fornecedor_nome": "MJRE Construtora Ltda",
         "fornecedor_cnpj": "05851921000181",
-        "valor": 315_900_000.0,
-        "tipo_anomalia": "asfalto_fatiado",
+        "valor": 315_980_953.18,
+        "tipo_anomalia": "outlier_valor",
         "status": "suspenso",
         "resumo": (
-            "Contrato de R$ 315,9 milhões para recapeamento asfáltico suspenso judicialmente "
-            "após identificação de sobreposição geográfica com outros contratos do mesmo grupo "
-            "econômico. Empresa integra o padrão Asfalto Fatiado com Hydra e Metropolitana, "
-            "cobrindo conjuntamente R$ 582 mi em obras de pavimentação nas cinco APs do Rio."
+            "Contrato de R$ 315.980.953,18 assinado em 23/03/2026 para Fresagem, Recapeamento "
+            "Asfáltico e Sinalização Horizontal nas AP1 e AP2 — Programa Asfalto Liso Fase 3. "
+            "Onze dias após a assinatura, a 3ª Vara da Fazenda Pública do TJRJ (juíza Mirela "
+            "Erbisti) suspendeu o contrato por liminar, após ação apontando que a proposta "
+            "vencedora era R$ 25 milhões mais cara do que a concorrente desclassificada. "
+            "O Sentinela identificou o valor como outlier severo: 11,4× acima do limite IQR "
+            "para a categoria Serviços de Engenharia (Z-score 8,7). Capital social da MJRE "
+            "(R$ 16,5 mi) corresponde a apenas 4,6% do volume total contratado pela empresa."
         ),
         "ordem": 1,
     },
@@ -2015,14 +2019,17 @@ _CASOS_SEED = [
         "titulo": "Bonus Track — Inexigibilidade Shows Copacabana",
         "fornecedor_nome": "Bonus Track Produções Ltda",
         "fornecedor_cnpj": "07072702000120",
-        "valor": 45_000_000.0,
+        "valor": 70_000_000.0,
         "tipo_anomalia": "sem_licitacao_inexigibilidade",
         "status": "investigando",
         "resumo": (
-            "Contratação direta por inexigibilidade de R$ 45 milhões para produção de shows "
-            "em Copacabana sem processo licitatório. A inexigibilidade foi justificada como "
-            "fornecedor exclusivo, porém o mercado de entretenimento possui múltiplos "
-            "competidores habilitados. Caso encaminhado ao TCM-RJ para análise."
+            "Três contratos consecutivos por inexigibilidade (Art. 74, Lei 14.133/2021) "
+            "somam R$ 70 milhões: Madonna em Copacabana (R$ 10 mi, abr/2024), Lady Gaga "
+            "(R$ 15 mi, abr/2025) e pacote 'Todo Mundo no Rio 2026–2028' (R$ 45 mi, abr/2026) "
+            "— três shows anuais a R$ 15 mi cada. O valor exato R$ 45.000.000,00 e a escalada "
+            "sistemática de cachês suscitam questionamento sobre a adequação da exclusividade "
+            "invocada: a Bonus Track não é produtora das artistas, apenas intermediária. "
+            "O conjunto representa padrão de captura de mercado via contratação direta."
         ),
         "ordem": 2,
     },
@@ -2030,30 +2037,36 @@ _CASOS_SEED = [
         "titulo": "Construtora Entre os Rios — Concentração Atípica",
         "fornecedor_nome": "Construtora Entre os Rios Ltda",
         "fornecedor_cnpj": "30307631000119",
-        "valor": 86_500_000.0,
+        "valor": 86_480_775.04,
         "tipo_anomalia": "concentracao_fornecedor",
         "status": "investigando",
         "resumo": (
-            "Fornecedor concentra R$ 86,5 milhões em contratos com um único órgão municipal "
-            "nos últimos 24 meses, representando mais de 40% do total contratado pela unidade. "
-            "Padrão de concentração atípica combinado com sócios em comum com outro fornecedor "
-            "da mesma secretaria eleva o risco de direcionamento."
+            "Quatro contratos com a Prefeitura do Rio em menos de 30 dias (09/03 a 08/04/2026), "
+            "todos pelo mesmo órgão contratante, totalizando R$ 86,5 milhões: grama sintética "
+            "e alambrados nas AP4/AP5 (R$ 45,9 mi), parque linear na Maré/AP3 (R$ 8,5 mi), "
+            "urbanização em Vargem Pequena/AP4 (R$ 14,9 mi) e calçadão de Campo Grande "
+            "(R$ 17,3 mi). O detector identificou concentração de 5 contratos em 90 dias "
+            "(R$ 86,7 mi). Capital social de R$ 5,5 mi cobre apenas 4,3% do volume contratado "
+            "(R$ 126,5 mi acumulados). Evolução de 1 para 4 contratos em 90 dias (×4,0)."
         ),
         "ordem": 3,
     },
     {
-        "titulo": "Padrão Asfalto Fatiado — R$ 582mi em Pavimentação",
-        "fornecedor_nome": "Múltiplos fornecedores (MJRE, Hydra, Metropolitana, Santa Luzia)",
+        "titulo": "Padrão Asfalto Fatiado — R$ 584mi em Pavimentação",
+        "fornecedor_nome": "MJRE, Hydra, Metropolitana, Santa Luzia, Matos Costa",
         "fornecedor_cnpj": None,
-        "valor": 582_000_000.0,
-        "tipo_anomalia": "asfalto_fatiado",
+        "valor": 584_271_894.23,
+        "tipo_anomalia": "fracionamento_ap",
         "status": "investigando",
         "resumo": (
-            "Cinco empresas distintas dividiram R$ 582 milhões em contratos de recapeamento "
-            "asfáltico distribuídos pelas cinco Áreas de Planejamento (AP1-AP5) do Rio de "
-            "Janeiro. O padrão é consistente com fracionamento geográfico para evitar "
-            "concorrência pública única: individualmente, cada contrato fica abaixo dos "
-            "limiares de licitação, mas o conjunto configuraria obra de grande vulto."
+            "Cinco empresas dividiram R$ 584 milhões em contratos de pavimentação asfáltica "
+            "distribuídos pelas cinco APs do Rio, firmados entre fev/2026 e mar/2026. "
+            "Programa Conservação Fase 2 (R$ 268 mi, 4 empresas): Hydra/AP3 R$ 84,5 mi, "
+            "Metropolitana/AP5 R$ 76,6 mi, Santa Luzia/AP4 R$ 60,5 mi, Matos Costa/AP1-2 "
+            "R$ 46,7 mi. Programa Asfalto Liso Fase 3 (R$ 316 mi): MJRE/AP1-2 — contrato "
+            "suspenso judicialmente. O fracionamento geográfico por AP distribui o objeto "
+            "entre concorrências separadas, evitando a modalidade de grande vulto que exigiria "
+            "concorrência pública unificada e maior escrutínio."
         ),
         "ordem": 4,
     },
