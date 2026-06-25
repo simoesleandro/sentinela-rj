@@ -287,9 +287,86 @@ async function api(path, { method = 'GET', body, ...rest } = {}) {
   return res;
 }
 
+// ─── Sessão / autenticação ──────────────────────────────────────────────────
+
+const sessao = { usuario: null, ia: null };
+
+function irParaLogin() {
+  location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
+}
+
+async function carregarSessao() {
+  try {
+    const res = await fetch(`${BASE}/api/auth/me`);
+    const data = await res.json();
+    sessao.usuario = data.usuario;
+    sessao.ia = data.ia;
+  } catch {
+    sessao.usuario = null;
+    sessao.ia = null;
+  }
+  renderAuthArea();
+}
+
+function renderAuthArea() {
+  const area = document.getElementById('auth-area');
+  if (!area) return;
+  if (!sessao.usuario) {
+    area.innerHTML = `<a href="/login?next=${encodeURIComponent(location.pathname)}" class="auth-link">Entrar</a>`;
+    return;
+  }
+  const u = sessao.usuario;
+  const nome = esc(u.nome || u.email);
+  let cota = '';
+  let reenviar = '';
+  if (sessao.ia) {
+    if (sessao.ia.ilimitado) {
+      cota = '<span class="auth-cota auth-admin">IA ilimitada</span>';
+    } else if (sessao.ia.verificar) {
+      cota = '<span class="auth-cota auth-warn" title="Confirme seu email para liberar a IA">⚠ Confirme seu email</span>';
+      reenviar = '<button type="button" id="auth-reenviar" class="auth-link">Reenviar</button>';
+    } else {
+      cota = `<span class="auth-cota">IA: ${sessao.ia.restante}/${sessao.ia.limite} hoje</span>`;
+    }
+  }
+  area.innerHTML = `
+    <span class="auth-user" title="${esc(u.email)}">Olá, ${nome}</span>
+    ${cota}
+    ${reenviar}
+    <button type="button" id="auth-logout" class="auth-link">Sair</button>
+  `;
+  document.getElementById('auth-logout')?.addEventListener('click', async () => {
+    await fetch(`${BASE}/api/auth/logout`, { method: 'POST' });
+    sessao.usuario = null;
+    sessao.ia = null;
+    renderAuthArea();
+  });
+  document.getElementById('auth-reenviar')?.addEventListener('click', reenviarConfirmacao);
+}
+
+async function reenviarConfirmacao() {
+  const btn = document.getElementById('auth-reenviar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    const res = await fetch(`${BASE}/api/auth/reenviar`, { method: 'POST' });
+    const data = await res.json();
+    if (data.email_enviado) {
+      alert('Link de confirmação reenviado! Verifique seu email.');
+    } else if (data.email_erro) {
+      alert('Não consegui enviar o email: ' + data.email_erro);
+    } else {
+      alert('Confirmação processada. Se não chegar, verifique o spam.');
+    }
+  } catch {
+    alert('Falha ao reenviar. Tente novamente.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Reenviar'; }
+  }
+}
+
 const VEREDITO_MARKER = '[Recomendação de Veredito]';
 
-function renderComparacaoVereditoHtml(vereditoGemini, vereditoGemma) {
+function renderComparacaoVereditoHtml(vereditoGemini, vereditoGemma, nomePrimario, nomeSecundario) {
   if (!vereditoGemini && !vereditoGemma) return '';
 
   function renderCol(modelo, dot, veredito, btnId) {
@@ -324,8 +401,8 @@ function renderComparacaoVereditoHtml(vereditoGemini, vereditoGemma) {
         <span class="comparacao-badge">EXPERIMENTO</span>
       </div>
       <div class="comparacao-grid">
-        ${renderCol('Gemini 2.5 Flash', 'gemini', vereditoGemini, 'gemini')}
-        ${renderCol('Gemma 4 · local', 'gemma', vereditoGemma, 'gemma')}
+        ${renderCol(esc(nomePrimario || 'Veredito primário'), 'gemini', vereditoGemini, 'gemini')}
+        ${renderCol(esc(nomeSecundario || 'Veredito secundário'), 'gemma', vereditoGemma, 'gemma')}
       </div>
     </div>`;
 }
@@ -993,7 +1070,7 @@ async function openDetail(id) {
       ${complementar}
       ${renderTransparenciaRjHtml(d.transparencia_rj)}
       <div class="investigation-toolbar">
-        <button type="button" id="btn-investigar-ia" class="btn-investigar" title="Gemma 4 local gera a narrativa; vereditos Gemma 4 e Gemini para comparação A/B">
+        <button type="button" id="btn-investigar-ia" class="btn-investigar" title="IA em nuvem gera a narrativa e o veredito; quando há dois provedores, mostra comparação A/B">
           ✨ ${btnIaLabel}
         </button>
         <button type="button" id="btn-investigar-profundo" class="btn-investigar-profundo" title="Agente ReAct coleta dados de múltiplas fontes e gera conclusão fundamentada">
@@ -1051,8 +1128,8 @@ async function openDetail(id) {
 }
 
 const IA_LOADING_STEPS = [
-  { id: 'gemma-corpo', label: 'Gemma 4 gerando narrativa...' },
-  { id: 'veredito', label: 'Gerando vereditos (Gemma 4 + Gemini)...' },
+  { id: 'corpo', label: 'IA gerando narrativa...' },
+  { id: 'veredito', label: 'Gerando vereditos (comparação A/B)...' },
 ];
 
 function _iaLoadingHtml(stepIndex) {
@@ -1136,7 +1213,13 @@ async function investigarComIa(alertaId) {
       headers: { 'Content-Type': 'application/json' },
     });
     const payload = await res.json();
+    if (res.status === 401 && payload.auth === 'login') { irParaLogin(); return; }
+    if (res.status === 403 && payload.auth === 'verificar') {
+      carregarSessao();
+      throw new Error('Confirme seu email para usar a IA. Use "Reenviar" no topo se não recebeu o link.');
+    }
     if (!res.ok) throw new Error(payload.error || res.statusText);
+    carregarSessao();
 
     const narrativaParts = renderNarrativaVereditoHtml(payload.narrativa_ia || '');
     container.classList.remove('is-loading');
@@ -1148,7 +1231,9 @@ async function investigarComIa(alertaId) {
     if (comparacaoEl) {
       comparacaoEl.innerHTML = renderComparacaoVereditoHtml(
         payload.veredito_gemini,
-        payload.veredito_gemma
+        payload.veredito_gemma,
+        payload.provedor_primario_nome,
+        payload.provedor_secundario_nome
       );
       wireComparacaoVereditoButtons(alertaId);
     }
@@ -1160,7 +1245,7 @@ async function investigarComIa(alertaId) {
     if (payload.veredito_gemini || payload.veredito_gemma) {
       statusEl.textContent = `Narrativa gerada (${payload.chars || 0} caracteres). Compare os vereditos abaixo e aplique o preferido.`;
     } else if (payload.revisao_gemini === false) {
-      statusEl.textContent = 'Narrativa Gemma 4 salva sem veredito — configure GEMINI_API_KEY para comparação A/B.';
+      statusEl.textContent = `Narrativa salva (${payload.chars || 0} caracteres). Configure um segundo provedor (Groq/Gemini) para ver a comparação A/B.`;
     } else {
       statusEl.textContent = `Narrativa salva (${payload.chars || 0} caracteres), mas sem vereditos gerados.`;
     }
@@ -1207,9 +1292,15 @@ async function investigarProfundo(alertaId) {
     });
     const data = await res.json();
 
+    if (res.status === 401 && data.auth === 'login') { irParaLogin(); return; }
+    if (res.status === 403 && data.auth === 'verificar') {
+      carregarSessao();
+      throw new Error('Confirme seu email para usar a IA. Use "Reenviar" no topo se não recebeu o link.');
+    }
     if (!res.ok && res.status !== 202) {
       throw new Error(data.error || res.statusText);
     }
+    carregarSessao();
 
     if (data.status === 'ja_rodando') {
       if (statusEl) statusEl.textContent = 'Investigação já em andamento…';
@@ -2754,6 +2845,7 @@ function setupEmpenhos() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
+  carregarSessao();
   await initMunicipioSelector();
   loadTab('visao-geral');
   state.tabLoaded['visao-geral'] = true;

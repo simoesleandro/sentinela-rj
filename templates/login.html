@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar — Sentinela RJ</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260615">
+  <style>
+    .auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+    .auth-card { width: 100%; max-width: 420px; background: #111827; border: 1px solid #1f2937;
+                 border-radius: 14px; padding: 2rem; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+    .auth-card h1 { margin: 0 0 .25rem; font-size: 1.4rem; }
+    .auth-sub { color: #9ca3af; font-size: .85rem; margin: 0 0 1.25rem; }
+    .auth-tabs { display: flex; gap: .5rem; margin-bottom: 1.25rem; }
+    .auth-tab { flex: 1; padding: .55rem; border-radius: 8px; border: 1px solid #1f2937;
+                background: transparent; color: #9ca3af; cursor: pointer; font-weight: 600; }
+    .auth-tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+    .auth-field { margin-bottom: .9rem; }
+    .auth-field label { display: block; font-size: .8rem; color: #cbd5e1; margin-bottom: .3rem; }
+    .auth-field input { width: 100%; box-sizing: border-box; padding: .6rem .7rem; border-radius: 8px;
+                        border: 1px solid #374151; background: #0b1220; color: #f1f5f9; font-size: .95rem; }
+    .auth-field input:focus { outline: none; border-color: #2563eb; }
+    .auth-btn { width: 100%; padding: .7rem; border-radius: 8px; border: none; background: #2563eb;
+                color: #fff; font-weight: 700; cursor: pointer; font-size: .95rem; }
+    .auth-btn:disabled { opacity: .6; cursor: default; }
+    .auth-msg { font-size: .85rem; margin-top: .9rem; min-height: 1.1rem; }
+    .auth-msg.erro { color: #f87171; }
+    .auth-msg.ok { color: #34d399; }
+    .auth-foot { margin-top: 1.2rem; text-align: center; font-size: .8rem; }
+    .auth-foot a { color: #60a5fa; text-decoration: none; }
+    .auth-info { font-size: .78rem; color: #9ca3af; background: #0b1220; border: 1px solid #1f2937;
+                 border-radius: 8px; padding: .6rem .7rem; margin-bottom: 1.1rem; }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h1>🛰️ Sentinela RJ</h1>
+      <p class="auth-sub">Acesso para investigação por IA</p>
+
+      <div class="auth-info">
+        Navegar o painel é livre. O login só é necessário para disparar
+        <strong>investigações de IA ao vivo</strong>, limitadas a algumas por dia por conta.
+      </div>
+
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-mode="login">Entrar</button>
+        <button type="button" class="auth-tab" data-mode="registrar">Criar conta</button>
+      </div>
+
+      <form id="auth-form">
+        <div class="auth-field" id="field-nome" style="display:none">
+          <label for="nome">Nome (opcional)</label>
+          <input type="text" id="nome" autocomplete="name">
+        </div>
+        <div class="auth-field">
+          <label for="email">Email</label>
+          <input type="email" id="email" autocomplete="email" required>
+        </div>
+        <div class="auth-field">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" autocomplete="current-password" required minlength="6">
+        </div>
+        <button type="submit" class="auth-btn" id="auth-submit">Entrar</button>
+        <div class="auth-msg" id="auth-msg"></div>
+      </form>
+
+      <div class="auth-foot"><a href="/dashboard">← Voltar ao painel</a></div>
+    </div>
+  </div>
+
+  <script>
+    let mode = 'login';
+    const params = new URLSearchParams(location.search);
+    const next = params.get('next') || '/dashboard';
+    const form = document.getElementById('auth-form');
+    const msg = document.getElementById('auth-msg');
+    const submit = document.getElementById('auth-submit');
+    const fieldNome = document.getElementById('field-nome');
+
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        mode = tab.dataset.mode;
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        fieldNome.style.display = mode === 'registrar' ? 'block' : 'none';
+        submit.textContent = mode === 'registrar' ? 'Criar conta' : 'Entrar';
+        document.getElementById('senha').setAttribute(
+          'autocomplete', mode === 'registrar' ? 'new-password' : 'current-password');
+        msg.textContent = '';
+        msg.className = 'auth-msg';
+      });
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      msg.className = 'auth-msg';
+      submit.disabled = true;
+      const body = {
+        email: document.getElementById('email').value.trim(),
+        senha: document.getElementById('senha').value,
+      };
+      if (mode === 'registrar') body.nome = document.getElementById('nome').value.trim();
+      try {
+        const res = await fetch(`/api/auth/${mode}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao autenticar.');
+        if (mode === 'registrar') {
+          let txt = '✅ Conta criada! ';
+          if (data.email_enviado) {
+            txt += `Enviamos um link de confirmação para ${body.email}. Confirme para liberar a IA.`;
+          } else if (data.email_erro) {
+            txt += `Mas houve um problema ao enviar o email (${data.email_erro}). Você pode reenviar no painel.`;
+          } else {
+            txt += 'Confirme seu email para liberar a IA (verifique sua caixa de entrada).';
+          }
+          msg.textContent = txt;
+          msg.className = 'auth-msg ok';
+          submit.textContent = 'Ir para o painel';
+          submit.disabled = false;
+          form.onsubmit = (ev) => { ev.preventDefault(); location.href = next; };
+          return;
+        }
+        msg.textContent = 'Tudo certo! Redirecionando…';
+        msg.className = 'auth-msg ok';
+        location.href = next;
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = 'auth-msg erro';
+        submit.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

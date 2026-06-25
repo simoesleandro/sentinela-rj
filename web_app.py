@@ -20,6 +20,10 @@ from db.conexao import DB_PATH, aplicar_migracoes
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
+from web_auth import checar_cota_ia, registrar_consumo_ia, requer_admin, init_auth
+
+init_auth(app)
+
 
 @app.route("/api/health")
 def health():
@@ -657,6 +661,10 @@ def alertas_investigar(alert_id: int):
     if request.method == "OPTIONS":
         return "", 204
 
+    usuario, erro = checar_cota_ia()
+    if erro:
+        return erro
+
     from analise.motor_ia import InvestigadorIA, _revisao_gemini_disponivel
     from db.conexao import DB_PATH
     from db.database import GerenciadorBanco
@@ -693,6 +701,9 @@ def alertas_investigar(alert_id: int):
             narrativa_gemma=resultado.narrativa_gemma,
             gemma_utilizado=1 if resultado.narrativa_gemma else 0,
         )
+        registrar_consumo_ia(usuario, "investigar")
+        from analise.motor_ia import NOMES_PROVEDOR
+
         return jsonify({
             "id": alert_id,
             "narrativa_ia": resultado.narrativa_ia,
@@ -705,6 +716,14 @@ def alertas_investigar(alert_id: int):
             "chars": len(resultado.narrativa_ia),
             "revisao_gemini": _revisao_gemini_disponivel(),
             "revisao_gemma4": resultado.gemma4_utilizado,
+            "provedor_primario": resultado.provedor_primario,
+            "provedor_secundario": resultado.provedor_secundario,
+            "provedor_primario_nome": NOMES_PROVEDOR.get(
+                resultado.provedor_primario, resultado.provedor_primario
+            ),
+            "provedor_secundario_nome": NOMES_PROVEDOR.get(
+                resultado.provedor_secundario, resultado.provedor_secundario
+            ),
         })
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 422
@@ -722,6 +741,10 @@ def alertas_investigar(alert_id: int):
 def alertas_investigar_profundo(alert_id: int):
     if request.method == "OPTIONS":
         return "", 204
+
+    usuario, erro = checar_cota_ia()
+    if erro:
+        return erro
 
     db = get_db()
     try:
@@ -779,6 +802,8 @@ def alertas_investigar_profundo(alert_id: int):
         db3.commit()
     finally:
         db3.close()
+
+    registrar_consumo_ia(usuario, "investigar_profundo")
 
     def _rodar_agente(alerta_id: int, inv_id: int, dados: dict) -> None:
         from investigacao import AgenteInvestigador
@@ -902,9 +927,16 @@ def dossie_api(alerta_id: int):
         "1",
         "yes",
     )
+    usuario = None
+    if gerar_ia:
+        usuario, erro = checar_cota_ia()
+        if erro:
+            return erro
     db = get_db()
     try:
         dados = obter_dossie(db, alerta_id, gerar_ia=gerar_ia, db_path=DB_PATH)
+        if gerar_ia:
+            registrar_consumo_ia(usuario, "dossie_ia")
     except DossieNaoEncontradoError:
         return jsonify({"error": "not found"}), 404
     except ValueError as exc:
@@ -2125,6 +2157,7 @@ def api_casos_list():
 
 
 @app.route("/api/casos", methods=["POST"])
+@requer_admin
 def api_casos_create():
     data = request.get_json(force=True)
     required = ("titulo", "status")
@@ -2158,6 +2191,7 @@ def api_casos_create():
 
 
 @app.route("/api/casos/<int:caso_id>", methods=["PATCH"])
+@requer_admin
 def api_casos_update(caso_id: int):
     data = request.get_json(force=True)
     db = get_db()
@@ -2188,6 +2222,7 @@ def api_casos_update(caso_id: int):
 
 
 @app.route("/api/casos/<int:caso_id>", methods=["DELETE"])
+@requer_admin
 def api_casos_delete(caso_id: int):
     db = get_db()
     try:

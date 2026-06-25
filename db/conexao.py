@@ -116,6 +116,28 @@ _MIGRACOES_DDL = [
         atualizado_em   TEXT DEFAULT (datetime('now'))
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        email             TEXT NOT NULL UNIQUE,
+        nome              TEXT,
+        senha_hash        TEXT NOT NULL,
+        is_admin          INTEGER NOT NULL DEFAULT 0,
+        email_verificado  INTEGER NOT NULL DEFAULT 0,
+        token_verificacao TEXT,
+        token_expira_em   TEXT,
+        criado_em         TEXT DEFAULT (datetime('now'))
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS ia_consumo (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id  INTEGER NOT NULL REFERENCES usuarios(id),
+        endpoint    TEXT,
+        criado_em   TEXT DEFAULT (datetime('now'))
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_ia_consumo_usuario_dia ON ia_consumo(usuario_id, criado_em)",
 ]
 
 _MIGRACOES_CASOS_CNPJ = [
@@ -140,6 +162,9 @@ _MIGRACOES_COLUNAS = [
     "ALTER TABLE alertas ADD COLUMN score REAL",
     "ALTER TABLE alertas ADD COLUMN narrativa_gemma TEXT",
     "ALTER TABLE alertas ADD COLUMN gemma_utilizado INTEGER DEFAULT 0",
+    "ALTER TABLE usuarios ADD COLUMN email_verificado INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE usuarios ADD COLUMN token_verificacao TEXT",
+    "ALTER TABLE usuarios ADD COLUMN token_expira_em TEXT",
 ]
 
 

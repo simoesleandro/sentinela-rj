@@ -20,12 +20,14 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ResultadoInvestigacao:
     corpo: str
-    narrativa_ia: str  # corpo + veredito_gemini (formato atual)
-    narrativa_gemma: str | None = None  # só veredito Gemma4
-    veredito_gemini: dict[str, str] | None = None
-    veredito_gemma: dict[str, str] | None = None
+    narrativa_ia: str  # corpo + veredito primário
+    narrativa_gemma: str | None = None  # texto bruto do veredito secundário (A/B)
+    veredito_gemini: dict[str, str] | None = None  # veredito primário
+    veredito_gemma: dict[str, str] | None = None  # veredito secundário (A/B)
     gemini_utilizado: bool = False
     gemma4_utilizado: bool = False
+    provedor_primario: str | None = None  # ex.: "gemini", "groq", "gemma4"
+    provedor_secundario: str | None = None
 
 _PROMPT_AUDITOR = (
     "Atue como um auditor investigativo. Seja direto: nas primeiras frases, "
@@ -159,9 +161,81 @@ def _revisao_gemini_disponivel() -> bool:
     return flag in ("true", "1", "yes", "sim")
 
 
-def _revisao_gemma4_disponivel() -> bool:
-    flag = os.environ.get("SENTINELA_IA_REVISAO_GEMMA4", "true").strip().lower()
+def _gemma4_habilitado() -> bool:
+    """Gemma 4 (Ollama local) é OPT-IN — só usado se explicitamente ligado.
+
+    Em produção (Fly) e na máquina de qualquer outra pessoa não há Ollama,
+    então o padrão é desligado: o pipeline roda 100% em nuvem.
+    """
+    flag = os.environ.get("SENTINELA_IA_GEMMA4", "false").strip().lower()
     return flag in ("true", "1", "yes", "sim")
+
+
+# Nomes de exibição dos provedores (para rótulos honestos no A/B do frontend).
+NOMES_PROVEDOR = {
+    "gemini": "Gemini 2.5 Flash",
+    "groq": "Groq · Llama 3.3 70B",
+    "gemma4": "Gemma 4 · local",
+}
+
+
+def _provedores_disponiveis() -> list[str]:
+    """Ordem de preferência dos provedores de IA realmente disponíveis.
+
+    Nuvem primeiro (Gemini, depois Groq). Gemma 4 local só entra se opt-in.
+    ``SENTINELA_IA_PROVIDER`` pode forçar um provedor para o topo da fila.
+    """
+    provedores: list[str] = []
+    if os.environ.get("GEMINI_API_KEY", "").strip():
+        provedores.append("gemini")
+    if os.environ.get("GROQ_API_KEY", "").strip():
+        provedores.append("groq")
+    if _gemma4_habilitado():
+        provedores.append("gemma4")
+
+    forcado = os.environ.get("SENTINELA_IA_PROVIDER", "").strip().lower()
+    if forcado in provedores:
+        provedores.remove(forcado)
+        provedores.insert(0, forcado)
+    return provedores
+
+
+def _call_provedor(nome: str, prompt: str) -> str:
+    if nome == "gemini":
+        return _call_gemini(prompt)
+    if nome == "groq":
+        return _call_groq(prompt)
+    if nome == "gemma4":
+        return _limpar_latex(_call_gemma4(prompt))
+    raise ValueError(f"Provedor de IA desconhecido: {nome}")
+
+
+def gerar_texto(
+    prompt: str, provedores: list[str] | None = None
+) -> tuple[str, str]:
+    """Gera texto tentando os provedores em ordem. Retorna (texto, provedor_usado).
+
+    Lança ValueError se não houver provedor disponível ou se todos falharem.
+    """
+    provs = provedores if provedores is not None else _provedores_disponiveis()
+    if not provs:
+        raise ValueError(
+            "Nenhum provedor de IA disponível. "
+            "Configure GEMINI_API_KEY ou GROQ_API_KEY."
+        )
+    ultimo_erro: Exception | None = None
+    for nome in provs:
+        try:
+            texto = _call_provedor(nome, prompt)
+            if texto and texto.strip():
+                return texto, nome
+            ultimo_erro = ValueError(f"Provedor {nome} retornou resposta vazia.")
+        except Exception as exc:
+            logger.warning("Provedor de IA %s falhou: %s", nome, exc)
+            ultimo_erro = exc
+    raise ValueError(
+        f"Todos os provedores de IA falharam. Último erro: {ultimo_erro}"
+    )
 
 
 def _call_gemma4(prompt: str) -> str:
@@ -372,60 +446,66 @@ class InvestigadorIA:
     ) -> ResultadoInvestigacao:
         self._gemini_utilizado = False
         self._gemma4_utilizado = False
+
+        provedores = _provedores_disponiveis()
+        if not provedores:
+            raise ValueError(
+                "Nenhum provedor de IA disponível. "
+                "Configure GEMINI_API_KEY ou GROQ_API_KEY."
+            )
         logger.info(
-            "Investigando anomalia id=%s — fluxo: Gemma4 corpo + vereditos A/B",
+            "Investigando anomalia id=%s — provedores disponíveis: %s",
             anomalia.get("id", "?"),
+            ", ".join(provedores),
         )
 
+        # 1. Corpo da narrativa — cascata cloud-first com fallback real.
         prompt_corpo = _montar_prompt(anomalia)
         if self._prompt_revisao_extra:
             prompt_corpo = f"{prompt_corpo}\n\n{self._prompt_revisao_extra}"
+        corpo, prov_corpo = gerar_texto(prompt_corpo, provedores)
+        logger.info("Corpo gerado por %s (%d chars)", prov_corpo, len(corpo))
 
+        prompt_v = _montar_prompt_veredito(
+            anomalia, corpo, extra=self._prompt_revisao_extra
+        )
+
+        # 2. Veredito primário — mesmo provedor do corpo (coerência).
+        veredito_primario_txt: str | None = None
+        veredito_primario_dict: dict[str, str] | None = None
+        usados: set[str] = {prov_corpo}
         try:
-            corpo = _limpar_latex(_call_gemma4(prompt_corpo))
-            logger.info("Corpo Gemma4 gerado (%d chars)", len(corpo))
+            veredito_primario_txt, _ = gerar_texto(prompt_v, [prov_corpo])
+            veredito_primario_dict = _parse_veredito(veredito_primario_txt)
+            logger.info("Veredito primário gerado por %s", prov_corpo)
         except ValueError as exc:
-            logger.warning("Gemma4 falhou — fallback Gemini para corpo: %s", exc)
-            try:
-                corpo = _call_gemini(prompt_corpo)
-                self._gemini_utilizado = True
-            except ValueError as exc2:
-                logger.warning("Gemini corpo falhou — fallback Groq: %s", exc2)
-                corpo = _call_groq(prompt_corpo)
+            logger.warning("Veredito primário (%s) falhou: %s", prov_corpo, exc)
 
-        veredito_gemma: str | None = None
-        veredito_gemma_dict: dict[str, str] | None = None
-        if _revisao_gemma4_disponivel():
+        # 3. Veredito secundário — primeiro provedor diferente (A/B), se houver.
+        prov_secundario = next((p for p in provedores if p != prov_corpo), None)
+        veredito_sec_txt: str | None = None
+        veredito_sec_dict: dict[str, str] | None = None
+        if prov_secundario:
             try:
-                prompt_v = _montar_prompt_veredito(
-                    anomalia, corpo, extra=self._prompt_revisao_extra
-                )
-                veredito_gemma = _limpar_latex(_call_gemma4(prompt_v))
-                veredito_gemma_dict = _parse_veredito(veredito_gemma)
-                self._gemma4_utilizado = True
-                logger.info("Veredito Gemma4 gerado")
+                veredito_sec_txt, _ = gerar_texto(prompt_v, [prov_secundario])
+                veredito_sec_dict = _parse_veredito(veredito_sec_txt)
+                usados.add(prov_secundario)
+                logger.info("Veredito secundário gerado por %s", prov_secundario)
             except ValueError as exc:
-                logger.warning("Veredito Gemma4 falhou: %s", exc)
-
-        veredito_gemini: str | None = None
-        veredito_gemini_dict: dict[str, str] | None = None
-        if _revisao_gemini_disponivel():
-            try:
-                prompt_v = _montar_prompt_veredito(
-                    anomalia, corpo, extra=self._prompt_revisao_extra
+                logger.warning(
+                    "Veredito secundário (%s) falhou: %s", prov_secundario, exc
                 )
-                veredito_gemini = _call_gemini(prompt_v)
-                veredito_gemini_dict = _parse_veredito(veredito_gemini)
-                self._gemini_utilizado = True
-                logger.info("Veredito Gemini gerado")
-            except ValueError as exc:
-                logger.warning("Veredito Gemini falhou: %s", exc)
 
-        if veredito_gemini:
-            narrativa_ia = f"{corpo}\n\n{veredito_gemini}"
+        # A narrativa carrega o veredito primário; se ele falhar mas o
+        # secundário existir, usa o secundário para não perder a recomendação.
+        veredito_narrativa = veredito_primario_txt or veredito_sec_txt
+        if veredito_narrativa:
+            narrativa_ia = f"{corpo}\n\n{veredito_narrativa}"
         else:
             narrativa_ia = corpo
 
+        self._gemini_utilizado = "gemini" in usados
+        self._gemma4_utilizado = "gemma4" in usados
         logger.info(
             "Investigação concluída (%d chars narrativa_ia)", len(narrativa_ia)
         )
@@ -433,9 +513,11 @@ class InvestigadorIA:
         return ResultadoInvestigacao(
             corpo=corpo,
             narrativa_ia=narrativa_ia,
-            narrativa_gemma=veredito_gemma,
-            veredito_gemini=veredito_gemini_dict,
-            veredito_gemma=veredito_gemma_dict,
+            narrativa_gemma=veredito_sec_txt,
+            veredito_gemini=veredito_primario_dict,
+            veredito_gemma=veredito_sec_dict,
             gemini_utilizado=self._gemini_utilizado,
             gemma4_utilizado=self._gemma4_utilizado,
+            provedor_primario=prov_corpo,
+            provedor_secundario=prov_secundario if veredito_sec_dict else None,
         )

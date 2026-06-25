@@ -116,9 +116,9 @@ class AgenteInvestigador:
             )
             resultado.evidencias["decisoes_tcm"] = decisoes_tcm
 
-        print("  [Agente] Sintetizando evidências (Gemma4 → Gemini fallback)...")
+        print("  [Agente] Sintetizando evidências (IA em nuvem: Gemini → Groq)...")
         try:
-            from analise.motor_ia import _call_gemini, _call_gemma4, _limpar_latex
+            from analise.motor_ia import _limpar_latex, gerar_texto
 
             prompt = _PROMPT_SINTESE.format(
                 dados_alerta=str(dados_alerta),
@@ -128,13 +128,9 @@ class AgenteInvestigador:
                 processos_tjrj=processos_tjrj.get("resumo", "Sem dados"),
                 decisoes_tcm=decisoes_tcm.get("resumo", "Sem dados"),
             )
-            try:
-                sintese_raw = _limpar_latex(_call_gemma4(prompt))
-            except ValueError as exc_gemma:
-                logger.warning("Gemma4 indisponível na síntese — fallback Gemini: %s", exc_gemma)
-                print("  [Agente] Gemma4 falhou — usando Gemini...")
-                sintese_raw = _call_gemini(prompt)
-            resultado.sintese = sintese_raw
+            sintese_raw, prov = gerar_texto(prompt)
+            print(f"  [Agente] Síntese gerada por {prov}.")
+            resultado.sintese = _limpar_latex(sintese_raw)
 
             status_match = re.search(
                 r"Status:\s*(confirmar|arquivar|escalar|inconclusivo)",

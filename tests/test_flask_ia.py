@@ -81,7 +81,9 @@ def test_investigar_endpoint_salva_narrativa(client) -> None:
         corpo=laudo,
         narrativa_ia=laudo,
     )
-    with patch("analise.motor_ia.InvestigadorIA") as mock_cls:
+    with patch("analise.motor_ia.InvestigadorIA") as mock_cls, patch(
+        "web_app.checar_cota_ia", return_value=({"id": 1, "is_admin": True}, None)
+    ), patch("web_app.registrar_consumo_ia"):
         inst = MagicMock()
         inst.investigar_anomalia.return_value = resultado_fake
         inst.gemma4_utilizado = False

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmação de email — Sentinela RJ</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260615">
+  <style>
+    .v-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+    .v-card { width: 100%; max-width: 440px; background: #111827; border: 1px solid #1f2937;
+              border-radius: 14px; padding: 2.2rem; text-align: center;
+              box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+    .v-icon { font-size: 3rem; margin-bottom: .5rem; }
+    .v-card h1 { margin: 0 0 .5rem; font-size: 1.3rem; }
+    .v-msg { color: #9ca3af; font-size: .95rem; margin-bottom: 1.5rem; }
+    .v-btn { display: inline-block; background: #2563eb; color: #fff; padding: .7rem 1.4rem;
+             border-radius: 8px; text-decoration: none; font-weight: 700; }
+    .v-ok { color: #34d399; }
+    .v-erro { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="v-wrap">
+    <div class="v-card">
+      {% if sucesso %}
+        <div class="v-icon">✅</div>
+        <h1 class="v-ok">{{ mensagem }}</h1>
+        <p class="v-msg">Sua conta está liberada para disparar investigações por IA.</p>
+        <a class="v-btn" href="/dashboard">Ir para o painel</a>
+      {% else %}
+        <div class="v-icon">⚠️</div>
+        <h1 class="v-erro">Não foi possível confirmar</h1>
+        <p class="v-msg">{{ mensagem }}</p>
+        <a class="v-btn" href="/dashboard">Voltar ao painel</a>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

@@ -56,6 +56,38 @@ header h1 {
   min-width: 220px;
 }
 
+/* ─── Auth area (header) ─── */
+.auth-area {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-left: 1rem;
+  white-space: nowrap;
+}
+.auth-area .auth-user { color: var(--text); }
+.auth-area .auth-cota {
+  background: #18181b;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  color: var(--blue);
+}
+.auth-area .auth-cota.auth-admin { color: var(--green); }
+.auth-area .auth-cota.auth-warn { color: var(--orange); border-color: var(--orange); }
+.auth-area .auth-link {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+.auth-area .auth-link:hover { border-color: var(--blue); color: var(--blue); }
+
 .municipio-selector label {
   font-size: 0.68rem;
   text-transform: uppercase;
