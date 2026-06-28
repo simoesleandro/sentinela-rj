@@ -9,8 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260625">
-  <script src="/static/app.js?v=20260625" defer></script>
+  <link rel="stylesheet" href="/static/style.css?v=20260628">
+  <script src="/static/app.js?v=20260628" defer></script>
 </head>
 <body>
   <header>
@@ -351,13 +351,100 @@
       <p>Todos os dados são obtidos diretamente do <strong>Portal Nacional de Contratações Públicas (PNCP)</strong>, a plataforma oficial do governo federal que centraliza informações de contratos de todos os entes públicos brasileiros. Os dados são coletados e atualizados periodicamente de forma automática.</p>
 
       <h3>Como detectamos anomalias?</h3>
-      <ul>
-        <li><strong>Outlier de valor:</strong> contrato com valor muito acima da mediana histórica para o mesmo tipo de objeto ou categoria.</li>
-        <li><strong>Concentração de fornecedor:</strong> empresa que recebeu volume desproporcional de contratos em curto período de tempo.</li>
-        <li><strong>Sem licitação — Inexigibilidade:</strong> contrato dispensado de licitação por alegação de fornecedor exclusivo.</li>
-        <li><strong>Sem licitação — Emergência:</strong> contrato emergencial firmado sem processo licitatório.</li>
-        <li><strong>Sem licitação — Dispensa:</strong> contrato com dispensa de licitação por valor ou outras condições.</li>
-      </ul>
+      <p>O Sentinela executa um pipeline automatizado com cinco detectores independentes. Cada contrato passa por todos os detectores; o resultado é consolidado em um <em>risk score</em> composto.</p>
+
+      <!-- Pipeline visual -->
+      <div class="sobre-pipeline">
+        <div class="sobre-pipeline-step">
+          <div class="sobre-pipeline-icon">📥</div>
+          <div class="sobre-pipeline-label">Coleta PNCP</div>
+        </div>
+        <div class="sobre-pipeline-arrow">→</div>
+        <div class="sobre-pipeline-step">
+          <div class="sobre-pipeline-icon">🔍</div>
+          <div class="sobre-pipeline-label">5 Detectores</div>
+        </div>
+        <div class="sobre-pipeline-arrow">→</div>
+        <div class="sobre-pipeline-step">
+          <div class="sobre-pipeline-icon">⚖️</div>
+          <div class="sobre-pipeline-label">Risk Score</div>
+        </div>
+        <div class="sobre-pipeline-arrow">→</div>
+        <div class="sobre-pipeline-step">
+          <div class="sobre-pipeline-icon">🚨</div>
+          <div class="sobre-pipeline-label">Alerta</div>
+        </div>
+        <div class="sobre-pipeline-arrow">→</div>
+        <div class="sobre-pipeline-step">
+          <div class="sobre-pipeline-icon">🤖</div>
+          <div class="sobre-pipeline-label">Investigação IA</div>
+        </div>
+      </div>
+
+      <div class="sobre-detectores">
+        <div class="sobre-detector">
+          <div class="sobre-detector-header">
+            <span class="sobre-detector-badge">1</span>
+            <strong>Outlier de Valor</strong>
+            <code class="sobre-detector-code">outlier_valor</code>
+          </div>
+          <p>Compara o valor de cada contrato com a distribuição histórica de contratos similares usando <strong>Z-score</strong> e <strong>IQR</strong>:</p>
+          <div class="sobre-formula">
+            <div class="sobre-formula-line"><span class="sobre-formula-name">Z-score</span><span class="sobre-formula-eq">= (valor − média) ÷ desvio padrão</span></div>
+            <div class="sobre-formula-line"><span class="sobre-formula-name">IQR</span><span class="sobre-formula-eq">= Q3 − Q1 &nbsp;|&nbsp; limite superior = Q3 + 1,5 × IQR</span></div>
+          </div>
+          <p>Um contrato é sinalizado quando seu valor supera o limite superior do IQR <em>e</em> apresenta Z-score acima de 2,0 — ou seja, está a mais de 2 desvios padrões da média do grupo.</p>
+        </div>
+
+        <div class="sobre-detector">
+          <div class="sobre-detector-header">
+            <span class="sobre-detector-badge">2</span>
+            <strong>Concentração de Fornecedor</strong>
+            <code class="sobre-detector-code">concentracao_fornecedor</code>
+          </div>
+          <p>Detecta quando um único fornecedor recebe uma fatia desproporcional dos contratos de um órgão em uma janela de 12 meses. O limiar é definido pelo percentual do valor total recebido pelo fornecedor em relação ao total contratado pelo órgão naquele período.</p>
+        </div>
+
+        <div class="sobre-detector">
+          <div class="sobre-detector-header">
+            <span class="sobre-detector-badge">3</span>
+            <strong>Fracionamento de Contratos</strong>
+            <code class="sobre-detector-code">asfalto_fatiado</code>
+          </div>
+          <p>Identifica sequências de contratos de pequeno valor com o mesmo objeto firmados com o mesmo fornecedor em janelas curtas de tempo. Esse padrão pode indicar divisão artificial de licitação para escapar de limites legais de dispensa.</p>
+        </div>
+
+        <div class="sobre-detector">
+          <div class="sobre-detector-header">
+            <span class="sobre-detector-badge">4</span>
+            <strong>Contratação sem Licitação</strong>
+            <code class="sobre-detector-code">sem_licitacao_*</code>
+          </div>
+          <p>Sinaliza contratos com modalidade de dispensa, inexigibilidade ou emergência. Esses mecanismos são legalmente previstos, mas concentração elevada deles num mesmo órgão ou fornecedor é um indicador de risco.</p>
+          <ul>
+            <li><strong>Inexigibilidade:</strong> fornecedor exclusivo ou notória especialização.</li>
+            <li><strong>Emergência:</strong> contratação sem tempo hábil para licitação.</li>
+            <li><strong>Dispensa:</strong> valor abaixo do limite obrigatório de licitação.</li>
+          </ul>
+        </div>
+
+        <div class="sobre-detector">
+          <div class="sobre-detector-header">
+            <span class="sobre-detector-badge">5</span>
+            <strong>Risco em Empenhos</strong>
+            <code class="sobre-detector-code">empenhos_risk</code>
+          </div>
+          <p>Cruza empenhos coletados do PNCP com contratos já monitorados. Empenhos de valor alto, fora do intervalo contratual esperado ou associados a fornecedores com histórico de alertas recebem pontuação de risco adicional.</p>
+        </div>
+      </div>
+
+      <h3>Risk Score composto</h3>
+      <p>Cada detector contribui com uma pontuação parcial (0–100). O risk score final é uma média ponderada dessas pontuações, com peso maior para outlier de valor e fracionamento. O score determina a severidade do alerta:</p>
+      <div class="sobre-severity-table">
+        <div class="sobre-severity-row"><span class="badge badge-red">ALTA</span><span>Score ≥ 70 — prioridade máxima de triagem</span></div>
+        <div class="sobre-severity-row"><span class="badge badge-yellow">MÉDIA</span><span>Score 40–69 — merece investigação</span></div>
+        <div class="sobre-severity-row"><span class="badge badge-green">BAIXA</span><span>Score &lt; 40 — monitoramento contínuo</span></div>
+      </div>
 
       <h3>Limitações</h3>
       <p>Este sistema identifica <em>padrões estatísticos</em> que merecem atenção. Uma anomalia detectada não significa necessariamente irregularidade — pode haver justificativas legais para qualquer contrato. O Sentinela RJ é uma ferramenta de transparência, não de acusação.</p>

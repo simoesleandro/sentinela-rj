@@ -633,15 +633,15 @@ async function loadStats() {
         <div class="kpi-label">Valor Total</div>
         <div class="kpi-hint">Soma dos contratos</div>
       </div>
-      <div class="kpi-card highlight">
+      <div class="kpi-card highlight kpi-clickable" role="button" tabindex="0" title="Ver todos os alertas abertos" onclick="goToAlertasFiltrado({status:'aberto'})" onkeydown="if(event.key==='Enter')goToAlertasFiltrado({status:'aberto'})">
         <div class="kpi-value">${(d.alertas_total || 0).toLocaleString('pt-BR')}</div>
         <div class="kpi-label">Anomalias Detectadas</div>
-        <div class="kpi-hint">Todos os tipos</div>
+        <div class="kpi-hint">Ver alertas abertos →</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card kpi-clickable" role="button" tabindex="0" title="Ver alertas de risco alto" onclick="goToAlertasFiltrado({severidade:'alta'})" onkeydown="if(event.key==='Enter')goToAlertasFiltrado({severidade:'alta'})">
         <div class="kpi-value" style="color:#ef4444">${(d.alertas_alta || 0).toLocaleString('pt-BR')}</div>
         <div class="kpi-label">Risco Alto</div>
-        <div class="kpi-hint">Severidade alta</div>
+        <div class="kpi-hint">Ver severidade alta →</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-value">${(d.fornecedores_distintos || 0).toLocaleString('pt-BR')}</div>
@@ -1715,6 +1715,23 @@ async function loadFornecedores() {
   } catch (e) {
     showError('chart-fornecedores', e.message);
   }
+}
+
+function goToAlertasFiltrado({ severidade = '', status = '' } = {}) {
+  if (severidade) {
+    state.alertasFiltros.severidade = severidade;
+    const el = document.getElementById('filter-severidade');
+    if (el) el.value = severidade;
+  }
+  if (status) {
+    state.alertasFiltros.status = status;
+    const el = document.getElementById('filter-status');
+    if (el) el.value = status;
+  }
+  state.alertasPage = 1;
+  const alertasBtn = document.querySelector('[data-tab="alertas"]');
+  if (alertasBtn) alertasBtn.click();
+  loadAlertas();
 }
 
 function filterByFornecedor(nome) {
