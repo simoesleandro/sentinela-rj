@@ -93,6 +93,32 @@ def registrar_consumo_ia(usuario: dict | None, endpoint: str) -> None:
         conn.close()
 
 
+_METODOS_SEGUROS = {"GET", "HEAD", "OPTIONS"}
+
+
+def requer_login(fn):
+    """Decorator: exige sessão autenticada nos métodos de ESCRITA.
+
+    Métodos seguros (GET/HEAD/OPTIONS) passam direto — o dashboard continua
+    público para leitura. Use em views que misturam leitura pública e escrita
+    (ex.: PATCH de triagem, CRUD de watchlists/regras) para proteger só as
+    mutações sem bloquear o GET.
+    """
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if request.method not in _METODOS_SEGUROS:
+            conn = _conn()
+            try:
+                usuario = usuario_atual(conn)
+            finally:
+                conn.close()
+            if usuario is None:
+                return _erro_login()
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 def requer_admin(fn):
     """Decorator: bloqueia o endpoint para não-admins."""
     @functools.wraps(fn)

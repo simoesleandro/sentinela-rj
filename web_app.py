@@ -1,5 +1,6 @@
 """Flask REST API — Sentinela RJ dashboard + triagem de alertas."""
 import csv
+import functools
 import io
 import json
 import math
@@ -10,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, request, render_template, Response, redirect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,9 +22,40 @@ from db.conexao import DB_PATH, aplicar_migracoes
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-from web_auth import checar_cota_ia, registrar_consumo_ia, requer_admin, init_auth
+from web_auth import checar_cota_ia, registrar_consumo_ia, requer_admin, requer_login, init_auth
 
 init_auth(app)
+
+# ---------------------------------------------------------------------------
+# Proteção CSRF
+# ---------------------------------------------------------------------------
+# A app é uma SPA que conversa via fetch/JSON. As APIs de leitura e os endpoints
+# de IA usam autenticação própria por sessão e ficam fora do CSRF. Só os
+# endpoints de ESCRITA do admin (CRUD de /api/casos) — disparados de um
+# formulário no navegador com cookie de sessão — recebem validação de token.
+#
+# WTF_CSRF_CHECK_DEFAULT = False desliga a proteção automática global; aplicamos
+# explicitamente via @csrf_required nos endpoints que precisam. O token é
+# exposto à página admin por csrf_token() (Jinja) e enviado no header
+# X-CSRFToken pelos fetch().
+app.config["WTF_CSRF_CHECK_DEFAULT"] = False
+app.config.setdefault("WTF_CSRF_TIME_LIMIT", None)  # token válido enquanto a sessão durar
+csrf = CSRFProtect(app)
+
+
+@app.errorhandler(CSRFError)
+def _handle_csrf_error(exc: CSRFError):
+    return jsonify({"error": "Token CSRF inválido ou ausente.", "csrf": True}), 400
+
+
+def csrf_required(fn):
+    """Valida o token CSRF (campo csrf_token ou header X-CSRFToken) antes da view."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        csrf.protect()  # levanta CSRFError (400) se o token for inválido/ausente
+        return fn(*args, **kwargs)
+
+    return wrapper
 
 
 @app.route("/api/health")
@@ -64,7 +97,32 @@ def fornecedor_page(fornecedor_ni: str):
 def add_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRFToken"
+    return response
+
+
+# Content-Security-Policy — libera apenas as origens efetivamente usadas pelos
+# templates: Chart.js (cdn.jsdelivr.net), vis-network (unpkg.com), Google Fonts.
+# 'unsafe-inline' é necessário para os handlers onclick e <style> inline.
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data:; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'"
+)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = _CSP
     return response
 
 
@@ -583,6 +641,7 @@ def alertas_agrupados():
 # ---------------------------------------------------------------------------
 
 @app.route("/api/alertas/<int:alert_id>", methods=["GET", "PATCH", "OPTIONS"])
+@requer_login
 def alertas_detail(alert_id: int):
     if request.method == "OPTIONS":
         return "", 204
@@ -1884,6 +1943,7 @@ def empenhos_list():
 # ---------------------------------------------------------------------------
 
 @app.route("/api/watchlists", methods=["GET", "POST", "OPTIONS"])
+@requer_login
 def watchlists_collection():
     if request.method == "OPTIONS":
         return "", 204
@@ -1917,6 +1977,7 @@ def watchlists_collection():
 
 
 @app.route("/api/watchlists/<int:watchlist_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
+@requer_login
 def watchlists_detail(watchlist_id: int):
     if request.method == "OPTIONS":
         return "", 204
@@ -1952,6 +2013,7 @@ def watchlists_detail(watchlist_id: int):
 # ---------------------------------------------------------------------------
 
 @app.route("/api/regras-alerta", methods=["GET", "POST", "OPTIONS"])
+@requer_login
 def regras_alerta_collection():
     if request.method == "OPTIONS":
         return "", 204
@@ -1984,6 +2046,7 @@ def regras_alerta_collection():
 
 
 @app.route("/api/regras-alerta/<int:regra_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
+@requer_login
 def regras_alerta_detail(regra_id: int):
     if request.method == "OPTIONS":
         return "", 204
@@ -2158,6 +2221,7 @@ def api_casos_list():
 
 @app.route("/api/casos", methods=["POST"])
 @requer_admin
+@csrf_required
 def api_casos_create():
     data = request.get_json(force=True)
     required = ("titulo", "status")
@@ -2192,6 +2256,7 @@ def api_casos_create():
 
 @app.route("/api/casos/<int:caso_id>", methods=["PATCH"])
 @requer_admin
+@csrf_required
 def api_casos_update(caso_id: int):
     data = request.get_json(force=True)
     db = get_db()
@@ -2223,6 +2288,7 @@ def api_casos_update(caso_id: int):
 
 @app.route("/api/casos/<int:caso_id>", methods=["DELETE"])
 @requer_admin
+@csrf_required
 def api_casos_delete(caso_id: int):
     db = get_db()
     try:

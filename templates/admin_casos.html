@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Admin — Casos Investigados · Sentinela RJ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -347,6 +348,8 @@
       return `R$ ${v.toLocaleString('pt-BR')}`;
     }
 
+    const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
     let todosOsCasos = [];
 
     async function carregarCasos() {
@@ -458,7 +461,7 @@
       try {
         const res = await fetch(url, {
           method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
           body: JSON.stringify(payload),
         });
         const data = await res.json();
@@ -475,7 +478,10 @@
       const c = todosOsCasos.find(x => x.id === id);
       if (!confirm(`Remover o caso "${c?.titulo}"? Esta ação não pode ser desfeita.`)) return;
       try {
-        const res = await fetch(`/api/casos/${id}`, { method: 'DELETE' });
+        const res = await fetch(`/api/casos/${id}`, {
+          method: 'DELETE',
+          headers: { 'X-CSRFToken': CSRF_TOKEN },
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         showMsg('Caso removido.', 'ok');
         await carregarCasos();

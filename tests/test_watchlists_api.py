@@ -19,8 +19,9 @@ def _bootstrap_db(db_file: Path) -> None:
 
 
 @pytest.fixture
-def client(tmp_path: Path):
+def client(tmp_path: Path, monkeypatch):
     import web_app as wa
+    import web_auth
 
     wa._migracoes_aplicadas = True
     db_file = tmp_path / "flask_api.db"
@@ -32,8 +33,44 @@ def client(tmp_path: Path):
         return conexao
 
     wa.get_db = _fake_get_db
+    # CRUD de watchlists/regras exige login (requer_login); simula usuário logado.
+    monkeypatch.setattr(
+        web_auth, "usuario_atual",
+        lambda conn: {"id": 1, "is_admin": 0, "email_verificado": 1},
+    )
     with wa.app.test_client() as test_client:
         yield test_client
+
+
+@pytest.fixture
+def client_anon(tmp_path: Path):
+    """Cliente sem login — para checar bloqueio de escrita (requer_login)."""
+    import web_app as wa
+
+    wa._migracoes_aplicadas = True
+    db_file = tmp_path / "flask_api_anon.db"
+    _bootstrap_db(db_file)
+
+    def _fake_get_db() -> sqlite3.Connection:
+        conexao = sqlite3.connect(db_file, check_same_thread=False)
+        conexao.row_factory = sqlite3.Row
+        return conexao
+
+    wa.get_db = _fake_get_db
+    with wa.app.test_client() as test_client:
+        yield test_client
+
+
+def test_escrita_sem_login_bloqueada(client_anon) -> None:
+    """POST/PATCH/DELETE sem sessão → 401; GET continua público."""
+    res = client_anon.post("/api/watchlists", json={"rotulo": "x"})
+    assert res.status_code == 401
+    res = client_anon.post("/api/regras-alerta", json={"severidade_min": "alta"})
+    assert res.status_code == 401
+    res = client_anon.patch("/api/alertas/1", json={"status": "investigando"})
+    assert res.status_code == 401
+    # leitura pública permanece liberada
+    assert client_anon.get("/api/watchlists").status_code == 200
 
 
 def test_watchlists_post_e_listagem(client) -> None:
