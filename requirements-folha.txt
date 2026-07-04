@@ -1,0 +1,3 @@
+# Importação da folha de pagamento (PCRJ) para o Supabase
+-r requirements.txt
+psycopg2-binary>=2.9.0
