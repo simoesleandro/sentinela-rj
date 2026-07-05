@@ -53,3 +53,6 @@ backend.zip
 frontend.zip
 reflex.lock/
 .streamlit/
+
+# ── Scratch ──────────────────────────────────────────────────────────────
+scratch/
