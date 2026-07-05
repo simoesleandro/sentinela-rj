@@ -48,6 +48,11 @@
     }
     .fornecedor-link { color: var(--blue); text-decoration: none; font-size: 0.8rem; }
     .fornecedor-link:hover { text-decoration: underline; }
+    #ci-table { min-width: 920px; }
+    @media (max-width: 768px) {
+      #ci-table { min-width: 720px; }
+      .ci-col-opcional { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -196,8 +201,8 @@
               </a>
             </td>
             <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_servidor || '—')}</td>
-            <td style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.matricula_servidor || '—')}</td>
-            <td style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.sigla_ua || '—')}</td>
+            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.matricula_servidor || '—')}</td>
+            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.sigla_ua || '—')}</td>
             <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
             <td>${statusBadge(c.status)}</td>
             <td>${acaoHtml}</td>
@@ -206,14 +211,14 @@
 
       content.innerHTML = `
         <div class="table-wrap">
-          <table>
+          <table id="ci-table">
             <thead>
               <tr>
                 <th>Sócio</th>
                 <th>Fornecedor</th>
                 <th>Servidor</th>
-                <th>Matrícula</th>
-                <th>Unidade</th>
+                <th class="ci-col-opcional">Matrícula</th>
+                <th class="ci-col-opcional">Unidade</th>
                 <th>Score</th>
                 <th>Status</th>
                 <th>Ação</th>
