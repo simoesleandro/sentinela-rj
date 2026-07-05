@@ -21,11 +21,13 @@ class _FakeFolhaPagamentoRepository(FolhaPagamentoRepository):
         self._chaves_folha: set[tuple[str, str, date]] = set()
         self.folha: list[RegistroFolha] = []
 
-    def upsert_servidor(self, matricula: str, nome: str) -> None:
-        self.servidores[matricula] = nome
+    def upsert_servidores_em_lote(self, itens: Iterable[tuple[str, str]]) -> None:
+        for matricula, nome in itens:
+            self.servidores[matricula] = nome
 
-    def upsert_orgao(self, sigla_ua: str, nome: str | None) -> None:
-        self.orgaos[sigla_ua] = nome
+    def upsert_orgaos_em_lote(self, itens: Iterable[tuple[str, str | None]]) -> None:
+        for sigla_ua, nome in itens:
+            self.orgaos[sigla_ua] = nome
 
     def insert_folha_mensal(self, registros: Iterable[RegistroFolha]) -> int:
         inseridos = 0
@@ -76,7 +78,7 @@ def test_importar_matricula_duplicada_tipos_diferentes_gera_multiplas_linhas(tmp
     resultado = PayrollImportService(repo).importar(caminho)
 
     assert resultado == {"lidos": 2, "inseridos": 2, "ignorados": 0}
-    # upsert_servidor/orgao chamado uma vez por matrícula/órgão distintos, não por linha
+    # servidores/orgaos dedupados antes do lote — uma entrada por matrícula/órgão distinto
     assert repo.servidores == {"12345": "MARIA DA SILVA"}
     assert set(repo.orgaos.keys()) == {"SMS"}
 

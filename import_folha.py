@@ -1,17 +1,11 @@
-"""CLI de importação manual da folha de pagamento (PCRJ) para o Supabase.
-
-Uso:
-    python import_folha.py caminho/ArquivoTC202106.csv
-
-Requer a variável de ambiente FOLHA_DATABASE_URL (connection string do Postgres
-do Supabase dedicado a este domínio — ver .env.example).
-"""
 from __future__ import annotations
 
 import argparse
 import logging
 import os
 import sys
+
+from dotenv import load_dotenv
 
 from folha_pagamento.repository import SupabaseFolhaPagamentoRepository
 from folha_pagamento.service import PayrollImportService
@@ -20,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> int:
+    load_dotenv()  # <-- precisa rodar ANTES de ler qualquer variável de ambiente
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     parser = argparse.ArgumentParser(description="Importa folha de pagamento PCRJ para o Supabase")

@@ -20,15 +20,14 @@ class PayrollImportService:
     def importar(self, caminho_csv: str | Path) -> dict[str, Any]:
         registros = PayrollCSVParser(caminho_csv).parse()
 
-        servidores_vistos: set[str] = set()
-        orgaos_vistos: set[str] = set()
+        servidores: dict[str, str] = {}
+        orgaos: dict[str, str | None] = {}
         for r in registros:
-            if r.matricula not in servidores_vistos:
-                self._repository.upsert_servidor(r.matricula, r.nome)
-                servidores_vistos.add(r.matricula)
-            if r.sigla_ua not in orgaos_vistos:
-                self._repository.upsert_orgao(r.sigla_ua, None)
-                orgaos_vistos.add(r.sigla_ua)
+            servidores.setdefault(r.matricula, r.nome)
+            orgaos.setdefault(r.sigla_ua, None)
+
+        self._repository.upsert_servidores_em_lote(list(servidores.items()))
+        self._repository.upsert_orgaos_em_lote(list(orgaos.items()))
 
         inseridos = self._repository.insert_folha_mensal(registros)
         resultado = {
