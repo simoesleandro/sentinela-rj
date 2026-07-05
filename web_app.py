@@ -2141,7 +2141,7 @@ def _serializar_candidato_conflito(item: dict) -> dict:
     nenhum dos dois é serializável por jsonify sem conversão explícita."""
     if item.get("score_similaridade") is not None:
         item["score_similaridade"] = float(item["score_similaridade"])
-    for campo in ("detectado_em", "revisado_em"):
+    for campo in ("detectado_em", "revisado_em", "data_entrada_sociedade", "primeira_competencia_servidor"):
         if item.get(campo) is not None:
             item[campo] = item[campo].isoformat()
     return item
@@ -2173,7 +2173,9 @@ def api_conflitos_interesse_list():
                 """
                 SELECT id, fornecedor_ni, nome_socio, qualificacao_socio,
                        matricula_servidor, nome_servidor, sigla_ua,
-                       score_similaridade, status, detectado_em, revisado_em
+                       score_similaridade, data_entrada_sociedade,
+                       faixa_etaria_socio, primeira_competencia_servidor,
+                       status, detectado_em, revisado_em
                 FROM candidatos_conflito_interesse
                 ORDER BY score_similaridade DESC
                 """
@@ -2183,7 +2185,9 @@ def api_conflitos_interesse_list():
                 """
                 SELECT id, fornecedor_ni, nome_socio, qualificacao_socio,
                        matricula_servidor, nome_servidor, sigla_ua,
-                       score_similaridade, status, detectado_em, revisado_em
+                       score_similaridade, data_entrada_sociedade,
+                       faixa_etaria_socio, primeira_competencia_servidor,
+                       status, detectado_em, revisado_em
                 FROM candidatos_conflito_interesse
                 WHERE status = %s
                 ORDER BY score_similaridade DESC

@@ -48,7 +48,7 @@
     }
     .fornecedor-link { color: var(--blue); text-decoration: none; font-size: 0.8rem; }
     .fornecedor-link:hover { text-decoration: underline; }
-    #ci-table { min-width: 920px; }
+    #ci-table { min-width: 1260px; }
     @media (max-width: 768px) {
       #ci-table { min-width: 720px; }
       .ci-col-opcional { display: none; }
@@ -105,6 +105,13 @@
     function escapeHtml(str) {
       if (!str) return '';
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const d = String(iso).slice(0, 10).split('-');
+      if (d.length !== 3) return iso;
+      return `${d[2]}/${d[1]}/${d[0]}`;
     }
 
     function formatCNPJ(ni) {
@@ -203,6 +210,9 @@
             <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_servidor || '—')}</td>
             <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.matricula_servidor || '—')}</td>
             <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.sigla_ua || '—')}</td>
+            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted);white-space:nowrap">${formatDate(c.data_entrada_sociedade)}</td>
+            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.faixa_etaria_socio || '—')}</td>
+            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted);white-space:nowrap">${formatDate(c.primeira_competencia_servidor)}</td>
             <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
             <td>${statusBadge(c.status)}</td>
             <td>${acaoHtml}</td>
@@ -219,6 +229,9 @@
                 <th>Servidor</th>
                 <th class="ci-col-opcional">Matrícula</th>
                 <th class="ci-col-opcional">Unidade</th>
+                <th class="ci-col-opcional">Entrada sociedade</th>
+                <th class="ci-col-opcional">Faixa etária</th>
+                <th class="ci-col-opcional">1ª competência</th>
                 <th>Score</th>
                 <th>Status</th>
                 <th>Ação</th>

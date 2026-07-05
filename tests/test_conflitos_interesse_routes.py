@@ -24,7 +24,9 @@ class _FakeCursor:
             cols = [
                 "id", "fornecedor_ni", "nome_socio", "qualificacao_socio",
                 "matricula_servidor", "nome_servidor", "sigla_ua",
-                "score_similaridade", "status", "detectado_em", "revisado_em",
+                "score_similaridade", "data_entrada_sociedade",
+                "faixa_etaria_socio", "primeira_competencia_servidor",
+                "status", "detectado_em", "revisado_em",
             ]
             rows = list(self._tabela.values())
             if "WHERE status = %s" in sql_norm:
@@ -99,6 +101,9 @@ def _candidato(
         "nome_servidor": "MARIA SILVA SANTOS",
         "sigla_ua": "SMS",
         "score_similaridade": score,
+        "data_entrada_sociedade": None,
+        "faixa_etaria_socio": None,
+        "primeira_competencia_servidor": None,
         "status": status,
         "detectado_em": datetime.now(timezone.utc),
         "revisado_em": None,

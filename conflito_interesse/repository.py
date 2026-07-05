@@ -16,7 +16,11 @@ from .matcher import CandidatoConflito
 class CandidatoConflitoRepository:
     """INSERT em lote via execute_values — nunca linha a linha (mesma lição do
     domínio folha_pagamento). Idempotente via ON CONFLICT (fornecedor_ni,
-    matricula_servidor) DO NOTHING: rodar de novo não duplica candidatos.
+    matricula_servidor) DO UPDATE: rodar de novo não duplica candidatos, mas
+    atualiza os sinais extras (data_entrada_sociedade, faixa_etaria_socio,
+    primeira_competencia_servidor) dos já existentes — sem tocar status nem
+    revisado_em, que pertencem exclusivamente ao fluxo de triagem manual
+    (ConflitoTriagemRepository).
     """
 
     def __init__(self, conn: Any, batch_size: int = 500):
@@ -33,6 +37,9 @@ class CandidatoConflitoRepository:
                 c.nome_servidor,
                 c.sigla_ua,
                 c.score_similaridade,
+                c.data_entrada_sociedade,
+                c.faixa_etaria_socio,
+                c.primeira_competencia_servidor,
             )
             for c in candidatos
         ]
@@ -40,18 +47,22 @@ class CandidatoConflitoRepository:
             return 0
 
         cur = self._conn.cursor()
-        inseridos = execute_values(
+        afetados = execute_values(
             cur,
             """INSERT INTO candidatos_conflito_interesse (
                    fornecedor_ni, nome_socio, qualificacao_socio,
                    matricula_servidor, nome_servidor, sigla_ua,
-                   score_similaridade
+                   score_similaridade, data_entrada_sociedade,
+                   faixa_etaria_socio, primeira_competencia_servidor
                ) VALUES %s
-               ON CONFLICT (fornecedor_ni, matricula_servidor) DO NOTHING
+               ON CONFLICT (fornecedor_ni, matricula_servidor) DO UPDATE SET
+                   data_entrada_sociedade = EXCLUDED.data_entrada_sociedade,
+                   faixa_etaria_socio = EXCLUDED.faixa_etaria_socio,
+                   primeira_competencia_servidor = EXCLUDED.primeira_competencia_servidor
                RETURNING id""",
             valores,
             page_size=self._batch_size,
             fetch=True,
         )
         self._conn.commit()
-        return len(inseridos)
+        return len(afetados)

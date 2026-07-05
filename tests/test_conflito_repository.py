@@ -16,11 +16,22 @@ from conflito_interesse.repository import CandidatoConflitoRepository
 
 
 class _FakeCursor:
-    """Simula a tabela candidatos_conflito_interesse com UNIQUE (fornecedor_ni, matricula_servidor)."""
+    """Simula a tabela candidatos_conflito_interesse com UNIQUE (fornecedor_ni,
+    matricula_servidor) e ON CONFLICT DO UPDATE dos 3 campos de sinal extra
+    (data_entrada_sociedade, faixa_etaria_socio, primeira_competencia_servidor),
+    preservando status/revisado_em — não fazem parte do SET do UPDATE real."""
 
-    def __init__(self, tabela: dict[tuple[str, str], int]):
+    _COLUNAS = (
+        "fornecedor_ni", "nome_socio", "qualificacao_socio",
+        "matricula_servidor", "nome_servidor", "sigla_ua",
+        "score_similaridade", "data_entrada_sociedade",
+        "faixa_etaria_socio", "primeira_competencia_servidor",
+    )
+
+    def __init__(self, tabela: dict[tuple[str, str], dict], linhas_por_chave: dict[tuple[str, str], int]):
         self._tabela = tabela
-        self._proximo_id = max(tabela.values(), default=0) + 1
+        self._linhas_por_chave = linhas_por_chave
+        self._proximo_id = max(linhas_por_chave.values(), default=0) + 1
         self.queries: list[str] = []
         self._resultado: list[tuple[int]] = []
         self.connection = type("_FakeRawConn", (), {"encoding": "UTF8"})()
@@ -36,14 +47,20 @@ class _FakeCursor:
 
         tuplas = re.findall(r"\(([^()]+)\)", sql.split("VALUES")[1].split("ON CONFLICT")[0])
         for t in tuplas:
-            valores = [v.strip().strip("'") for v in t.split(",")]
-            fornecedor_ni, matricula_servidor = valores[0], valores[3]
-            chave = (fornecedor_ni, matricula_servidor)
-            if chave in self._tabela:
-                continue
-            self._tabela[chave] = self._proximo_id
-            self._resultado.append((self._proximo_id,))
-            self._proximo_id += 1
+            valores = [None if v.strip() == "NULL" else v.strip().strip("'") for v in t.split(",")]
+            linha = dict(zip(self._COLUNAS, valores))
+            chave = (linha["fornecedor_ni"], linha["matricula_servidor"])
+            if chave in self._linhas_por_chave:
+                registro = self._tabela[self._linhas_por_chave[chave]]
+                registro["data_entrada_sociedade"] = linha["data_entrada_sociedade"]
+                registro["faixa_etaria_socio"] = linha["faixa_etaria_socio"]
+                registro["primeira_competencia_servidor"] = linha["primeira_competencia_servidor"]
+            else:
+                id_ = self._proximo_id
+                self._linhas_por_chave[chave] = id_
+                self._tabela[id_] = {**linha, "status": "aberto", "revisado_em": None}
+                self._proximo_id += 1
+            self._resultado.append((self._linhas_por_chave[chave],))
 
     def fetchall(self) -> list[tuple[int]]:
         return self._resultado
@@ -55,12 +72,13 @@ class _FakeCursor:
 
 class _FakeConn:
     def __init__(self):
-        self.tabela: dict[tuple[str, str], int] = {}
+        self.tabela: dict[int, dict] = {}
+        self.linhas_por_chave: dict[tuple[str, str], int] = {}
         self.commits = 0
         self.last_cursor: _FakeCursor | None = None
 
     def cursor(self) -> _FakeCursor:
-        self.last_cursor = _FakeCursor(self.tabela)
+        self.last_cursor = _FakeCursor(self.tabela, self.linhas_por_chave)
         return self.last_cursor
 
     def commit(self) -> None:
@@ -71,6 +89,9 @@ def _candidato(
     fornecedor_ni: str = "12345678000199",
     matricula_servidor: str = "0001",
     score: float = 92.5,
+    data_entrada_sociedade: str | None = None,
+    faixa_etaria_socio: str | None = None,
+    primeira_competencia_servidor: str | None = None,
 ) -> CandidatoConflito:
     return CandidatoConflito(
         fornecedor_ni=fornecedor_ni,
@@ -80,6 +101,9 @@ def _candidato(
         nome_servidor="MARIA SILVA SANTOS",
         sigla_ua=None,
         score_similaridade=score,
+        data_entrada_sociedade=data_entrada_sociedade,
+        faixa_etaria_socio=faixa_etaria_socio,
+        primeira_competencia_servidor=primeira_competencia_servidor,
     )
 
 
@@ -97,16 +121,55 @@ def test_salvar_candidatos_insere_novos(conn):
     assert conn.commits == 1
 
 
-def test_salvar_candidatos_idempotente_nao_duplica(conn):
+def test_salvar_candidatos_reprocessamento_nao_duplica_linha(conn):
+    """Rodar o matcher de novo com o mesmo candidato faz UPSERT (não INSERT
+    ignorado) — a linha é atualizada, mas não duplicada."""
     repo = CandidatoConflitoRepository(conn)
     registros = [_candidato()]
 
-    primeira = repo.salvar_candidatos(registros)
-    segunda = repo.salvar_candidatos(registros)
+    repo.salvar_candidatos(registros)
+    repo.salvar_candidatos(registros)
 
-    assert primeira == 1
-    assert segunda == 0
     assert len(conn.tabela) == 1
+
+
+def test_salvar_candidatos_reprocessamento_preserva_status_e_revisado_em(conn):
+    """UPSERT não deve sobrescrever status nem revisado_em de um candidato
+    já triado manualmente — só os sinais extras são atualizados."""
+    repo = CandidatoConflitoRepository(conn)
+    registros = [_candidato()]
+    repo.salvar_candidatos(registros)
+
+    id_ = next(iter(conn.tabela))
+    conn.tabela[id_]["status"] = "confirmado"
+    conn.tabela[id_]["revisado_em"] = "2026-01-01T00:00:00"
+
+    repo.salvar_candidatos(
+        [_candidato(data_entrada_sociedade="2010-05-01", faixa_etaria_socio="41 a 50 anos")]
+    )
+
+    assert conn.tabela[id_]["status"] == "confirmado"
+    assert conn.tabela[id_]["revisado_em"] == "2026-01-01T00:00:00"
+
+
+def test_salvar_candidatos_reprocessamento_atualiza_sinais_extras(conn):
+    repo = CandidatoConflitoRepository(conn)
+    repo.salvar_candidatos([_candidato()])
+
+    id_ = next(iter(conn.tabela))
+    assert conn.tabela[id_]["data_entrada_sociedade"] is None
+
+    repo.salvar_candidatos(
+        [_candidato(
+            data_entrada_sociedade="2010-05-01",
+            faixa_etaria_socio="41 a 50 anos",
+            primeira_competencia_servidor="2015-03-01",
+        )]
+    )
+
+    assert conn.tabela[id_]["data_entrada_sociedade"] == "2010-05-01"
+    assert conn.tabela[id_]["faixa_etaria_socio"] == "41 a 50 anos"
+    assert conn.tabela[id_]["primeira_competencia_servidor"] == "2015-03-01"
 
 
 def test_salvar_candidatos_matriculas_diferentes_mesmo_fornecedor(conn):
@@ -137,5 +200,9 @@ def test_salvar_candidatos_usa_sql_correta(conn):
 
     sql = conn.last_cursor.queries[0]
     assert "INSERT INTO candidatos_conflito_interesse" in sql
-    assert "ON CONFLICT (fornecedor_ni, matricula_servidor) DO NOTHING" in sql
+    assert "ON CONFLICT (fornecedor_ni, matricula_servidor) DO UPDATE SET" in sql
+    assert "data_entrada_sociedade = EXCLUDED.data_entrada_sociedade" in sql
+    assert "faixa_etaria_socio = EXCLUDED.faixa_etaria_socio" in sql
+    assert "primeira_competencia_servidor = EXCLUDED.primeira_competencia_servidor" in sql
+    assert "status" not in sql.split("DO UPDATE SET")[1].split("RETURNING")[0]
     assert "RETURNING id" in sql

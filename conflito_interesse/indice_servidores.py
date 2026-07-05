@@ -45,3 +45,12 @@ class IndiceServidoresPorToken:
             (matricula,),
         ).fetchone()
         return row[0] if row else None
+
+    def primeira_competencia(self, matricula: str) -> str | None:
+        """Competência mais antiga daquela matrícula em folha_mensal — para o
+        revisor comparar com data_entrada_sociedade na triagem manual."""
+        row = self._conn.execute(
+            "SELECT MIN(competencia) FROM folha_mensal WHERE matricula = ?",
+            (matricula,),
+        ).fetchone()
+        return row[0] if row and row[0] else None

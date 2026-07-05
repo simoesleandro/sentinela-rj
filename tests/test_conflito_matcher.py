@@ -31,15 +31,34 @@ def _conn_servidores(
     return conn
 
 
-def _socios_json(nome_socio: str, qualificacao: str = "Sócio-Administrador") -> str:
-    return json.dumps([{"nome_socio": nome_socio, "qualificacao_socio": qualificacao}])
+def _socios_json(
+    nome_socio: str,
+    qualificacao: str = "Sócio-Administrador",
+    data_entrada_sociedade: str | None = None,
+    faixa_etaria: str | None = None,
+) -> str:
+    socio = {"nome_socio": nome_socio, "qualificacao_socio": qualificacao}
+    if data_entrada_sociedade is not None:
+        socio["data_entrada_sociedade"] = data_entrada_sociedade
+    if faixa_etaria is not None:
+        socio["faixa_etaria"] = faixa_etaria
+    return json.dumps([socio])
 
 
 def test_match_positivo_nome_batendo():
-    conn_forn = _conn_fornecedores([("12345678000199", _socios_json("MARIA DA SILVA SANTOS"))])
+    conn_forn = _conn_fornecedores(
+        [(
+            "12345678000199",
+            _socios_json(
+                "MARIA DA SILVA SANTOS",
+                data_entrada_sociedade="2010-05-01",
+                faixa_etaria="41 a 50 anos",
+            ),
+        )]
+    )
     conn_serv = _conn_servidores(
         [("0001", "MARIA DA SILVA SANTOS")],
-        folha_mensal=[("0001", "SMS", "2024-01-01")],
+        folha_mensal=[("0001", "SMS", "2024-01-01"), ("0001", "SMS", "2015-03-01")],
     )
     indice = IndiceServidoresPorToken(conn_serv)
 
@@ -53,6 +72,9 @@ def test_match_positivo_nome_batendo():
     assert c.qualificacao_socio == "Sócio-Administrador"
     assert c.sigla_ua == "SMS"
     assert c.score_similaridade >= 90
+    assert c.data_entrada_sociedade == "2010-05-01"
+    assert c.faixa_etaria_socio == "41 a 50 anos"
+    assert c.primeira_competencia_servidor == "2015-03-01"
 
 
 def test_match_negativo_primeiro_token_diferente_nao_entra_no_indice():
@@ -116,3 +138,18 @@ def test_sigla_ua_fica_none_quando_servidor_sem_folha_mensal():
 
     assert len(candidatos) == 1
     assert candidatos[0].sigla_ua is None
+    assert candidatos[0].primeira_competencia_servidor is None
+
+
+def test_campos_extras_ausentes_no_json_ficam_none():
+    """Sócio sem data_entrada_sociedade/faixa_etaria no JSON (schema antigo,
+    ou brasilapi não retornou o campo) não deve quebrar o matcher."""
+    conn_forn = _conn_fornecedores([("12345678000199", _socios_json("MARIA DA SILVA SANTOS"))])
+    conn_serv = _conn_servidores([("0001", "MARIA DA SILVA SANTOS")])
+    indice = IndiceServidoresPorToken(conn_serv)
+
+    candidatos = ConflictMatcherService(conn_forn, indice).buscar_candidatos()
+
+    assert len(candidatos) == 1
+    assert candidatos[0].data_entrada_sociedade is None
+    assert candidatos[0].faixa_etaria_socio is None

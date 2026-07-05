@@ -26,6 +26,9 @@ class CandidatoConflito:
     nome_servidor: str
     sigla_ua: str | None
     score_similaridade: float
+    data_entrada_sociedade: str | None = None
+    faixa_etaria_socio: str | None = None
+    primeira_competencia_servidor: str | None = None
 
 
 class ConflictMatcherService:
@@ -74,6 +77,9 @@ class ConflictMatcherService:
                         nome_servidor=nome_servidor,
                         sigla_ua=self._indice.sigla_ua_mais_recente(matricula),
                         score_similaridade=float(score),
+                        data_entrada_sociedade=socio.get("data_entrada_sociedade"),
+                        faixa_etaria_socio=socio.get("faixa_etaria"),
+                        primeira_competencia_servidor=self._indice.primeira_competencia(matricula),
                     )
                 )
         return resultado

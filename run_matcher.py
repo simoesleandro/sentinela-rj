@@ -54,14 +54,16 @@ def main() -> int:
         alta_confianca = sum(1 for c in candidatos if c.score_similaridade >= 90)
         media_confianca = sum(1 for c in candidatos if 80 <= c.score_similaridade < 90)
 
-        inseridos = CandidatoConflitoRepository(conn_supabase).salvar_candidatos(candidatos)
+        afetados = CandidatoConflitoRepository(conn_supabase).salvar_candidatos(candidatos)
 
         logger.info("Fornecedores processados: %d", fornecedores_processados)
         logger.info(
             "Candidatos gerados: %d (score>=90: %d, score 80-89: %d)",
             len(candidatos), alta_confianca, media_confianca,
         )
-        logger.info("Candidatos novos inseridos: %d", inseridos)
+        logger.info(
+            "Candidatos inseridos ou atualizados (upsert, status preservado): %d", afetados
+        )
     finally:
         conn_folha.close()
         conn_sentinela.close()
