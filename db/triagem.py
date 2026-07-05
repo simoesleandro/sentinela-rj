@@ -6,62 +6,23 @@ from datetime import datetime, timezone
 from typing import Any
 
 from analise.motivos_descarte import MOTIVOS_FALSO_POSITIVO, formatar_nota_descarte
-
-STATUS_ABERTO = "aberto"
-STATUS_INVESTIGANDO = "investigando"
-STATUS_CONFIRMADO = "confirmado"
-STATUS_DESCARTADO = "descartado"
-
-STATUS_VALIDOS: frozenset[str] = frozenset({
+from db.triagem_core import (
     STATUS_ABERTO,
-    STATUS_INVESTIGANDO,
     STATUS_CONFIRMADO,
     STATUS_DESCARTADO,
-})
-
-_TRANSICOES: dict[str, frozenset[str]] = {
-    STATUS_ABERTO: frozenset({STATUS_INVESTIGANDO, STATUS_DESCARTADO}),
-    STATUS_INVESTIGANDO: frozenset({
-        STATUS_CONFIRMADO,
-        STATUS_DESCARTADO,
-        STATUS_ABERTO,
-    }),
-    STATUS_CONFIRMADO: frozenset({STATUS_INVESTIGANDO}),
-    STATUS_DESCARTADO: frozenset({STATUS_ABERTO, STATUS_INVESTIGANDO}),
-}
+    STATUS_INVESTIGANDO,
+    STATUS_VALIDOS,
+    TriagemError,
+    normalizar_status,
+    status_permitidos,
+    validar_transicao,
+)
 
 _FILA_STATUS = (STATUS_ABERTO, STATUS_INVESTIGANDO)
 
 
-class TriagemError(ValueError):
-    """Erro de validação na triagem."""
-
-
 class AlertaNaoEncontradoError(LookupError):
     """Alerta inexistente."""
-
-
-def normalizar_status(status: str | None) -> str:
-    valor = (status or STATUS_ABERTO).strip().lower()
-    return valor if valor in STATUS_VALIDOS else STATUS_ABERTO
-
-
-def status_permitidos(status_atual: str | None) -> list[str]:
-    atual = normalizar_status(status_atual)
-    return sorted(_TRANSICOES.get(atual, frozenset()))
-
-
-def _validar_transicao(atual: str, novo: str) -> None:
-    if novo not in STATUS_VALIDOS:
-        raise TriagemError(
-            f"Status inválido: '{novo}'. Use: {', '.join(sorted(STATUS_VALIDOS))}."
-        )
-    permitidos = _TRANSICOES.get(atual, frozenset())
-    if novo not in permitidos:
-        raise TriagemError(
-            f"Transição '{atual}' → '{novo}' não permitida. "
-            f"Opções: {', '.join(sorted(permitidos)) or 'nenhuma'}."
-        )
 
 
 def listar_historico(conn: sqlite3.Connection, alerta_id: int) -> list[dict[str, Any]]:
@@ -137,7 +98,7 @@ def atualizar_status_alerta(
             "historico": listar_historico(conn, alerta_id),
         }
 
-    _validar_transicao(anterior, novo)
+    validar_transicao(anterior, novo)
 
     conn.execute(
         """
@@ -199,3 +160,50 @@ def filtro_status_sql(param_status: str | None) -> tuple[str, list[str]]:
     if valor not in STATUS_VALIDOS:
         raise TriagemError(f"Filtro de status inválido: '{param_status}'.")
     return f"COALESCE(NULLIF(TRIM(a.status), ''), '{STATUS_ABERTO}') = ?", [valor]
+
+
+class AlertaTriagemRepository:
+    """Implementação de TriagemRepository (db.triagem_core) para alertas de
+    contrato em SQLite. Encapsula as funções acima sem alterar seu
+    comportamento — usada por consumidores que querem tratar a triagem de
+    forma genérica (via o Protocol); web_app.py continua chamando as funções
+    livres diretamente.
+    """
+
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+
+    def atualizar_status(
+        self,
+        id: int,
+        novo_status: str,
+        nota: str | None = None,
+        motivo_descarte: str | None = None,
+    ) -> None:
+        atualizar_status_alerta(
+            self._conn, id, status=novo_status, nota=nota, motivo_descarte=motivo_descarte
+        )
+
+    def registrar_historico(
+        self,
+        id: int,
+        status_anterior: str,
+        status_novo: str,
+        nota: str | None = None,
+    ) -> None:
+        """Insere uma linha de histórico avulsa, fora do fluxo de
+        atualizar_status (que já grava histórico atomicamente junto com a
+        mudança de status)."""
+        agora = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        self._conn.execute(
+            """
+            INSERT INTO alertas_historico (
+                alerta_id, status_anterior, status_novo, nota, criado_em
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (id, status_anterior, status_novo, nota, agora),
+        )
+        self._conn.commit()
+
+    def resumo_status(self) -> dict[str, int]:
+        return resumo_status(self._conn)
