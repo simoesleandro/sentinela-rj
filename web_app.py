@@ -1533,11 +1533,43 @@ def fornecedor_dossie(fornecedor_ni: str):
                 "valor_total": empenho_agg["valor_total"],
                 "recentes": [dict(r) for r in empenhos_recentes],
             },
+            "conflitos_interesse": _listar_conflitos_interesse_fornecedor(fornecedor_ni),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
+
+
+def _listar_conflitos_interesse_fornecedor(fornecedor_ni: str) -> list[dict]:
+    """Candidatos a conflito de interesse para este CNPJ — best-effort: se o
+    Postgres de conflito_interesse não estiver configurado/acessível, a
+    página de fornecedor continua funcionando normalmente sem essa seção."""
+    try:
+        conn = get_conflito_conn()
+    except Exception:
+        return []
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, nome_socio, qualificacao_socio, matricula_servidor,
+                   nome_servidor, sigla_ua, score_similaridade, status
+            FROM candidatos_conflito_interesse
+            WHERE fornecedor_ni = %s
+            ORDER BY score_similaridade DESC
+            """,
+            (fornecedor_ni,),
+        )
+        colunas = [d[0] for d in cur.description]
+        return [
+            _serializar_candidato_conflito(dict(zip(colunas, row)))
+            for row in cur.fetchall()
+        ]
+    except Exception:
+        return []
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------

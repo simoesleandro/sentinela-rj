@@ -214,6 +214,17 @@
         <div id="cadastro-content"></div>
       </section>
 
+      <!-- Conflito de Interesse (sócio também é servidor público) -->
+      <section class="forn-section" id="conflito-interesse-section" style="display:none">
+        <h2 class="section-title">Possível Conflito de Interesse</h2>
+        <p class="section-note">
+          Sócio(s) desta empresa com nome coincidente a servidor público ativo.
+          A triagem completa (confirmar/descartar) é feita em
+          <a href="/conflitos-interesse" class="contratos-link">/conflitos-interesse</a>.
+        </p>
+        <div id="conflito-interesse-content"></div>
+      </section>
+
       <!-- KPI cards -->
       <div id="forn-resumo" class="kpi-grid" style="margin-bottom:2.5rem"></div>
 
@@ -378,6 +389,7 @@
         document.title = `${d.identidade.razao_social} — Sentinela RJ`;
         renderHero(d.identidade, d.resumo);
         renderCadastro(d.cadastro, d.identidade);
+        renderConflitoInteresse(d.conflitos_interesse);
         renderResumo(d.resumo);
         renderTimeline(d.timeline);
         renderOrgaos(d.orgaos_contratantes);
@@ -446,6 +458,56 @@
         <div>
           <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Sócios / QSA</div>
           <ul style="list-style:none;padding:0;margin:0">${sociosHtml}</ul>
+        </div>`;
+    }
+
+    const CONFLITO_STATUS_LABELS = {
+      aberto: 'Aberto', investigando: 'Investigando',
+      confirmado: 'Confirmado', descartado: 'Descartado',
+    };
+    const CONFLITO_STATUS_BADGE = {
+      aberto: 'gray', investigando: 'yellow', confirmado: 'red', descartado: 'green',
+    };
+
+    function renderConflitoInteresse(candidatos) {
+      const section = document.getElementById('conflito-interesse-section');
+      const el = document.getElementById('conflito-interesse-content');
+      if (!section || !el) return;
+      if (!candidatos || !candidatos.length) {
+        section.style.display = 'none';
+        return;
+      }
+      section.style.display = 'block';
+
+      const rows = candidatos.map(c => {
+        const cls = CONFLITO_STATUS_BADGE[c.status] || 'gray';
+        const label = CONFLITO_STATUS_LABELS[c.status] || c.status;
+        return `
+          <tr>
+            <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_socio || '—')}</td>
+            <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_servidor || '—')}</td>
+            <td style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.matricula_servidor || '—')}</td>
+            <td style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.sigla_ua || '—')}</td>
+            <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
+            <td><span class="badge badge-${cls}">${escapeHtml(label)}</span></td>
+          </tr>`;
+      }).join('');
+
+      el.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Sócio</th>
+                <th>Servidor</th>
+                <th>Matrícula</th>
+                <th>Unidade</th>
+                <th>Score</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
         </div>`;
     }
 
