@@ -15,14 +15,13 @@ from typing import Any
 
 import pytest
 
-from folha_pagamento.parser import RegistroFolha
-from folha_pagamento.repository import SupabaseFolhaPagamentoRepository
+from folha_pagamento.repository import AgregadoFolhaMensal, SupabaseFolhaPagamentoRepository
 
 
 class _FakeCursor:
-    """Simula uma tabela folha_mensal com UNIQUE (matricula, tipo_folha, competencia)."""
+    """Simula uma tabela folha_mensal com UNIQUE (matricula, competencia)."""
 
-    def __init__(self, folha_mensal: dict[tuple[str, str, date], int]):
+    def __init__(self, folha_mensal: dict[tuple[str, str], int]):
         self._folha_mensal = folha_mensal
         self._proximo_id = max(folha_mensal.values(), default=0) + 1
         self.queries: list[str] = []
@@ -45,8 +44,8 @@ class _FakeCursor:
         tuplas = re.findall(r"\(([^()]+)\)", sql.split("VALUES")[1].split("ON CONFLICT")[0])
         for t in tuplas:
             valores = [v.strip().strip("'") for v in t.split(",")]
-            matricula, sigla_ua, competencia, tipo_folha = valores[0], valores[1], valores[2], valores[3]
-            chave = (matricula, tipo_folha, competencia)
+            matricula, competencia = valores[0], valores[2]
+            chave = (matricula, competencia)
             if chave in self._folha_mensal:
                 continue
             self._folha_mensal[chave] = self._proximo_id
@@ -66,7 +65,7 @@ class _FakeCursor:
 
 class _FakeConn:
     def __init__(self):
-        self.folha_mensal: dict[tuple[str, str, date], int] = {}
+        self.folha_mensal: dict[tuple[str, str], int] = {}
         self.servidores: dict[str, str] = {}
         self.orgaos: dict[str, str | None] = {}
         self.commits = 0
@@ -80,19 +79,18 @@ class _FakeConn:
         self.commits += 1
 
 
-def _registro(tipo_folha: str = "NORMAL", competencia=date(2021, 6, 1)) -> RegistroFolha:
-    return RegistroFolha(
-        nome="MARIA DA SILVA",
-        matricula="12345",
+def _agregado(
+    matricula: str = "12345",
+    competencia: date = date(2021, 6, 1),
+    remuneracao_bruta_total: float = 3518.31,
+    excedeu_teto: bool = False,
+) -> AgregadoFolhaMensal:
+    return AgregadoFolhaMensal(
+        matricula=matricula,
         sigla_ua="SMS",
-        tipo_folha=tipo_folha,
         competencia=competencia,
-        remuneracao_bruta=3018.31,
-        desconto_previdencia=301.83,
-        desconto_ir=150.00,
-        outros_descontos=10.50,
-        desconto_excedente_teto=0.00,
-        remuneracao_liquida=2555.98,
+        remuneracao_bruta_total=remuneracao_bruta_total,
+        excedeu_teto=excedeu_teto,
     )
 
 
@@ -103,7 +101,7 @@ def conn():
 
 def test_insert_folha_mensal_insere_novos_registros(conn):
     repo = SupabaseFolhaPagamentoRepository(conn)
-    inseridos = repo.insert_folha_mensal([_registro()])
+    inseridos = repo.insert_folha_mensal([_agregado()])
     assert inseridos == 1
     assert len(conn.folha_mensal) == 1
     assert conn.commits == 1
@@ -112,7 +110,7 @@ def test_insert_folha_mensal_insere_novos_registros(conn):
 def test_insert_folha_mensal_idempotente_reimportar_mesmo_arquivo(conn):
     """Importar o mesmo mês duas vezes não duplica linhas em folha_mensal."""
     repo = SupabaseFolhaPagamentoRepository(conn)
-    registros = [_registro()]
+    registros = [_agregado()]
 
     primeira = repo.insert_folha_mensal(registros)
     segunda = repo.insert_folha_mensal(registros)
@@ -122,13 +120,12 @@ def test_insert_folha_mensal_idempotente_reimportar_mesmo_arquivo(conn):
     assert len(conn.folha_mensal) == 1
 
 
-def test_insert_folha_mensal_matricula_duplicada_tipos_diferentes(conn):
-    """Mesma matrícula com TIPO_FOLHA diferente na mesma competência gera linhas distintas."""
+def test_insert_folha_mensal_matriculas_diferentes_geram_linhas_distintas(conn):
     repo = SupabaseFolhaPagamentoRepository(conn)
     registros = [
-        _registro(tipo_folha="NORMAL"),
-        _registro(tipo_folha="SUPLEMENTO"),
-        _registro(tipo_folha="FOLHA DE FERIAS"),
+        _agregado(matricula="12345"),
+        _agregado(matricula="54321"),
+        _agregado(matricula="99999"),
     ]
 
     inseridos = repo.insert_folha_mensal(registros)
@@ -144,7 +141,7 @@ def test_insert_folha_mensal_conta_corretamente_atraves_de_paginas(conn):
     RETURNING id + fetch=True, que agrega os resultados de todas as páginas.
     """
     repo = SupabaseFolhaPagamentoRepository(conn, batch_size=1)
-    registros = [_registro(tipo_folha=f"TIPO_{i}") for i in range(5)]
+    registros = [_agregado(matricula=f"MAT_{i}") for i in range(5)]
 
     inseridos = repo.insert_folha_mensal(registros)
 

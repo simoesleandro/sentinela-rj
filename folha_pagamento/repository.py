@@ -6,11 +6,26 @@ depender de uma instância real do Supabase (produção: psycopg2 + execute_valu
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import date
 from typing import Any, Iterable
 
 from psycopg2.extras import execute_values
 
-from .parser import RegistroFolha
+
+@dataclass
+class AgregadoFolhaMensal:
+    """Uma linha de folha_mensal: já agregada por (matricula, competencia).
+
+    Produzida pelo PayrollImportService a partir dos RegistroFolha crus do CSV
+    (que podem ter várias linhas por matrícula/mês, uma por tipo_folha).
+    """
+
+    matricula: str
+    sigla_ua: str
+    competencia: date
+    remuneracao_bruta_total: float
+    excedeu_teto: bool
 
 
 class FolhaPagamentoRepository(ABC):
@@ -23,8 +38,8 @@ class FolhaPagamentoRepository(ABC):
         ...
 
     @abstractmethod
-    def insert_folha_mensal(self, registros: Iterable[RegistroFolha]) -> int:
-        """Insere registros de folha mensal, ignorando conflitos de chave única.
+    def insert_folha_mensal(self, registros: Iterable[AgregadoFolhaMensal]) -> int:
+        """Insere registros agregados de folha mensal, ignorando conflitos de chave única.
 
         Returns:
             Número de linhas efetivamente inseridas (exclui as ignoradas por conflito).
@@ -70,24 +85,22 @@ class SupabaseFolhaPagamentoRepository(FolhaPagamentoRepository):
         )
         self._conn.commit()
 
-    def insert_folha_mensal(self, registros: Iterable[RegistroFolha]) -> int:
+    def insert_folha_mensal(self, registros: Iterable[AgregadoFolhaMensal]) -> int:
         cur = self._conn.cursor()
         valores = [
             (
-                r.matricula, r.sigla_ua, r.competencia, r.tipo_folha,
-                r.remuneracao_bruta, r.desconto_previdencia, r.desconto_ir,
-                r.outros_descontos, r.desconto_excedente_teto, r.remuneracao_liquida,
+                r.matricula, r.sigla_ua, r.competencia,
+                r.remuneracao_bruta_total, r.excedeu_teto,
             )
             for r in registros
         ]
         inseridos = execute_values(
             cur,
             """INSERT INTO folha_mensal (
-                   matricula, sigla_ua, competencia, tipo_folha,
-                   remuneracao_bruta, desconto_previdencia, desconto_ir,
-                   outros_descontos, desconto_excedente_teto, remuneracao_liquida
+                   matricula, sigla_ua, competencia,
+                   remuneracao_bruta_total, excedeu_teto
                ) VALUES %s
-               ON CONFLICT (matricula, tipo_folha, competencia) DO NOTHING
+               ON CONFLICT (matricula, competencia) DO NOTHING
                RETURNING id""",
             valores,
             page_size=self._batch_size,

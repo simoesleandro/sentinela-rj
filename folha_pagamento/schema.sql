@@ -17,12 +17,7 @@ CREATE TABLE IF NOT EXISTS folha_mensal (
     matricula                   TEXT NOT NULL REFERENCES servidores(matricula),
     sigla_ua                    TEXT NOT NULL REFERENCES orgaos(sigla_ua),
     competencia                 DATE NOT NULL,
-    tipo_folha                  TEXT NOT NULL,
-    remuneracao_bruta           NUMERIC(12,2),
-    desconto_previdencia        NUMERIC(12,2),
-    desconto_ir                 NUMERIC(12,2),
-    outros_descontos            NUMERIC(12,2),
-    desconto_excedente_teto     NUMERIC(12,2),
-    remuneracao_liquida         NUMERIC(12,2),
-    UNIQUE (matricula, tipo_folha, competencia)
+    remuneracao_bruta_total     NUMERIC(12,2),
+    excedeu_teto                BOOLEAN NOT NULL DEFAULT FALSE,
+    UNIQUE (matricula, competencia)
 );
