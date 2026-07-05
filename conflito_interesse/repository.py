@@ -28,6 +28,7 @@ class CandidatoConflitoRepository:
         self._batch_size = batch_size
 
     def salvar_candidatos(self, candidatos: Iterable[CandidatoConflito]) -> int:
+        candidatos_dedup = self._deduplicar(candidatos)
         valores = [
             (
                 c.fornecedor_ni,
@@ -41,7 +42,7 @@ class CandidatoConflitoRepository:
                 c.faixa_etaria_socio,
                 c.primeira_competencia_servidor,
             )
-            for c in candidatos
+            for c in candidatos_dedup
         ]
         if not valores:
             return 0
@@ -66,3 +67,18 @@ class CandidatoConflitoRepository:
         )
         self._conn.commit()
         return len(afetados)
+
+    @staticmethod
+    def _deduplicar(candidatos: Iterable[CandidatoConflito]) -> list[CandidatoConflito]:
+        """Um mesmo par (fornecedor_ni, matricula_servidor) pode aparecer mais de
+        uma vez no lote (sócios diferentes do mesmo fornecedor batendo com o
+        mesmo servidor) — o UNIQUE da tabela é só nesse par, então o Postgres
+        rejeita UPSERT afetando a mesma linha duas vezes no mesmo comando
+        (CardinalityViolation). Mantém o candidato de maior score por chave."""
+        melhores: dict[tuple[str, str], CandidatoConflito] = {}
+        for c in candidatos:
+            chave = (c.fornecedor_ni, c.matricula_servidor)
+            atual = melhores.get(chave)
+            if atual is None or c.score_similaridade > atual.score_similaridade:
+                melhores[chave] = c
+        return list(melhores.values())

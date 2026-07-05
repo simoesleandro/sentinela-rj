@@ -152,6 +152,26 @@ def test_salvar_candidatos_reprocessamento_preserva_status_e_revisado_em(conn):
     assert conn.tabela[id_]["revisado_em"] == "2026-01-01T00:00:00"
 
 
+def test_salvar_candidatos_deduplica_mesma_chave_mantendo_maior_score(conn):
+    """Dois sócios diferentes do mesmo fornecedor batendo com o mesmo servidor
+    geram a mesma chave (fornecedor_ni, matricula_servidor) no lote — sem
+    deduplicar, o Postgres real rejeitaria com CardinalityViolation (UPSERT
+    afetando a mesma linha duas vezes no mesmo comando)."""
+    repo = CandidatoConflitoRepository(conn)
+    registros = [
+        _candidato(score=82.0, data_entrada_sociedade="2005-01-01"),
+        _candidato(score=95.0, data_entrada_sociedade="2012-06-01"),
+    ]
+
+    inseridos = repo.salvar_candidatos(registros)
+
+    assert inseridos == 1
+    assert len(conn.tabela) == 1
+    id_ = next(iter(conn.tabela))
+    assert conn.tabela[id_]["score_similaridade"] == "95.0"
+    assert conn.tabela[id_]["data_entrada_sociedade"] == "2012-06-01"
+
+
 def test_salvar_candidatos_reprocessamento_atualiza_sinais_extras(conn):
     repo = CandidatoConflitoRepository(conn)
     repo.salvar_candidatos([_candidato()])
