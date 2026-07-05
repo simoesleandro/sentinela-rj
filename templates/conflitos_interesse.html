@@ -49,6 +49,18 @@
     .fornecedor-link { color: var(--blue); text-decoration: none; font-size: 0.8rem; }
     .fornecedor-link:hover { text-decoration: underline; }
     #ci-table { min-width: 1260px; }
+    /* Com centenas de linhas sem paginação, um .table-wrap comum (overflow-x
+       só na largura, altura ilimitada) deixa a barra de rolagem horizontal a
+       milhares de pixels abaixo, fora da tela visível — sem essa barra o
+       corte de colunas fica indistinguível de um bug de layout. Limitar a
+       altura mantém a rolagem horizontal sempre alcançável perto do topo. */
+    #ci-table-wrap { max-height: calc(100vh - 380px); min-height: 240px; overflow-y: auto; }
+    #ci-table thead th {
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      z-index: 1;
+    }
     @media (max-width: 768px) {
       #ci-table { min-width: 720px; }
       .ci-col-opcional { display: none; }
@@ -220,7 +232,7 @@
       }).join('');
 
       content.innerHTML = `
-        <div class="table-wrap">
+        <div class="table-wrap" id="ci-table-wrap">
           <table id="ci-table">
             <thead>
               <tr>
