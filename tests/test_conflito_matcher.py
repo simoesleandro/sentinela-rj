@@ -16,10 +16,17 @@ def _conn_fornecedores(fornecedores: list[tuple[str, str]]) -> sqlite3.Connectio
     return conn
 
 
-def _conn_servidores(pares: list[tuple[str, str]]) -> sqlite3.Connection:
+def _conn_servidores(
+    pares: list[tuple[str, str]],
+    folha_mensal: list[tuple[str, str, str]] | None = None,
+) -> sqlite3.Connection:
+    """servidores + folha_mensal no mesmo db :memory: (mesmo arquivo em produção)."""
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE servidores (matricula TEXT PRIMARY KEY, nome_atual TEXT NOT NULL)")
     conn.executemany("INSERT INTO servidores VALUES (?, ?)", pares)
+    conn.execute("CREATE TABLE folha_mensal (matricula TEXT, sigla_ua TEXT, competencia TEXT)")
+    if folha_mensal:
+        conn.executemany("INSERT INTO folha_mensal VALUES (?, ?, ?)", folha_mensal)
     conn.commit()
     return conn
 
@@ -30,7 +37,10 @@ def _socios_json(nome_socio: str, qualificacao: str = "Sócio-Administrador") ->
 
 def test_match_positivo_nome_batendo():
     conn_forn = _conn_fornecedores([("12345678000199", _socios_json("MARIA DA SILVA SANTOS"))])
-    conn_serv = _conn_servidores([("0001", "MARIA DA SILVA SANTOS")])
+    conn_serv = _conn_servidores(
+        [("0001", "MARIA DA SILVA SANTOS")],
+        folha_mensal=[("0001", "SMS", "2024-01-01")],
+    )
     indice = IndiceServidoresPorToken(conn_serv)
 
     candidatos = ConflictMatcherService(conn_forn, indice).buscar_candidatos()
@@ -41,16 +51,16 @@ def test_match_positivo_nome_batendo():
     assert c.matricula_servidor == "0001"
     assert c.nome_servidor == "MARIA SILVA SANTOS"
     assert c.qualificacao_socio == "Sócio-Administrador"
-    assert c.sigla_ua is None
+    assert c.sigla_ua == "SMS"
     assert c.score_similaridade >= 90
 
 
-def test_match_negativo_primeiro_token_diferente_nao_entra_no_indice():
-    """Nome parecido, mas primeiro token diferente — nem chega a ser comparado
-    via fuzzy matching, porque a busca no índice já não encontra candidatos.
+def test_match_negativo_ultimo_token_diferente_nao_entra_no_indice():
+    """Nome parecido, mas sobrenome (último token) diferente — nem chega a ser
+    comparado via fuzzy matching, porque a busca no índice já não encontra candidatos.
     """
-    conn_forn = _conn_fornecedores([("12345678000199", _socios_json("CARLOS ALBERTO SILVA SANTOS"))])
-    conn_serv = _conn_servidores([("0001", "MARCOS ALBERTO SILVA SANTOS")])
+    conn_forn = _conn_fornecedores([("12345678000199", _socios_json("CARLOS ALBERTO PEREIRA LIMA"))])
+    conn_serv = _conn_servidores([("0001", "CARLOS ALBERTO PEREIRA SANTOS")])
     indice = IndiceServidoresPorToken(conn_serv)
 
     candidatos = ConflictMatcherService(conn_forn, indice).buscar_candidatos()
@@ -60,7 +70,7 @@ def test_match_negativo_primeiro_token_diferente_nao_entra_no_indice():
 
 def test_score_abaixo_do_minimo_e_descartado():
     conn_forn = _conn_fornecedores([("12345678000199", _socios_json("MARIA SILVA"))])
-    conn_serv = _conn_servidores([("0001", "MARIA OLIVEIRA COSTA PEREIRA")])
+    conn_serv = _conn_servidores([("0001", "COSTA PEREIRA OLIVEIRA SILVA")])
     indice = IndiceServidoresPorToken(conn_serv)
 
     candidatos = ConflictMatcherService(conn_forn, indice).buscar_candidatos()
@@ -95,3 +105,14 @@ def test_fornecedor_sem_socios_e_ignorado():
     candidatos = ConflictMatcherService(conn_forn, indice).buscar_candidatos()
 
     assert candidatos == []
+
+
+def test_sigla_ua_fica_none_quando_servidor_sem_folha_mensal():
+    conn_forn = _conn_fornecedores([("12345678000199", _socios_json("MARIA DA SILVA SANTOS"))])
+    conn_serv = _conn_servidores([("0001", "MARIA DA SILVA SANTOS")])  # sem folha_mensal
+    indice = IndiceServidoresPorToken(conn_serv)
+
+    candidatos = ConflictMatcherService(conn_forn, indice).buscar_candidatos()
+
+    assert len(candidatos) == 1
+    assert candidatos[0].sigla_ua is None
