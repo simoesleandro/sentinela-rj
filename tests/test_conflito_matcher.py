@@ -55,12 +55,12 @@ def test_match_positivo_nome_batendo():
     assert c.score_similaridade >= 90
 
 
-def test_match_negativo_ultimo_token_diferente_nao_entra_no_indice():
-    """Nome parecido, mas sobrenome (último token) diferente — nem chega a ser
-    comparado via fuzzy matching, porque a busca no índice já não encontra candidatos.
+def test_match_negativo_primeiro_token_diferente_nao_entra_no_indice():
+    """Nome parecido, mas primeiro token diferente — nem chega a ser comparado
+    via fuzzy matching, porque a busca no índice já não encontra candidatos.
     """
-    conn_forn = _conn_fornecedores([("12345678000199", _socios_json("CARLOS ALBERTO PEREIRA LIMA"))])
-    conn_serv = _conn_servidores([("0001", "CARLOS ALBERTO PEREIRA SANTOS")])
+    conn_forn = _conn_fornecedores([("12345678000199", _socios_json("CARLOS ALBERTO SILVA SANTOS"))])
+    conn_serv = _conn_servidores([("0001", "MARCOS ALBERTO SILVA SANTOS")])
     indice = IndiceServidoresPorToken(conn_serv)
 
     candidatos = ConflictMatcherService(conn_forn, indice).buscar_candidatos()
@@ -70,7 +70,7 @@ def test_match_negativo_ultimo_token_diferente_nao_entra_no_indice():
 
 def test_score_abaixo_do_minimo_e_descartado():
     conn_forn = _conn_fornecedores([("12345678000199", _socios_json("MARIA SILVA"))])
-    conn_serv = _conn_servidores([("0001", "COSTA PEREIRA OLIVEIRA SILVA")])
+    conn_serv = _conn_servidores([("0001", "MARIA OLIVEIRA COSTA PEREIRA")])
     indice = IndiceServidoresPorToken(conn_serv)
 
     candidatos = ConflictMatcherService(conn_forn, indice).buscar_candidatos()

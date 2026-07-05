@@ -2,8 +2,8 @@
 
 Não existe CPF utilizável dos dois lados (fornecedor_cadastro tem CPF mascarado,
 folha de pagamento não tem CPF algum) — o match é 100% por nome, com normalização
-+ fuzzy matching, restrito pelo último token (sobrenome) para não comparar cada
-sócio contra os 286k servidores.
++ fuzzy matching, restrito pelo primeiro token para não comparar cada sócio contra
+os 286k servidores.
 """
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ class CandidatoConflito:
 
 
 class ConflictMatcherService:
-    """Para cada sócio de cada fornecedor, busca servidores candidatos pelo último
-    token (sobrenome) do nome normalizado e pontua com rapidfuzz.token_sort_ratio.
+    """Para cada sócio de cada fornecedor, busca servidores candidatos pelo primeiro
+    token do nome normalizado e pontua com rapidfuzz.token_sort_ratio.
     """
 
     SCORE_MINIMO = 80.0
@@ -59,10 +59,10 @@ class ConflictMatcherService:
         nome_normalizado = normalizar_nome(nome_socio)
         if not nome_normalizado:
             return []
-        ultimo_token = nome_normalizado.rsplit(" ", 1)[-1]
+        primeiro_token = nome_normalizado.split(" ", 1)[0]
 
         resultado: list[CandidatoConflito] = []
-        for matricula, nome_servidor in self._indice.candidatos(ultimo_token):
+        for matricula, nome_servidor in self._indice.candidatos(primeiro_token):
             score = fuzz.token_sort_ratio(nome_normalizado, nome_servidor)
             if score >= self.SCORE_MINIMO:
                 resultado.append(
