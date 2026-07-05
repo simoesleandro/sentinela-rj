@@ -11,6 +11,7 @@ from typing import Any, Iterable
 
 from db.triagem_core import (
     STATUS_DESCARTADO,
+    STATUS_VALIDOS,
     TriagemError,
     normalizar_status,
     validar_transicao,
@@ -111,4 +112,7 @@ class ConflitoTriagemRepository:
         cur.execute(
             "SELECT status, COUNT(*) FROM candidatos_conflito_interesse GROUP BY status"
         )
-        return {normalizar_status(status): int(n) for status, n in cur.fetchall()}
+        base = {s: 0 for s in STATUS_VALIDOS}
+        for status, n in cur.fetchall():
+            base[normalizar_status(status)] = int(n)
+        return base

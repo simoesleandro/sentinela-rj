@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>Conflito de Interesse — Sentinela RJ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .ci-header {
+      padding: 1rem max(2rem, calc((100% - 1200px) / 2 + 2rem));
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .back-link { color: var(--muted); text-decoration: none; font-size: 0.875rem; }
+    .back-link:hover { color: var(--text); }
+    .ci-brand { font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem max(2rem, calc((100% - 1200px) / 2 + 2rem)); }
+    .ci-intro { color: var(--muted); font-size: 0.85rem; max-width: 70ch; margin-bottom: 1.5rem; }
+    .ci-filtros { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .ci-filtros select {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      padding: 0.4rem 0.6rem; border-radius: 6px; font-family: inherit; font-size: 0.85rem;
+    }
+    .ci-resumo-chip {
+      font-size: 0.78rem; color: var(--muted); background: var(--surface);
+      border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+    }
+    .ci-resumo-chip strong { color: var(--text); }
+    .ci-acao-cell { display: flex; flex-direction: column; gap: 0.4rem; min-width: 220px; }
+    .ci-acao-form { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+    .ci-acao-form select, .ci-acao-form input {
+      background: #1a1a1a; border: 1px solid var(--border); color: var(--text);
+      padding: 0.3rem 0.4rem; border-radius: 4px; font-family: inherit; font-size: 0.78rem;
+    }
+    .ci-acao-form input[type="text"] { flex: 1; min-width: 120px; }
+    .ci-motivo-wrap { display: none; width: 100%; }
+    .ci-motivo-wrap.show { display: flex; gap: 0.4rem; }
+    .ci-erro { color: var(--red); font-size: 0.75rem; display: none; }
+    .ci-empty {
+      color: var(--muted); font-size: 0.875rem; padding: 2.5rem; text-align: center;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    }
+    .fornecedor-link { color: var(--blue); text-decoration: none; font-size: 0.8rem; }
+    .fornecedor-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header class="ci-header">
+    <a href="/dashboard" class="back-link">← Voltar ao Sentinela RJ</a>
+    <span class="ci-brand">Sentinela RJ</span>
+  </header>
+
+  <main>
+    <h1 style="font-size:1.5rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:0.5rem">
+      Conflito de Interesse
+    </h1>
+    <p class="ci-intro">
+      Sócios de empresas contratadas cujo nome coincide com o de um servidor público ativo
+      (match por nome, sem CPF — sempre exige confirmação manual antes de virar caso).
+    </p>
+
+    <div id="ci-resumo" class="ci-filtros"></div>
+
+    <div class="ci-filtros">
+      <label for="ci-status-filtro" style="font-size:0.8rem;color:var(--muted)">Status:</label>
+      <select id="ci-status-filtro">
+        <option value="aberto">Aberto</option>
+        <option value="investigando">Investigando</option>
+        <option value="confirmado">Confirmado</option>
+        <option value="descartado">Descartado</option>
+        <option value="todos">Todos</option>
+      </select>
+    </div>
+
+    <div id="ci-loading" class="loading-msg">Carregando candidatos…</div>
+    <div id="ci-content" style="display:none"></div>
+  </main>
+
+  <script>
+    'use strict';
+
+    const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
+    const STATUS_LABELS = {
+      aberto: 'Aberto', investigando: 'Investigando',
+      confirmado: 'Confirmado', descartado: 'Descartado',
+    };
+    const STATUS_BADGE = {
+      aberto: 'gray', investigando: 'yellow', confirmado: 'red', descartado: 'green',
+    };
+
+    let MOTIVOS_DESCARTE = [];
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatCNPJ(ni) {
+      if (!ni) return '—';
+      const d = String(ni).replace(/\D/g, '');
+      if (d.length !== 14) return ni;
+      return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12,14)}`;
+    }
+
+    function statusBadge(status) {
+      const cls = STATUS_BADGE[status] || 'gray';
+      const label = STATUS_LABELS[status] || status;
+      return `<span class="badge badge-${cls}">${escapeHtml(label)}</span>`;
+    }
+
+    async function carregar() {
+      const status = document.getElementById('ci-status-filtro').value;
+      const loading = document.getElementById('ci-loading');
+      const content = document.getElementById('ci-content');
+      loading.style.display = 'block';
+      content.style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/conflitos-interesse?status=${encodeURIComponent(status)}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || res.statusText);
+        }
+        const d = await res.json();
+        MOTIVOS_DESCARTE = d.motivos_descarte || [];
+        renderResumo(d.resumo);
+        renderTabela(d.items);
+        loading.style.display = 'none';
+        content.style.display = 'block';
+      } catch (e) {
+        loading.textContent = `Erro ao carregar: ${e.message}`;
+      }
+    }
+
+    function renderResumo(resumo) {
+      const el = document.getElementById('ci-resumo');
+      if (!resumo) { el.innerHTML = ''; return; }
+      const ordem = ['aberto', 'investigando', 'confirmado', 'descartado'];
+      el.innerHTML = ordem.map(st => `
+        <span class="ci-resumo-chip">${STATUS_LABELS[st]}: <strong>${resumo[st] ?? 0}</strong></span>
+      `).join('');
+    }
+
+    function renderTabela(items) {
+      const content = document.getElementById('ci-content');
+      if (!items || !items.length) {
+        content.innerHTML = '<div class="ci-empty">Nenhum candidato encontrado para este filtro.</div>';
+        return;
+      }
+
+      const motivoOpts = MOTIVOS_DESCARTE.map(m =>
+        `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`
+      ).join('');
+
+      const rows = items.map(c => {
+        const transicoes = c.transicoes_permitidas || [];
+        const opts = transicoes.map(st =>
+          `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
+        ).join('');
+
+        const acaoHtml = transicoes.length
+          ? `
+            <div class="ci-acao-cell">
+              <div class="ci-acao-form">
+                <select id="ci-status-${c.id}" onchange="toggleMotivo(${c.id})">
+                  <option value="">Mudar status…</option>
+                  ${opts}
+                </select>
+                <button type="button" class="btn-page" style="padding:0.3rem 0.6rem;font-size:0.78rem"
+                        onclick="salvarStatus(${c.id})">Salvar</button>
+              </div>
+              <div class="ci-acao-form ci-motivo-wrap" id="ci-motivo-wrap-${c.id}">
+                <select id="ci-motivo-${c.id}">
+                  <option value="">Motivo do descarte…</option>
+                  ${motivoOpts}
+                </select>
+              </div>
+              <input type="text" id="ci-nota-${c.id}" placeholder="Nota (opcional)">
+              <div class="ci-erro" id="ci-erro-${c.id}"></div>
+            </div>`
+          : '<span style="color:var(--muted);font-size:0.78rem">Sem transições</span>';
+
+        return `
+          <tr>
+            <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_socio || '—')}</td>
+            <td>
+              <a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link">
+                ${formatCNPJ(c.fornecedor_ni)}
+              </a>
+            </td>
+            <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_servidor || '—')}</td>
+            <td style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.matricula_servidor || '—')}</td>
+            <td style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.sigla_ua || '—')}</td>
+            <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
+            <td>${statusBadge(c.status)}</td>
+            <td>${acaoHtml}</td>
+          </tr>`;
+      }).join('');
+
+      content.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Sócio</th>
+                <th>Fornecedor</th>
+                <th>Servidor</th>
+                <th>Matrícula</th>
+                <th>Unidade</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    window.toggleMotivo = function(id) {
+      const sel = document.getElementById(`ci-status-${id}`);
+      const wrap = document.getElementById(`ci-motivo-wrap-${id}`);
+      wrap.classList.toggle('show', sel.value === 'descartado');
+    };
+
+    window.salvarStatus = async function(id) {
+      const statusEl = document.getElementById(`ci-status-${id}`);
+      const motivoEl = document.getElementById(`ci-motivo-${id}`);
+      const notaEl = document.getElementById(`ci-nota-${id}`);
+      const erroEl = document.getElementById(`ci-erro-${id}`);
+      erroEl.style.display = 'none';
+
+      const status = statusEl.value;
+      if (!status) {
+        erroEl.textContent = 'Selecione um status.';
+        erroEl.style.display = 'block';
+        return;
+      }
+      const body = { status, nota: notaEl.value.trim() };
+      if (status === 'descartado') {
+        body.motivo_descarte = motivoEl.value;
+      }
+
+      try {
+        const res = await fetch(`/conflitos-interesse/${id}/status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN,
+          },
+          body: JSON.stringify(body),
+        });
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error || res.statusText);
+        carregar();
+      } catch (e) {
+        erroEl.textContent = e.message;
+        erroEl.style.display = 'block';
+      }
+    };
+
+    document.getElementById('ci-status-filtro').addEventListener('change', carregar);
+    carregar();
+  </script>
+</body>
+</html>

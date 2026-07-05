@@ -554,11 +554,14 @@ function chartOptions(extraX = {}, extraY = {}) {
 // ─── Tab management ────────────────────────────────────────────────────────
 
 function setupTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  // button.tab-btn (não .tab-btn) exclui o link de navegação para
+  // /conflitos-interesse, que reaproveita a classe visual mas é uma página
+  // separada, não uma aba desta SPA.
+  document.querySelectorAll('button.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
 
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('button.tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
 
       document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));

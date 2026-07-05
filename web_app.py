@@ -2087,6 +2087,133 @@ def regras_alerta_detail(regra_id: int):
 
 
 # ---------------------------------------------------------------------------
+# Conflito de interesse — candidatos sócio/servidor (Supabase/Postgres)
+# ---------------------------------------------------------------------------
+
+def get_conflito_conn():
+    """Conexão Postgres/Supabase para candidatos_conflito_interesse.
+
+    Cursor padrão (linhas como tupla), não RealDictCursor — é o que
+    ConflitoTriagemRepository espera (acesso posicional, ex.: row[0]).
+    """
+    import psycopg2
+
+    dsn = os.environ.get("CONFLITO_INTERESSE_DATABASE_URL")
+    if not dsn:
+        raise RuntimeError("CONFLITO_INTERESSE_DATABASE_URL não configurada.")
+    return psycopg2.connect(dsn)
+
+
+def _serializar_candidato_conflito(item: dict) -> dict:
+    """psycopg2 devolve NUMERIC como Decimal e TIMESTAMP como datetime —
+    nenhum dos dois é serializável por jsonify sem conversão explícita."""
+    if item.get("score_similaridade") is not None:
+        item["score_similaridade"] = float(item["score_similaridade"])
+    for campo in ("detectado_em", "revisado_em"):
+        if item.get(campo) is not None:
+            item[campo] = item[campo].isoformat()
+    return item
+
+
+@app.route("/conflitos-interesse")
+def conflitos_interesse_page():
+    return render_template("conflitos_interesse.html")
+
+
+@app.route("/api/conflitos-interesse")
+def api_conflitos_interesse_list():
+    from conflito_interesse.triagem_repository import (
+        MOTIVOS_DESCARTE_PADRAO,
+        ConflitoTriagemRepository,
+    )
+    from db.triagem_core import STATUS_VALIDOS, normalizar_status, status_permitidos
+
+    status_param = (request.args.get("status") or "aberto").strip().lower()
+    todos = status_param in ("", "todos", "all")
+    if not todos and status_param not in STATUS_VALIDOS:
+        return jsonify({"error": f"Filtro de status inválido: '{status_param}'."}), 400
+
+    conn = get_conflito_conn()
+    try:
+        cur = conn.cursor()
+        if todos:
+            cur.execute(
+                """
+                SELECT id, fornecedor_ni, nome_socio, qualificacao_socio,
+                       matricula_servidor, nome_servidor, sigla_ua,
+                       score_similaridade, status, detectado_em, revisado_em
+                FROM candidatos_conflito_interesse
+                ORDER BY score_similaridade DESC
+                """
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, fornecedor_ni, nome_socio, qualificacao_socio,
+                       matricula_servidor, nome_servidor, sigla_ua,
+                       score_similaridade, status, detectado_em, revisado_em
+                FROM candidatos_conflito_interesse
+                WHERE status = %s
+                ORDER BY score_similaridade DESC
+                """,
+                (normalizar_status(status_param),),
+            )
+        colunas = [d[0] for d in cur.description]
+        items = []
+        for row in cur.fetchall():
+            item = _serializar_candidato_conflito(dict(zip(colunas, row)))
+            item["transicoes_permitidas"] = status_permitidos(item["status"])
+            items.append(item)
+
+        resumo = ConflitoTriagemRepository(conn).resumo_status()
+
+        return jsonify({
+            "items": items,
+            "resumo": resumo,
+            "motivos_descarte": list(MOTIVOS_DESCARTE_PADRAO),
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/conflitos-interesse/<int:candidato_id>/status", methods=["POST"])
+@requer_login
+@csrf_required
+def api_conflitos_interesse_status(candidato_id: int):
+    from conflito_interesse.triagem_repository import (
+        CandidatoConflitoNaoEncontradoError,
+        ConflitoTriagemRepository,
+    )
+    from db.triagem_core import TriagemError, normalizar_status
+
+    body = request.get_json(silent=True) or {}
+    status = body.get("status")
+    if not status:
+        return jsonify({"error": "Campo 'status' é obrigatório."}), 400
+
+    conn = get_conflito_conn()
+    try:
+        repo = ConflitoTriagemRepository(conn)
+        repo.atualizar_status(
+            candidato_id,
+            str(status),
+            nota=body.get("nota"),
+            motivo_descarte=body.get("motivo_descarte"),
+        )
+        return jsonify({"ok": True, "id": candidato_id, "status": normalizar_status(status)})
+    except CandidatoConflitoNaoEncontradoError:
+        return jsonify({"error": "not found"}), 404
+    except TriagemError as exc:
+        return jsonify({"error": str(exc)}), 422
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
 # Casos investigados — página pública + admin CRUD
 # ---------------------------------------------------------------------------
 

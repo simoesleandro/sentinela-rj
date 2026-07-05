@@ -157,6 +157,11 @@ header h1 {
   border-bottom-color: var(--red);
 }
 
+a.tab-btn {
+  text-decoration: none;
+  display: inline-block;
+}
+
 /* ─── Main content ─── */
 main {
   padding: 2rem;
