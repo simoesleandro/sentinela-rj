@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS candidatos_conflito_interesse (
     data_entrada_sociedade         DATE,
     faixa_etaria_socio             TEXT,
     primeira_competencia_servidor  DATE,
+    contrato_ativo                 BOOLEAN NOT NULL DEFAULT FALSE,
+    valor_total_contratos          NUMERIC(14,2),
+    qtd_servidores_matched_mesmo_socio INTEGER NOT NULL DEFAULT 1,
     status                         TEXT NOT NULL DEFAULT 'aberto',
     detectado_em                   TIMESTAMP NOT NULL DEFAULT now(),
     revisado_em                    TIMESTAMP,
@@ -27,3 +30,39 @@ CREATE TABLE IF NOT EXISTS candidatos_conflito_interesse (
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS data_entrada_sociedade DATE;
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS faixa_etaria_socio TEXT;
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS primeira_competencia_servidor DATE;
+
+-- Sinais de priorização (jul/2026): não provam identidade, só ordenam a fila
+-- de revisão manual por relevância real (contrato vigente, valor, quantos
+-- SERVIDORES DISTINTOS o MESMO sócio bateu). Não substituem score_similaridade.
+--
+-- A primeira versão deste sinal (deployada e depois corrigida no mesmo dia)
+-- se chamava qtd_socios_matched_mesma_empresa e agrupava só por
+-- fornecedor_ni — saturava (~97% dos candidatos com >=2) porque conta
+-- qualquer sócio distinto da empresa batendo isoladamente com um servidor
+-- diferente, o que reflete tamanho da empresa, não conflito sistêmico.
+-- Agrupar por (fornecedor_ni, sócio) sozinho AINDA saturava (93.8%, dados
+-- reais de jul/2026): sobrenome comum bate via fuzzy matching (score 80-84)
+-- com dezenas de servidores de nome só parecido, que não são a mesma
+-- pessoa. A versão final (conflito_interesse.enriquecimento) só conta
+-- matches de nome EXATO (score 100) dentro do grupo — caiu para 13.2%
+-- (128/972). O bloco abaixo renomeia a coluna em bancos que já rodaram a
+-- versão antiga, e cria do zero em bancos que ainda não tinham nenhum dos
+-- dois nomes.
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS contrato_ativo BOOLEAN DEFAULT FALSE;
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS valor_total_contratos NUMERIC(14,2);
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'candidatos_conflito_interesse'
+          AND column_name = 'qtd_socios_matched_mesma_empresa'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'candidatos_conflito_interesse'
+          AND column_name = 'qtd_servidores_matched_mesmo_socio'
+    ) THEN
+        ALTER TABLE candidatos_conflito_interesse
+            RENAME COLUMN qtd_socios_matched_mesma_empresa TO qtd_servidores_matched_mesmo_socio;
+    END IF;
+END $$;
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS qtd_servidores_matched_mesmo_socio INTEGER NOT NULL DEFAULT 1;

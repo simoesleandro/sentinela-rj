@@ -37,6 +37,32 @@
     }
     .fornecedor-link { color: var(--blue); text-decoration: none; font-size: 0.8rem; }
     .fornecedor-link:hover { text-decoration: underline; }
+    .diario-link { color: var(--blue); text-decoration: none; font-size: 0.8rem; }
+    .diario-link:hover { text-decoration: underline; }
+
+    .selo-compat {
+      display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    .selo-compat.incompativel { background: rgba(220,38,38,0.15); color: #f87171; border-color: rgba(220,38,38,0.4); }
+    .selo-compat.compativel { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+    .selo-contrato {
+      display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    .selo-contrato.ativo { background: rgba(34,197,94,0.15); color: #4ade80; border-color: rgba(34,197,94,0.4); }
+    .selo-contrato.inativo { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+    .selo-socios {
+      display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+      background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border);
+    }
+
+    .selo-prioridade {
+      display: inline-block; font-size: 0.68rem; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+      background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.4);
+    }
 
     /* Tabela enxuta de propósito: só as colunas que cabem sem quebrar o
        layout de 1200px do app (mesmo princípio da tabela de /alertas). Os
@@ -94,6 +120,12 @@
         <option value="descartado">Descartado</option>
         <option value="todos">Todos</option>
       </select>
+
+      <label for="ci-compat-filtro" style="font-size:0.8rem;color:var(--muted)">Compatibilidade:</label>
+      <select id="ci-compat-filtro">
+        <option value="todos">Todos</option>
+        <option value="incompativel">Só incompatíveis</option>
+      </select>
     </div>
 
     <div id="ci-loading" class="loading-msg">Carregando candidatos…</div>
@@ -147,6 +179,44 @@
       return `<span class="badge badge-${cls}">${escapeHtml(label)}</span>`;
     }
 
+    function selocompatHtml(compat) {
+      if (compat === 'incompativel') {
+        return '<span class="selo-compat incompativel" title="Idade estimada do sócio tornaria a entrada no serviço público improvável (menos de 16 anos) — provável coincidência de nome, não a mesma pessoa.">Incompatível: idade improvável</span>';
+      }
+      if (compat === 'compativel') {
+        return '<span class="selo-compat compativel">Compatível</span>';
+      }
+      return '';
+    }
+
+    function linkDiarioOficial(nome) {
+      if (!nome) return '';
+      const url = `https://doweb.rio.rj.gov.br/buscanova/#/p=1&q=${encodeURIComponent(nome)}`;
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="diario-link">Buscar no Diário Oficial do Rio ↗</a>`;
+    }
+
+    function formatCurrency(val) {
+      if (val === null || val === undefined) return '—';
+      const n = Number(val);
+      if (Number.isNaN(n)) return '—';
+      return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function seloContratoHtml(ativo) {
+      return ativo
+        ? '<span class="selo-contrato ativo">Contrato ativo</span>'
+        : '<span class="selo-contrato inativo">Sem contrato vigente</span>';
+    }
+
+    function seloServidoresHtml(qtd) {
+      if (!qtd || qtd <= 1) return '';
+      return `<span class="selo-socios">${qtd} servidores para este sócio</span>`;
+    }
+
+    function seloPrioridadeHtml(prioritario) {
+      return prioritario ? '<span class="selo-prioridade">Prioritário</span>' : '';
+    }
+
     async function carregar() {
       const status = document.getElementById('ci-status-filtro').value;
       const loading = document.getElementById('ci-loading');
@@ -164,12 +234,20 @@
         MOTIVOS_DESCARTE = d.motivos_descarte || [];
         ITENS_ATUAIS = d.items || [];
         renderResumo(d.resumo);
-        renderTabela(ITENS_ATUAIS);
+        renderTabela(itensFiltradosPorCompatibilidade());
         loading.style.display = 'none';
         content.style.display = 'block';
       } catch (e) {
         loading.textContent = `Erro ao carregar: ${e.message}`;
       }
+    }
+
+    function itensFiltradosPorCompatibilidade() {
+      const filtro = document.getElementById('ci-compat-filtro').value;
+      if (filtro === 'incompativel') {
+        return ITENS_ATUAIS.filter(c => c.compatibilidade_data === 'incompativel');
+      }
+      return ITENS_ATUAIS;
     }
 
     function renderResumo(resumo) {
@@ -190,11 +268,15 @@
 
       const rows = items.map(c => `
         <tr>
-          <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_socio || '—')}</td>
+          <td style="font-size:0.8rem;color:#d4d4d4">
+            ${seloPrioridadeHtml(c.prioridade_investigacao)}
+            ${escapeHtml(c.nome_socio || '—')}
+          </td>
           <td>
             <a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link">
               ${formatCNPJ(c.fornecedor_ni)}
             </a>
+            ${seloServidoresHtml(c.qtd_servidores_matched_mesmo_socio)}
           </td>
           <td style="font-size:0.8rem;color:#d4d4d4">
             ${escapeHtml(c.nome_servidor || '—')}
@@ -202,6 +284,9 @@
           </td>
           <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
           <td>${statusBadge(c.status)}</td>
+          <td>${selocompatHtml(c.compatibilidade_data) || '—'}</td>
+          <td>${seloContratoHtml(c.contrato_ativo)}</td>
+          <td style="white-space:nowrap">${formatCurrency(c.valor_total_contratos)}</td>
           <td><button type="button" class="ci-detalhe-btn" onclick="abrirDetalhe(${c.id})">Detalhes</button></td>
         </tr>`
       ).join('');
@@ -216,6 +301,9 @@
                 <th>Servidor</th>
                 <th>Score</th>
                 <th>Status</th>
+                <th>Compat.</th>
+                <th>Contrato</th>
+                <th>Valor total</th>
                 <th>Detalhes</th>
               </tr>
             </thead>
@@ -258,7 +346,8 @@
       document.getElementById('detail-content').innerHTML = `
         <h2 style="font-size:1.15rem;font-weight:700;margin-bottom:0.25rem">${escapeHtml(c.nome_socio || '—')}</h2>
         <p style="color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem">${escapeHtml(c.qualificacao_socio || '—')}</p>
-        ${statusBadge(c.status)}
+        ${statusBadge(c.status)} ${selocompatHtml(c.compatibilidade_data)} ${seloPrioridadeHtml(c.prioridade_investigacao)}
+        <p style="margin-top:0.75rem">${linkDiarioOficial(c.nome_servidor)}</p>
         <dl class="ci-detalhe-grid">
           <div><dt>Fornecedor</dt><dd><a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link">${formatCNPJ(c.fornecedor_ni)}</a></dd></div>
           <div><dt>Score</dt><dd>${(c.score_similaridade ?? 0).toFixed(1)}</dd></div>
@@ -268,6 +357,9 @@
           <div><dt>Entrada na sociedade</dt><dd>${formatDate(c.data_entrada_sociedade)}</dd></div>
           <div><dt>Faixa etária do sócio</dt><dd>${escapeHtml(c.faixa_etaria_socio || '—')}</dd></div>
           <div><dt>1ª competência como servidor</dt><dd>${formatDate(c.primeira_competencia_servidor)}</dd></div>
+          <div><dt>Contrato</dt><dd>${seloContratoHtml(c.contrato_ativo)}</dd></div>
+          <div><dt>Valor total de contratos</dt><dd>${formatCurrency(c.valor_total_contratos)}</dd></div>
+          <div><dt>Servidores distintos batendo com este sócio</dt><dd>${c.qtd_servidores_matched_mesmo_socio ?? 1}</dd></div>
         </dl>
         ${acaoHtml}`;
 
@@ -324,6 +416,7 @@
     };
 
     document.getElementById('ci-status-filtro').addEventListener('change', carregar);
+    document.getElementById('ci-compat-filtro').addEventListener('change', () => renderTabela(itensFiltradosPorCompatibilidade()));
     carregar();
   </script>
 </body>

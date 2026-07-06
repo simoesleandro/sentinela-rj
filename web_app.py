@@ -2139,8 +2139,21 @@ def get_conflito_conn():
 def _serializar_candidato_conflito(item: dict) -> dict:
     """psycopg2 devolve NUMERIC como Decimal e TIMESTAMP como datetime —
     nenhum dos dois é serializável por jsonify sem conversão explícita."""
+    from conflito_interesse.compatibilidade import calcular_compatibilidade
+    from conflito_interesse.priorizacao import calcular_prioridade_investigacao
+
     if item.get("score_similaridade") is not None:
         item["score_similaridade"] = float(item["score_similaridade"])
+    if item.get("valor_total_contratos") is not None:
+        item["valor_total_contratos"] = float(item["valor_total_contratos"])
+    item["compatibilidade_data"] = calcular_compatibilidade(
+        item.get("faixa_etaria_socio"), item.get("primeira_competencia_servidor")
+    )
+    item["prioridade_investigacao"] = calcular_prioridade_investigacao(
+        item.get("contrato_ativo"),
+        item.get("qtd_servidores_matched_mesmo_socio"),
+        item["compatibilidade_data"],
+    )
     for campo in ("detectado_em", "revisado_em", "data_entrada_sociedade", "primeira_competencia_servidor"):
         if item.get(campo) is not None:
             item[campo] = item[campo].isoformat()
@@ -2175,9 +2188,10 @@ def api_conflitos_interesse_list():
                        matricula_servidor, nome_servidor, sigla_ua,
                        score_similaridade, data_entrada_sociedade,
                        faixa_etaria_socio, primeira_competencia_servidor,
+                       contrato_ativo, valor_total_contratos,
+                       qtd_servidores_matched_mesmo_socio,
                        status, detectado_em, revisado_em
                 FROM candidatos_conflito_interesse
-                ORDER BY score_similaridade DESC
                 """
             )
         else:
@@ -2187,10 +2201,11 @@ def api_conflitos_interesse_list():
                        matricula_servidor, nome_servidor, sigla_ua,
                        score_similaridade, data_entrada_sociedade,
                        faixa_etaria_socio, primeira_competencia_servidor,
+                       contrato_ativo, valor_total_contratos,
+                       qtd_servidores_matched_mesmo_socio,
                        status, detectado_em, revisado_em
                 FROM candidatos_conflito_interesse
                 WHERE status = %s
-                ORDER BY score_similaridade DESC
                 """,
                 (normalizar_status(status_param),),
             )
@@ -2200,6 +2215,11 @@ def api_conflitos_interesse_list():
             item = _serializar_candidato_conflito(dict(zip(colunas, row)))
             item["transicoes_permitidas"] = status_permitidos(item["status"])
             items.append(item)
+
+        # Prioridade de investigação (contrato ativo + vários sócios do mesmo
+        # fornecedor + sem sinal de falso positivo) manda na ordem — o score
+        # de nome só desempata dentro do mesmo grupo de prioridade.
+        items.sort(key=lambda it: (0 if it["prioridade_investigacao"] else 1, -it["score_similaridade"]))
 
         resumo = ConflitoTriagemRepository(conn).resumo_status()
 

@@ -26,6 +26,8 @@ class _FakeCursor:
         "matricula_servidor", "nome_servidor", "sigla_ua",
         "score_similaridade", "data_entrada_sociedade",
         "faixa_etaria_socio", "primeira_competencia_servidor",
+        "contrato_ativo", "valor_total_contratos",
+        "qtd_servidores_matched_mesmo_socio",
     )
 
     def __init__(self, tabela: dict[tuple[str, str], dict], linhas_por_chave: dict[tuple[str, str], int]):
@@ -55,6 +57,9 @@ class _FakeCursor:
                 registro["data_entrada_sociedade"] = linha["data_entrada_sociedade"]
                 registro["faixa_etaria_socio"] = linha["faixa_etaria_socio"]
                 registro["primeira_competencia_servidor"] = linha["primeira_competencia_servidor"]
+                registro["contrato_ativo"] = linha["contrato_ativo"]
+                registro["valor_total_contratos"] = linha["valor_total_contratos"]
+                registro["qtd_servidores_matched_mesmo_socio"] = linha["qtd_servidores_matched_mesmo_socio"]
             else:
                 id_ = self._proximo_id
                 self._linhas_por_chave[chave] = id_
@@ -92,6 +97,9 @@ def _candidato(
     data_entrada_sociedade: str | None = None,
     faixa_etaria_socio: str | None = None,
     primeira_competencia_servidor: str | None = None,
+    contrato_ativo: bool = False,
+    valor_total_contratos: float | None = None,
+    qtd_servidores_matched_mesmo_socio: int = 1,
 ) -> CandidatoConflito:
     return CandidatoConflito(
         fornecedor_ni=fornecedor_ni,
@@ -104,6 +112,9 @@ def _candidato(
         data_entrada_sociedade=data_entrada_sociedade,
         faixa_etaria_socio=faixa_etaria_socio,
         primeira_competencia_servidor=primeira_competencia_servidor,
+        contrato_ativo=contrato_ativo,
+        valor_total_contratos=valor_total_contratos,
+        qtd_servidores_matched_mesmo_socio=qtd_servidores_matched_mesmo_socio,
     )
 
 
@@ -224,5 +235,28 @@ def test_salvar_candidatos_usa_sql_correta(conn):
     assert "data_entrada_sociedade = EXCLUDED.data_entrada_sociedade" in sql
     assert "faixa_etaria_socio = EXCLUDED.faixa_etaria_socio" in sql
     assert "primeira_competencia_servidor = EXCLUDED.primeira_competencia_servidor" in sql
+    assert "contrato_ativo = EXCLUDED.contrato_ativo" in sql
+    assert "valor_total_contratos = EXCLUDED.valor_total_contratos" in sql
+    assert "qtd_servidores_matched_mesmo_socio = EXCLUDED.qtd_servidores_matched_mesmo_socio" in sql
     assert "status" not in sql.split("DO UPDATE SET")[1].split("RETURNING")[0]
     assert "RETURNING id" in sql
+
+
+def test_salvar_candidatos_reprocessamento_atualiza_sinais_de_priorizacao(conn):
+    repo = CandidatoConflitoRepository(conn)
+    repo.salvar_candidatos([_candidato()])
+
+    id_ = next(iter(conn.tabela))
+    assert conn.tabela[id_]["qtd_servidores_matched_mesmo_socio"] == "1"
+
+    repo.salvar_candidatos(
+        [_candidato(
+            contrato_ativo=True,
+            valor_total_contratos=1500.5,
+            qtd_servidores_matched_mesmo_socio=3,
+        )]
+    )
+
+    assert conn.tabela[id_]["contrato_ativo"] == "True"
+    assert conn.tabela[id_]["valor_total_contratos"] == "1500.5"
+    assert conn.tabela[id_]["qtd_servidores_matched_mesmo_socio"] == "3"

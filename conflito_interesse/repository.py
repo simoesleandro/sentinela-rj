@@ -18,8 +18,9 @@ class CandidatoConflitoRepository:
     domínio folha_pagamento). Idempotente via ON CONFLICT (fornecedor_ni,
     matricula_servidor) DO UPDATE: rodar de novo não duplica candidatos, mas
     atualiza os sinais extras (data_entrada_sociedade, faixa_etaria_socio,
-    primeira_competencia_servidor) dos já existentes — sem tocar status nem
-    revisado_em, que pertencem exclusivamente ao fluxo de triagem manual
+    primeira_competencia_servidor, contrato_ativo, valor_total_contratos,
+    qtd_servidores_matched_mesmo_socio) dos já existentes — sem tocar status
+    nem revisado_em, que pertencem exclusivamente ao fluxo de triagem manual
     (ConflitoTriagemRepository).
     """
 
@@ -41,6 +42,9 @@ class CandidatoConflitoRepository:
                 c.data_entrada_sociedade,
                 c.faixa_etaria_socio,
                 c.primeira_competencia_servidor,
+                c.contrato_ativo,
+                c.valor_total_contratos,
+                c.qtd_servidores_matched_mesmo_socio,
             )
             for c in candidatos_dedup
         ]
@@ -54,12 +58,17 @@ class CandidatoConflitoRepository:
                    fornecedor_ni, nome_socio, qualificacao_socio,
                    matricula_servidor, nome_servidor, sigla_ua,
                    score_similaridade, data_entrada_sociedade,
-                   faixa_etaria_socio, primeira_competencia_servidor
+                   faixa_etaria_socio, primeira_competencia_servidor,
+                   contrato_ativo, valor_total_contratos,
+                   qtd_servidores_matched_mesmo_socio
                ) VALUES %s
                ON CONFLICT (fornecedor_ni, matricula_servidor) DO UPDATE SET
                    data_entrada_sociedade = EXCLUDED.data_entrada_sociedade,
                    faixa_etaria_socio = EXCLUDED.faixa_etaria_socio,
-                   primeira_competencia_servidor = EXCLUDED.primeira_competencia_servidor
+                   primeira_competencia_servidor = EXCLUDED.primeira_competencia_servidor,
+                   contrato_ativo = EXCLUDED.contrato_ativo,
+                   valor_total_contratos = EXCLUDED.valor_total_contratos,
+                   qtd_servidores_matched_mesmo_socio = EXCLUDED.qtd_servidores_matched_mesmo_socio
                RETURNING id""",
             valores,
             page_size=self._batch_size,

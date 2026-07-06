@@ -29,6 +29,9 @@ class CandidatoConflito:
     data_entrada_sociedade: str | None = None
     faixa_etaria_socio: str | None = None
     primeira_competencia_servidor: str | None = None
+    contrato_ativo: bool = False
+    valor_total_contratos: float | None = None
+    qtd_servidores_matched_mesmo_socio: int = 1
 
 
 class ConflictMatcherService:

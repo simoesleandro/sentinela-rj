@@ -26,6 +26,8 @@ class _FakeCursor:
                 "matricula_servidor", "nome_servidor", "sigla_ua",
                 "score_similaridade", "data_entrada_sociedade",
                 "faixa_etaria_socio", "primeira_competencia_servidor",
+                "contrato_ativo", "valor_total_contratos",
+                "qtd_servidores_matched_mesmo_socio",
                 "status", "detectado_em", "revisado_em",
             ]
             rows = list(self._tabela.values())
@@ -105,6 +107,9 @@ def _candidato(
         "data_entrada_sociedade": None,
         "faixa_etaria_socio": None,
         "primeira_competencia_servidor": None,
+        "contrato_ativo": False,
+        "valor_total_contratos": None,
+        "qtd_servidores_matched_mesmo_socio": 1,
         "status": status,
         "detectado_em": datetime.now(timezone.utc),
         "revisado_em": None,
@@ -203,6 +208,32 @@ def test_lista_nunca_retorna_dois_itens_com_mesma_chave(client, monkeypatch) -> 
     assert len(items) == 3
     chaves = [(it["fornecedor_ni"], it["matricula_servidor"]) for it in items]
     assert len(chaves) == len(set(chaves))
+
+
+def test_lista_ordena_por_prioridade_investigacao_antes_do_score(client, monkeypatch) -> None:
+    """Candidato com score menor, mas contrato ativo + 2 sócios batendo no
+    mesmo fornecedor, deve vir antes de um candidato de score maior sem
+    esses sinais — a prioridade de investigação manda na ordem, o score de
+    nome só desempata dentro do mesmo grupo."""
+    import web_app as wa
+
+    tabela = {
+        1: _candidato(1, score=99.0, matricula_servidor="0001"),
+        2: {
+            **_candidato(2, score=81.0, fornecedor_ni="99999999000199", matricula_servidor="0002"),
+            "contrato_ativo": True,
+            "qtd_servidores_matched_mesmo_socio": 2,
+        },
+    }
+    monkeypatch.setattr(wa, "get_conflito_conn", lambda: _FakeConn(tabela))
+
+    res = client.get("/api/conflitos-interesse?status=todos")
+    assert res.status_code == 200
+    items = res.get_json()["items"]
+
+    assert [it["id"] for it in items] == [2, 1]
+    assert items[0]["prioridade_investigacao"] is True
+    assert items[1]["prioridade_investigacao"] is False
 
 
 def test_lista_inclui_resumo_e_motivos(client) -> None:

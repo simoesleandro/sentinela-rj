@@ -19,6 +19,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from conflito_interesse.enriquecimento import enriquecer_candidatos
 from conflito_interesse.indice_servidores import IndiceServidoresPorToken
 from conflito_interesse.matcher import ConflictMatcherService
 from conflito_interesse.repository import CandidatoConflitoRepository
@@ -47,6 +48,7 @@ def main() -> int:
     try:
         indice = IndiceServidoresPorToken(conn_folha)
         candidatos = ConflictMatcherService(conn_sentinela, indice).buscar_candidatos()
+        candidatos = enriquecer_candidatos(candidatos, conn_sentinela)
 
         fornecedores_processados = conn_sentinela.execute(
             "SELECT COUNT(*) FROM fornecedor_cadastro WHERE socios IS NOT NULL AND socios != ''"
