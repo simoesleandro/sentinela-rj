@@ -20,7 +20,6 @@
     .back-link { color: var(--muted); text-decoration: none; font-size: 0.875rem; }
     .back-link:hover { color: var(--text); }
     .ci-brand { font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; }
-    main { max-width: 1200px; margin: 0 auto; padding: 2rem max(2rem, calc((100% - 1200px) / 2 + 2rem)); }
     .ci-intro { color: var(--muted); font-size: 0.85rem; max-width: 70ch; margin-bottom: 1.5rem; }
     .ci-filtros { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
     .ci-filtros select {
@@ -32,39 +31,41 @@
       border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
     }
     .ci-resumo-chip strong { color: var(--text); }
-    .ci-acao-cell { display: flex; flex-direction: column; gap: 0.4rem; min-width: 220px; }
-    .ci-acao-form { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
-    .ci-acao-form select, .ci-acao-form input {
-      background: #1a1a1a; border: 1px solid var(--border); color: var(--text);
-      padding: 0.3rem 0.4rem; border-radius: 4px; font-family: inherit; font-size: 0.78rem;
-    }
-    .ci-acao-form input[type="text"] { flex: 1; min-width: 120px; }
-    .ci-motivo-wrap { display: none; width: 100%; }
-    .ci-motivo-wrap.show { display: flex; gap: 0.4rem; }
-    .ci-erro { color: var(--red); font-size: 0.75rem; display: none; }
     .ci-empty {
       color: var(--muted); font-size: 0.875rem; padding: 2.5rem; text-align: center;
       background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
     }
     .fornecedor-link { color: var(--blue); text-decoration: none; font-size: 0.8rem; }
     .fornecedor-link:hover { text-decoration: underline; }
-    #ci-table { min-width: 1260px; }
-    /* Com centenas de linhas sem paginação, um .table-wrap comum (overflow-x
-       só na largura, altura ilimitada) deixa a barra de rolagem horizontal a
-       milhares de pixels abaixo, fora da tela visível — sem essa barra o
-       corte de colunas fica indistinguível de um bug de layout. Limitar a
-       altura mantém a rolagem horizontal sempre alcançável perto do topo. */
-    #ci-table-wrap { max-height: calc(100vh - 380px); min-height: 240px; overflow-y: auto; }
-    #ci-table thead th {
-      position: sticky;
-      top: 0;
-      background: var(--surface);
-      z-index: 1;
+
+    /* Tabela enxuta de propósito: só as colunas que cabem sem quebrar o
+       layout de 1200px do app (mesmo princípio da tabela de /alertas). Os
+       sinais extras (matrícula, unidade, entrada na sociedade, faixa etária,
+       1ª competência) e a triagem em si vivem no painel lateral — mesmo
+       padrão de #detail-panel usado pela tabela de alertas. */
+    .ci-detalhe-btn {
+      background: #262626; border: 1px solid var(--border); color: var(--text);
+      padding: 0.3rem 0.7rem; border-radius: 6px; font-family: inherit; font-size: 0.78rem;
+      cursor: pointer;
     }
-    @media (max-width: 768px) {
-      #ci-table { min-width: 720px; }
-      .ci-col-opcional { display: none; }
+    .ci-detalhe-btn:hover { background: #333; }
+
+    .ci-detalhe-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem 1.2rem;
+      margin: 1.25rem 0; font-size: 0.85rem;
     }
+    .ci-detalhe-grid dt { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.15rem; }
+    .ci-detalhe-grid dd { color: var(--text); }
+
+    .ci-acao-form { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+    .ci-acao-form select, .ci-acao-form input {
+      background: #1a1a1a; border: 1px solid var(--border); color: var(--text);
+      padding: 0.4rem 0.5rem; border-radius: 4px; font-family: inherit; font-size: 0.8rem;
+    }
+    .ci-acao-form input[type="text"] { flex: 1; min-width: 160px; }
+    .ci-motivo-wrap { display: none; width: 100%; margin-top: 0.5rem; }
+    .ci-motivo-wrap.show { display: flex; gap: 0.4rem; }
+    .ci-erro { color: var(--red); font-size: 0.78rem; display: none; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
@@ -99,6 +100,12 @@
     <div id="ci-content" style="display:none"></div>
   </main>
 
+  <div id="detail-backdrop" onclick="fecharDetalhe()"></div>
+  <div id="detail-panel">
+    <button id="detail-close" onclick="fecharDetalhe()">✕</button>
+    <div id="detail-content"></div>
+  </div>
+
   <script>
     'use strict';
 
@@ -113,6 +120,7 @@
     };
 
     let MOTIVOS_DESCARTE = [];
+    let ITENS_ATUAIS = [];
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -154,8 +162,9 @@
         }
         const d = await res.json();
         MOTIVOS_DESCARTE = d.motivos_descarte || [];
+        ITENS_ATUAIS = d.items || [];
         renderResumo(d.resumo);
-        renderTabela(d.items);
+        renderTabela(ITENS_ATUAIS);
         loading.style.display = 'none';
         content.style.display = 'block';
       } catch (e) {
@@ -179,80 +188,94 @@
         return;
       }
 
-      const motivoOpts = MOTIVOS_DESCARTE.map(m =>
-        `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`
+      const rows = items.map(c => `
+        <tr>
+          <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_socio || '—')}</td>
+          <td>
+            <a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link">
+              ${formatCNPJ(c.fornecedor_ni)}
+            </a>
+          </td>
+          <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_servidor || '—')}</td>
+          <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td><button type="button" class="ci-detalhe-btn" onclick="abrirDetalhe(${c.id})">Detalhes</button></td>
+        </tr>`
       ).join('');
 
-      const rows = items.map(c => {
-        const transicoes = c.transicoes_permitidas || [];
-        const opts = transicoes.map(st =>
-          `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
-        ).join('');
-
-        const acaoHtml = transicoes.length
-          ? `
-            <div class="ci-acao-cell">
-              <div class="ci-acao-form">
-                <select id="ci-status-${c.id}" onchange="toggleMotivo(${c.id})">
-                  <option value="">Mudar status…</option>
-                  ${opts}
-                </select>
-                <button type="button" class="btn-page" style="padding:0.3rem 0.6rem;font-size:0.78rem"
-                        onclick="salvarStatus(${c.id})">Salvar</button>
-              </div>
-              <div class="ci-acao-form ci-motivo-wrap" id="ci-motivo-wrap-${c.id}">
-                <select id="ci-motivo-${c.id}">
-                  <option value="">Motivo do descarte…</option>
-                  ${motivoOpts}
-                </select>
-              </div>
-              <input type="text" id="ci-nota-${c.id}" placeholder="Nota (opcional)">
-              <div class="ci-erro" id="ci-erro-${c.id}"></div>
-            </div>`
-          : '<span style="color:var(--muted);font-size:0.78rem">Sem transições</span>';
-
-        return `
-          <tr>
-            <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_socio || '—')}</td>
-            <td>
-              <a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link">
-                ${formatCNPJ(c.fornecedor_ni)}
-              </a>
-            </td>
-            <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_servidor || '—')}</td>
-            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.matricula_servidor || '—')}</td>
-            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.sigla_ua || '—')}</td>
-            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted);white-space:nowrap">${formatDate(c.data_entrada_sociedade)}</td>
-            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted)">${escapeHtml(c.faixa_etaria_socio || '—')}</td>
-            <td class="ci-col-opcional" style="font-size:0.8rem;color:var(--muted);white-space:nowrap">${formatDate(c.primeira_competencia_servidor)}</td>
-            <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
-            <td>${statusBadge(c.status)}</td>
-            <td>${acaoHtml}</td>
-          </tr>`;
-      }).join('');
-
       content.innerHTML = `
-        <div class="table-wrap" id="ci-table-wrap">
-          <table id="ci-table">
+        <div class="table-wrap">
+          <table>
             <thead>
               <tr>
                 <th>Sócio</th>
                 <th>Fornecedor</th>
                 <th>Servidor</th>
-                <th class="ci-col-opcional">Matrícula</th>
-                <th class="ci-col-opcional">Unidade</th>
-                <th class="ci-col-opcional">Entrada sociedade</th>
-                <th class="ci-col-opcional">Faixa etária</th>
-                <th class="ci-col-opcional">1ª competência</th>
                 <th>Score</th>
                 <th>Status</th>
-                <th>Ação</th>
+                <th>Detalhes</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
         </div>`;
     }
+
+    window.abrirDetalhe = function(id) {
+      const c = ITENS_ATUAIS.find(i => i.id === id);
+      if (!c) return;
+
+      const transicoes = c.transicoes_permitidas || [];
+      const opts = transicoes.map(st =>
+        `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
+      ).join('');
+      const motivoOpts = MOTIVOS_DESCARTE.map(m =>
+        `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`
+      ).join('');
+
+      const acaoHtml = transicoes.length
+        ? `
+          <div class="ci-acao-form">
+            <select id="ci-status-${c.id}" onchange="toggleMotivo(${c.id})">
+              <option value="">Mudar status…</option>
+              ${opts}
+            </select>
+            <button type="button" class="btn-page" onclick="salvarStatus(${c.id})">Salvar</button>
+            <div class="ci-acao-form ci-motivo-wrap" id="ci-motivo-wrap-${c.id}">
+              <select id="ci-motivo-${c.id}">
+                <option value="">Motivo do descarte…</option>
+                ${motivoOpts}
+              </select>
+            </div>
+            <input type="text" id="ci-nota-${c.id}" placeholder="Nota (opcional)">
+          </div>
+          <div class="ci-erro" id="ci-erro-${c.id}"></div>`
+        : '<p style="color:var(--muted);font-size:0.8rem;margin-top:1rem">Sem transições disponíveis neste status.</p>';
+
+      document.getElementById('detail-content').innerHTML = `
+        <h2 style="font-size:1.15rem;font-weight:700;margin-bottom:0.25rem">${escapeHtml(c.nome_socio || '—')}</h2>
+        <p style="color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem">${escapeHtml(c.qualificacao_socio || '—')}</p>
+        ${statusBadge(c.status)}
+        <dl class="ci-detalhe-grid">
+          <div><dt>Fornecedor</dt><dd><a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link">${formatCNPJ(c.fornecedor_ni)}</a></dd></div>
+          <div><dt>Score</dt><dd>${(c.score_similaridade ?? 0).toFixed(1)}</dd></div>
+          <div><dt>Servidor</dt><dd>${escapeHtml(c.nome_servidor || '—')}</dd></div>
+          <div><dt>Matrícula</dt><dd>${escapeHtml(c.matricula_servidor || '—')}</dd></div>
+          <div><dt>Unidade</dt><dd>${escapeHtml(c.sigla_ua || '—')}</dd></div>
+          <div><dt>Entrada na sociedade</dt><dd>${formatDate(c.data_entrada_sociedade)}</dd></div>
+          <div><dt>Faixa etária do sócio</dt><dd>${escapeHtml(c.faixa_etaria_socio || '—')}</dd></div>
+          <div><dt>1ª competência como servidor</dt><dd>${formatDate(c.primeira_competencia_servidor)}</dd></div>
+        </dl>
+        ${acaoHtml}`;
+
+      document.getElementById('detail-backdrop').classList.add('backdrop-open');
+      document.getElementById('detail-panel').classList.add('panel-open');
+    };
+
+    window.fecharDetalhe = function() {
+      document.getElementById('detail-backdrop').classList.remove('backdrop-open');
+      document.getElementById('detail-panel').classList.remove('panel-open');
+    };
 
     window.toggleMotivo = function(id) {
       const sel = document.getElementById(`ci-status-${id}`);
@@ -289,6 +312,7 @@
         });
         const payload = await res.json();
         if (!res.ok) throw new Error(payload.error || res.statusText);
+        fecharDetalhe();
         carregar();
       } catch (e) {
         erroEl.textContent = e.message;
