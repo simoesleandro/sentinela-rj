@@ -196,7 +196,10 @@
               ${formatCNPJ(c.fornecedor_ni)}
             </a>
           </td>
-          <td style="font-size:0.8rem;color:#d4d4d4">${escapeHtml(c.nome_servidor || '—')}</td>
+          <td style="font-size:0.8rem;color:#d4d4d4">
+            ${escapeHtml(c.nome_servidor || '—')}
+            <div style="font-size:0.7rem;color:var(--muted)">matrícula ${escapeHtml(c.matricula_servidor || '—')}</div>
+          </td>
           <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
           <td>${statusBadge(c.status)}</td>
           <td><button type="button" class="ci-detalhe-btn" onclick="abrirDetalhe(${c.id})">Detalhes</button></td>

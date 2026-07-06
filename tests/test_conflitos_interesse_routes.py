@@ -91,13 +91,14 @@ def _candidato(
     status: str = "aberto",
     fornecedor_ni: str = "12345678000199",
     score: float = 92.5,
+    matricula_servidor: str = "0001",
 ) -> dict:
     return {
         "id": id_,
         "fornecedor_ni": fornecedor_ni,
         "nome_socio": "MARIA DA SILVA SANTOS",
         "qualificacao_socio": "Presidente",
-        "matricula_servidor": "0001",
+        "matricula_servidor": matricula_servidor,
         "nome_servidor": "MARIA SILVA SANTOS",
         "sigla_ua": "SMS",
         "score_similaridade": score,
@@ -176,6 +177,32 @@ def test_lista_todos_retorna_tudo(client) -> None:
     assert res.status_code == 200
     data = res.get_json()
     assert len(data["items"]) == 2
+
+
+def test_lista_nunca_retorna_dois_itens_com_mesma_chave(client, monkeypatch) -> None:
+    """Investigação de bug reportado: candidatos com o mesmo fornecedor_ni e o
+    mesmo nome_servidor normalizado (nomes muito parecidos após fuzzy match,
+    ex.: dois vínculos/matrículas distintos da mesma pessoa em folha_mensal)
+    são candidatos LEGITIMAMENTE distintos — cada matricula_servidor é uma
+    linha própria, protegida pelo UNIQUE (fornecedor_ni, matricula_servidor).
+    A API não deve, em hipótese alguma, devolver duas linhas com essa mesma
+    chave (o que indicaria duplicata real, não apenas nomes parecidos)."""
+    import web_app as wa
+
+    tabela = {
+        1: _candidato(1, matricula_servidor="0001"),
+        2: _candidato(2, matricula_servidor="0002"),
+        3: _candidato(3, fornecedor_ni="99999999000199", matricula_servidor="0001"),
+    }
+    monkeypatch.setattr(wa, "get_conflito_conn", lambda: _FakeConn(tabela))
+
+    res = client.get("/api/conflitos-interesse?status=todos")
+    assert res.status_code == 200
+    items = res.get_json()["items"]
+
+    assert len(items) == 3
+    chaves = [(it["fornecedor_ni"], it["matricula_servidor"]) for it in items]
+    assert len(chaves) == len(set(chaves))
 
 
 def test_lista_inclui_resumo_e_motivos(client) -> None:
