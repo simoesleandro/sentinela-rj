@@ -64,6 +64,14 @@
       background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.4);
     }
 
+    .selo-risco {
+      display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 999px;
+      background: rgba(220,38,38,0.15); color: #f87171; border: 1px solid rgba(220,38,38,0.4);
+      margin-right: 4px;
+    }
+
+    .nota-raridade { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+
     /* Tabela enxuta de propósito: só as colunas que cabem sem quebrar o
        layout de 1200px do app (mesmo princípio da tabela de /alertas). Os
        sinais extras (matrícula, unidade, entrada na sociedade, faixa etária,
@@ -217,6 +225,24 @@
       return prioritario ? '<span class="selo-prioridade">Prioritário</span>' : '';
     }
 
+    function seloEvidenciasHtml(c) {
+      const partes = [];
+      if (c.tem_alerta_severidade_alta) {
+        partes.push('<span class="selo-risco" title="Este fornecedor já tem um alerta de severidade alta em algum contrato (valor atípico, fornecedor recorrente, adesão suspeita...), independente deste match de nome.">Alerta de contrato</span>');
+      }
+      if (c.tem_sancao) {
+        partes.push('<span class="selo-risco" title="Este fornecedor tem registro de sanção.">Sancionado</span>');
+      }
+      return partes.join('') || '—';
+    }
+
+    const LIMIAR_NOME_COMUM = 5;
+
+    function notaRaridadeHtml(qtd) {
+      if (!qtd || qtd <= LIMIAR_NOME_COMUM) return '';
+      return `<div class="nota-raridade">nome comum entre servidores (${qtd} homônimos)</div>`;
+    }
+
     async function carregar() {
       const status = document.getElementById('ci-status-filtro').value;
       const loading = document.getElementById('ci-loading');
@@ -281,12 +307,14 @@
           <td style="font-size:0.8rem;color:#d4d4d4">
             ${escapeHtml(c.nome_servidor || '—')}
             <div style="font-size:0.7rem;color:var(--muted)">matrícula ${escapeHtml(c.matricula_servidor || '—')}</div>
+            ${notaRaridadeHtml(c.qtd_servidores_mesmo_nome)}
           </td>
           <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
           <td>${statusBadge(c.status)}</td>
           <td>${selocompatHtml(c.compatibilidade_data) || '—'}</td>
           <td>${seloContratoHtml(c.contrato_ativo)}</td>
           <td style="white-space:nowrap">${formatCurrency(c.valor_total_contratos)}</td>
+          <td>${seloEvidenciasHtml(c)}</td>
           <td><button type="button" class="ci-detalhe-btn" onclick="abrirDetalhe(${c.id})">Detalhes</button></td>
         </tr>`
       ).join('');
@@ -304,6 +332,7 @@
                 <th>Compat.</th>
                 <th>Contrato</th>
                 <th>Valor total</th>
+                <th>Evidências</th>
                 <th>Detalhes</th>
               </tr>
             </thead>
@@ -360,6 +389,8 @@
           <div><dt>Contrato</dt><dd>${seloContratoHtml(c.contrato_ativo)}</dd></div>
           <div><dt>Valor total de contratos</dt><dd>${formatCurrency(c.valor_total_contratos)}</dd></div>
           <div><dt>Servidores distintos batendo com este sócio</dt><dd>${c.qtd_servidores_matched_mesmo_socio ?? 1}</dd></div>
+          <div><dt>Nome exato entre servidores</dt><dd>${c.qtd_servidores_mesmo_nome ?? 1} homônimo(s) na base inteira</dd></div>
+          <div><dt>Outras evidências do fornecedor</dt><dd>${seloEvidenciasHtml(c)}</dd></div>
         </dl>
         ${acaoHtml}`;
 

@@ -48,7 +48,7 @@ def main() -> int:
     try:
         indice = IndiceServidoresPorToken(conn_folha)
         candidatos = ConflictMatcherService(conn_sentinela, indice).buscar_candidatos()
-        candidatos = enriquecer_candidatos(candidatos, conn_sentinela)
+        candidatos = enriquecer_candidatos(candidatos, conn_sentinela, indice)
 
         fornecedores_processados = conn_sentinela.execute(
             "SELECT COUNT(*) FROM fornecedor_cadastro WHERE socios IS NOT NULL AND socios != ''"

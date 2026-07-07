@@ -14,6 +14,7 @@ import sqlite3
 from collections import defaultdict
 from typing import Iterable
 
+from .indice_servidores import IndiceServidoresPorToken
 from .matcher import CandidatoConflito
 from .normalizador import normalizar_nome
 
@@ -79,20 +80,54 @@ def somar_valor_contratos(conn: sqlite3.Connection, fornecedor_ni: str) -> float
     return float(valor) if valor is not None else None
 
 
+def tem_alerta_severidade_alta(conn: sqlite3.Connection, fornecedor_ni: str) -> bool:
+    """Fornecedor já tem algum alerta de severidade alta (valor atípico,
+    fornecedor recorrente, adesão suspeita...) em algum contrato dele —
+    evidência de irregularidade que já existia ANTES do match sócio-servidor,
+    então é genuinamente independente do problema de nome comum."""
+    row = conn.execute(
+        """
+        SELECT 1 FROM contratos c
+        JOIN alertas a ON a.numero_controle_pncp = c.numero_controle_pncp
+        WHERE c.fornecedor_ni = ? AND a.severidade = 'alta'
+        LIMIT 1
+        """,
+        (fornecedor_ni,),
+    ).fetchone()
+    return row is not None
+
+
+def tem_sancao(conn: sqlite3.Connection, fornecedor_ni: str) -> bool:
+    """Fornecedor tem algum registro em fornecedor_sancoes (independente de
+    a sanção estar em vigor ou não — o histórico já é relevante pra
+    triagem)."""
+    row = conn.execute(
+        "SELECT 1 FROM fornecedor_sancoes WHERE fornecedor_ni = ? LIMIT 1",
+        (fornecedor_ni,),
+    ).fetchone()
+    return row is not None
+
+
 def enriquecer_candidatos(
-    candidatos: list[CandidatoConflito], conn_sentinela: sqlite3.Connection
+    candidatos: list[CandidatoConflito],
+    conn_sentinela: sqlite3.Connection,
+    indice: IndiceServidoresPorToken,
 ) -> list[CandidatoConflito]:
-    """Preenche contrato_ativo, valor_total_contratos e
-    qtd_servidores_matched_mesmo_socio. Consulta 'contratos' uma vez por
-    fornecedor_ni distinto (cache local), não uma vez por candidato —
-    o mesmo fornecedor pode aparecer várias vezes no lote (vários sócios
-    ou vários servidores batendo)."""
+    """Preenche contrato_ativo, valor_total_contratos,
+    qtd_servidores_matched_mesmo_socio, tem_alerta_severidade_alta,
+    tem_sancao e qtd_servidores_mesmo_nome. Consulta 'contratos'/'alertas'/
+    'fornecedor_sancoes' uma vez por fornecedor_ni distinto (cache local),
+    não uma vez por candidato — o mesmo fornecedor pode aparecer várias
+    vezes no lote (vários sócios ou vários servidores batendo)."""
     if not candidatos:
         return []
 
     qtd_por_socio = contar_servidores_por_socio(candidatos)
     cache_contrato_ativo: dict[str, bool] = {}
     cache_valor_total: dict[str, float | None] = {}
+    cache_alerta_alta: dict[str, bool] = {}
+    cache_sancao: dict[str, bool] = {}
+    cache_freq_nome: dict[str, int] = {}
 
     enriquecidos = []
     for c in candidatos:
@@ -100,17 +135,30 @@ def enriquecer_candidatos(
         if ni not in cache_contrato_ativo:
             cache_contrato_ativo[ni] = buscar_contrato_ativo(conn_sentinela, ni)
             cache_valor_total[ni] = somar_valor_contratos(conn_sentinela, ni)
+            cache_alerta_alta[ni] = tem_alerta_severidade_alta(conn_sentinela, ni)
+            cache_sancao[ni] = tem_sancao(conn_sentinela, ni)
         chave_socio = (ni, normalizar_nome(c.nome_socio))
         # Piso de 1: um candidato cujo próprio match é fuzzy (score < 100) não
         # entra no dict acima (não é "confiável" o bastante pra contar), mas
         # ele continua existindo — não faz sentido reportar 0 servidores.
         qtd = max(qtd_por_socio.get(chave_socio, 0), 1)
+
+        nome_servidor_normalizado = normalizar_nome(c.nome_servidor)
+        if nome_servidor_normalizado not in cache_freq_nome:
+            cache_freq_nome[nome_servidor_normalizado] = indice.frequencia_nome(nome_servidor_normalizado)
+        # Piso de 1: o próprio candidato sempre existe, mesmo que a busca no
+        # índice (bloqueada por primeiro token) não confirme o total.
+        freq_nome = max(cache_freq_nome[nome_servidor_normalizado], 1)
+
         enriquecidos.append(
             dataclasses.replace(
                 c,
                 contrato_ativo=cache_contrato_ativo[ni],
                 valor_total_contratos=cache_valor_total[ni],
                 qtd_servidores_matched_mesmo_socio=qtd,
+                tem_alerta_severidade_alta=cache_alerta_alta[ni],
+                tem_sancao=cache_sancao[ni],
+                qtd_servidores_mesmo_nome=freq_nome,
             )
         )
     return enriquecidos

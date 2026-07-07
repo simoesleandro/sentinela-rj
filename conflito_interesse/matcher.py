@@ -32,6 +32,9 @@ class CandidatoConflito:
     contrato_ativo: bool = False
     valor_total_contratos: float | None = None
     qtd_servidores_matched_mesmo_socio: int = 1
+    tem_alerta_severidade_alta: bool = False
+    tem_sancao: bool = False
+    qtd_servidores_mesmo_nome: int = 1
 
 
 class ConflictMatcherService:

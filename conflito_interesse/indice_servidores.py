@@ -54,3 +54,21 @@ class IndiceServidoresPorToken:
             (matricula,),
         ).fetchone()
         return row[0] if row and row[0] else None
+
+    def frequencia_nome(self, nome_normalizado: str) -> int:
+        """Quantos servidores, em toda a base (286k), têm esse nome idêntico
+        depois de normalizado.
+
+        Serve pro revisor calibrar confiança: um match de nome exato num
+        sobrenome raro é evidência bem mais forte do que um match exato num
+        nome que já é comum dentro do próprio funcionalismo do Rio (ex.:
+        "LUIZ CARLOS SILVA" tem 28 servidores homônimos — o match em si não
+        prova muito). Reaproveita o índice por primeiro token: dois nomes
+        idênticos depois de normalizados sempre compartilham o primeiro
+        token, então a contagem dentro do bucket já é exata, sem precisar de
+        um índice global à parte.
+        """
+        if not nome_normalizado:
+            return 0
+        primeiro_token = nome_normalizado.split(" ", 1)[0]
+        return sum(1 for _, nome in self._indice.get(primeiro_token, []) if nome == nome_normalizado)

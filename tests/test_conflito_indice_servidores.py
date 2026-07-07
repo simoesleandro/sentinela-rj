@@ -85,3 +85,47 @@ def test_sigla_ua_mais_recente_sem_registros_retorna_none():
     indice = IndiceServidoresPorToken(conn)
 
     assert indice.sigla_ua_mais_recente("1") is None
+
+
+def test_frequencia_nome_conta_homonimos_exatos():
+    conn = _conn_servidores(
+        [
+            ("1", "LUIZ CARLOS SILVA"),
+            ("2", "LUIZ CARLOS SILVA"),
+            ("3", "LUIZ CARLOS SILVA"),
+            ("4", "JOAO SOUZA"),
+        ]
+    )
+    indice = IndiceServidoresPorToken(conn)
+
+    assert indice.frequencia_nome("LUIZ CARLOS SILVA") == 3
+    assert indice.frequencia_nome("JOAO SOUZA") == 1
+
+
+def test_frequencia_nome_nao_conta_nomes_so_parecidos():
+    """Frequência é de nome EXATO (pós-normalização), não fuzzy — diferente
+    do problema de match do matcher.py."""
+    conn = _conn_servidores(
+        [
+            ("1", "LEANDRO SILVA"),
+            ("2", "LEANDRO SILVA MELO"),
+            ("3", "LEANDRO GOMES SILVA"),
+        ]
+    )
+    indice = IndiceServidoresPorToken(conn)
+
+    assert indice.frequencia_nome("LEANDRO SILVA") == 1
+
+
+def test_frequencia_nome_inexistente_retorna_zero():
+    conn = _conn_servidores([("1", "MARIA DA SILVA")])
+    indice = IndiceServidoresPorToken(conn)
+
+    assert indice.frequencia_nome("PEDRO ALVES") == 0
+
+
+def test_frequencia_nome_vazio_retorna_zero():
+    conn = _conn_servidores([("1", "MARIA DA SILVA")])
+    indice = IndiceServidoresPorToken(conn)
+
+    assert indice.frequencia_nome("") == 0

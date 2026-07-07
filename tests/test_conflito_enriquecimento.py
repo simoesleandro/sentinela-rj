@@ -8,26 +8,64 @@ from conflito_interesse.enriquecimento import (
     contar_servidores_por_socio,
     enriquecer_candidatos,
     somar_valor_contratos,
+    tem_alerta_severidade_alta,
+    tem_sancao,
 )
+from conflito_interesse.indice_servidores import IndiceServidoresPorToken
 from conflito_interesse.matcher import CandidatoConflito
 
 
 def _conn_contratos(contratos: list[tuple[str, str, str, float]]) -> sqlite3.Connection:
-    """contratos: [(fornecedor_ni, data_vigencia_inicio, data_vigencia_fim, valor_global)]."""
+    """contratos: [(fornecedor_ni, data_vigencia_inicio, data_vigencia_fim, valor_global)].
+
+    Cria também 'alertas' e 'fornecedor_sancoes' vazias — os testes que
+    precisam de linhas nelas usam _adicionar_alerta/_adicionar_sancao.
+    """
     conn = sqlite3.connect(":memory:")
     conn.execute(
-        "CREATE TABLE contratos (fornecedor_ni TEXT, data_vigencia_inicio TEXT, "
-        "data_vigencia_fim TEXT, valor_global REAL)"
+        "CREATE TABLE contratos (numero_controle_pncp TEXT PRIMARY KEY, fornecedor_ni TEXT, "
+        "data_vigencia_inicio TEXT, data_vigencia_fim TEXT, valor_global REAL)"
     )
-    conn.executemany("INSERT INTO contratos VALUES (?, ?, ?, ?)", contratos)
+    for i, (ni, inicio, fim, valor) in enumerate(contratos):
+        conn.execute(
+            "INSERT INTO contratos VALUES (?, ?, ?, ?, ?)",
+            (f"pncp-{i}", ni, inicio, fim, valor),
+        )
+    conn.execute("CREATE TABLE alertas (numero_controle_pncp TEXT, severidade TEXT)")
+    conn.execute("CREATE TABLE fornecedor_sancoes (fornecedor_ni TEXT)")
     conn.commit()
     return conn
+
+
+def _adicionar_alerta(conn: sqlite3.Connection, fornecedor_ni: str, severidade: str = "alta") -> None:
+    row = conn.execute(
+        "SELECT numero_controle_pncp FROM contratos WHERE fornecedor_ni = ? LIMIT 1", (fornecedor_ni,)
+    ).fetchone()
+    conn.execute("INSERT INTO alertas VALUES (?, ?)", (row[0], severidade))
+    conn.commit()
+
+
+def _adicionar_sancao(conn: sqlite3.Connection, fornecedor_ni: str) -> None:
+    conn.execute("INSERT INTO fornecedor_sancoes VALUES (?)", (fornecedor_ni,))
+    conn.commit()
+
+
+def _indice_servidores(pares: list[tuple[str, str]] | None = None) -> IndiceServidoresPorToken:
+    """pares: [(matricula, nome_atual)] — usado só pelo sinal de raridade de nome."""
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE servidores (matricula TEXT PRIMARY KEY, nome_atual TEXT NOT NULL)")
+    conn.execute("CREATE TABLE folha_mensal (matricula TEXT, sigla_ua TEXT, competencia TEXT)")
+    if pares:
+        conn.executemany("INSERT INTO servidores VALUES (?, ?)", pares)
+    conn.commit()
+    return IndiceServidoresPorToken(conn)
 
 
 def _candidato(
     fornecedor_ni: str = "12345678000199",
     matricula_servidor: str = "0001",
     nome_socio: str = "MARIA DA SILVA SANTOS",
+    nome_servidor: str = "MARIA SILVA SANTOS",
     score_similaridade: float = 100.0,
 ) -> CandidatoConflito:
     return CandidatoConflito(
@@ -35,7 +73,7 @@ def _candidato(
         nome_socio=nome_socio,
         qualificacao_socio="Presidente",
         matricula_servidor=matricula_servidor,
-        nome_servidor="MARIA SILVA SANTOS",
+        nome_servidor=nome_servidor,
         sigla_ua=None,
         score_similaridade=score_similaridade,
     )
@@ -84,6 +122,34 @@ def test_soma_valor_contratos_ignora_valor_zero_ou_negativo():
 def test_soma_valor_contratos_sem_contratos_retorna_none():
     conn = _conn_contratos([])
     assert somar_valor_contratos(conn, "12345678000199") is None
+
+
+def test_tem_alerta_severidade_alta_true_quando_existe():
+    conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
+    _adicionar_alerta(conn, "A", severidade="alta")
+    assert tem_alerta_severidade_alta(conn, "A") is True
+
+
+def test_tem_alerta_severidade_alta_false_quando_so_baixa_ou_media():
+    conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
+    _adicionar_alerta(conn, "A", severidade="media")
+    assert tem_alerta_severidade_alta(conn, "A") is False
+
+
+def test_tem_alerta_severidade_alta_false_sem_alertas():
+    conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
+    assert tem_alerta_severidade_alta(conn, "A") is False
+
+
+def test_tem_sancao_true_quando_existe_registro():
+    conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
+    _adicionar_sancao(conn, "A")
+    assert tem_sancao(conn, "A") is True
+
+
+def test_tem_sancao_false_sem_registro():
+    conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
+    assert tem_sancao(conn, "A") is False
 
 
 def test_contar_servidores_por_socio_conta_matriculas_distintas_do_mesmo_socio():
@@ -149,20 +215,22 @@ def test_contar_servidores_por_socio_normaliza_nome_do_socio():
     assert contar_servidores_por_socio(candidatos) == {("A", "JOSE SILVA"): 2}
 
 
-def test_enriquecer_candidatos_preenche_os_tres_sinais():
+def test_enriquecer_candidatos_preenche_os_sinais():
     conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
     candidatos = [
         _candidato(fornecedor_ni="A", nome_socio="MARIA SILVA", matricula_servidor="0001"),
         _candidato(fornecedor_ni="A", nome_socio="MARIA SILVA", matricula_servidor="0002"),
     ]
 
-    enriquecidos = enriquecer_candidatos(candidatos, conn)
+    enriquecidos = enriquecer_candidatos(candidatos, conn, _indice_servidores())
 
     assert len(enriquecidos) == 2
     for c in enriquecidos:
         assert c.contrato_ativo is True
         assert c.valor_total_contratos == 1000.0
         assert c.qtd_servidores_matched_mesmo_socio == 2
+        assert c.tem_alerta_severidade_alta is False
+        assert c.tem_sancao is False
 
 
 def test_enriquecer_candidatos_socios_distintos_nao_saturam_o_sinal():
@@ -175,7 +243,7 @@ def test_enriquecer_candidatos_socios_distintos_nao_saturam_o_sinal():
         _candidato(fornecedor_ni="A", nome_socio="JOAO SOUZA", matricula_servidor="0002"),
     ]
 
-    enriquecidos = enriquecer_candidatos(candidatos, conn)
+    enriquecidos = enriquecer_candidatos(candidatos, conn, _indice_servidores())
 
     assert all(c.qtd_servidores_matched_mesmo_socio == 1 for c in enriquecidos)
 
@@ -190,7 +258,7 @@ def test_enriquecer_candidatos_matches_fuzzy_nao_saturam_o_sinal():
         _candidato(fornecedor_ni="A", nome_socio="LEANDRO SILVA", matricula_servidor="0002", score_similaridade=81.25),
     ]
 
-    enriquecidos = enriquecer_candidatos(candidatos, conn)
+    enriquecidos = enriquecer_candidatos(candidatos, conn, _indice_servidores())
 
     assert all(c.qtd_servidores_matched_mesmo_socio == 1 for c in enriquecidos)
 
@@ -199,10 +267,49 @@ def test_enriquecer_candidatos_fornecedor_sem_contrato_ativo():
     conn = _conn_contratos([("A", "2010-01-01", "2011-01-01", 1000.0)])
     candidatos = [_candidato(fornecedor_ni="A")]
 
-    enriquecidos = enriquecer_candidatos(candidatos, conn)
+    enriquecidos = enriquecer_candidatos(candidatos, conn, _indice_servidores())
 
     assert enriquecidos[0].contrato_ativo is False
     assert enriquecidos[0].qtd_servidores_matched_mesmo_socio == 1
+
+
+def test_enriquecer_candidatos_preenche_alerta_e_sancao():
+    conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
+    _adicionar_alerta(conn, "A", severidade="alta")
+    _adicionar_sancao(conn, "A")
+    candidatos = [_candidato(fornecedor_ni="A")]
+
+    enriquecidos = enriquecer_candidatos(candidatos, conn, _indice_servidores())
+
+    assert enriquecidos[0].tem_alerta_severidade_alta is True
+    assert enriquecidos[0].tem_sancao is True
+
+
+def test_enriquecer_candidatos_preenche_raridade_nome():
+    conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
+    indice = _indice_servidores(
+        [
+            ("0001", "MARIA SILVA SANTOS"),
+            ("0002", "MARIA SILVA SANTOS"),
+            ("0003", "MARIA SILVA SANTOS"),
+        ]
+    )
+    candidatos = [_candidato(fornecedor_ni="A", matricula_servidor="0001", nome_servidor="MARIA SILVA SANTOS")]
+
+    enriquecidos = enriquecer_candidatos(candidatos, conn, indice)
+
+    assert enriquecidos[0].qtd_servidores_mesmo_nome == 3
+
+
+def test_enriquecer_candidatos_raridade_nome_piso_1_quando_indice_nao_confirma():
+    """Índice vazio (ou sem esse nome) não deve reportar 0 — o próprio
+    candidato já é uma ocorrência real."""
+    conn = _conn_contratos([("A", "2020-01-01", "2099-01-01", 1000.0)])
+    candidatos = [_candidato(fornecedor_ni="A", nome_servidor="ALGUEM RARO")]
+
+    enriquecidos = enriquecer_candidatos(candidatos, conn, _indice_servidores())
+
+    assert enriquecidos[0].qtd_servidores_mesmo_nome == 1
 
 
 def test_enriquecer_candidatos_consulta_uma_vez_por_fornecedor(monkeypatch):
@@ -225,11 +332,11 @@ def test_enriquecer_candidatos_consulta_uma_vez_por_fornecedor(monkeypatch):
         return original(conn_, ni)
 
     monkeypatch.setattr(mod, "buscar_contrato_ativo", _contando)
-    mod.enriquecer_candidatos(candidatos, conn)
+    mod.enriquecer_candidatos(candidatos, conn, _indice_servidores())
 
     assert chamadas["n"] == 1
 
 
 def test_enriquecer_candidatos_lista_vazia():
     conn = _conn_contratos([])
-    assert enriquecer_candidatos([], conn) == []
+    assert enriquecer_candidatos([], conn, _indice_servidores()) == []

@@ -19,9 +19,10 @@ class CandidatoConflitoRepository:
     matricula_servidor) DO UPDATE: rodar de novo não duplica candidatos, mas
     atualiza os sinais extras (data_entrada_sociedade, faixa_etaria_socio,
     primeira_competencia_servidor, contrato_ativo, valor_total_contratos,
-    qtd_servidores_matched_mesmo_socio) dos já existentes — sem tocar status
-    nem revisado_em, que pertencem exclusivamente ao fluxo de triagem manual
-    (ConflitoTriagemRepository).
+    qtd_servidores_matched_mesmo_socio, tem_alerta_severidade_alta,
+    tem_sancao, qtd_servidores_mesmo_nome) dos já existentes — sem tocar
+    status nem revisado_em, que pertencem exclusivamente ao fluxo de
+    triagem manual (ConflitoTriagemRepository).
     """
 
     def __init__(self, conn: Any, batch_size: int = 500):
@@ -45,6 +46,9 @@ class CandidatoConflitoRepository:
                 c.contrato_ativo,
                 c.valor_total_contratos,
                 c.qtd_servidores_matched_mesmo_socio,
+                c.tem_alerta_severidade_alta,
+                c.tem_sancao,
+                c.qtd_servidores_mesmo_nome,
             )
             for c in candidatos_dedup
         ]
@@ -60,7 +64,9 @@ class CandidatoConflitoRepository:
                    score_similaridade, data_entrada_sociedade,
                    faixa_etaria_socio, primeira_competencia_servidor,
                    contrato_ativo, valor_total_contratos,
-                   qtd_servidores_matched_mesmo_socio
+                   qtd_servidores_matched_mesmo_socio,
+                   tem_alerta_severidade_alta, tem_sancao,
+                   qtd_servidores_mesmo_nome
                ) VALUES %s
                ON CONFLICT (fornecedor_ni, matricula_servidor) DO UPDATE SET
                    data_entrada_sociedade = EXCLUDED.data_entrada_sociedade,
@@ -68,7 +74,10 @@ class CandidatoConflitoRepository:
                    primeira_competencia_servidor = EXCLUDED.primeira_competencia_servidor,
                    contrato_ativo = EXCLUDED.contrato_ativo,
                    valor_total_contratos = EXCLUDED.valor_total_contratos,
-                   qtd_servidores_matched_mesmo_socio = EXCLUDED.qtd_servidores_matched_mesmo_socio
+                   qtd_servidores_matched_mesmo_socio = EXCLUDED.qtd_servidores_matched_mesmo_socio,
+                   tem_alerta_severidade_alta = EXCLUDED.tem_alerta_severidade_alta,
+                   tem_sancao = EXCLUDED.tem_sancao,
+                   qtd_servidores_mesmo_nome = EXCLUDED.qtd_servidores_mesmo_nome
                RETURNING id""",
             valores,
             page_size=self._batch_size,

@@ -28,6 +28,8 @@ class _FakeCursor:
         "faixa_etaria_socio", "primeira_competencia_servidor",
         "contrato_ativo", "valor_total_contratos",
         "qtd_servidores_matched_mesmo_socio",
+        "tem_alerta_severidade_alta", "tem_sancao",
+        "qtd_servidores_mesmo_nome",
     )
 
     def __init__(self, tabela: dict[tuple[str, str], dict], linhas_por_chave: dict[tuple[str, str], int]):
@@ -60,6 +62,9 @@ class _FakeCursor:
                 registro["contrato_ativo"] = linha["contrato_ativo"]
                 registro["valor_total_contratos"] = linha["valor_total_contratos"]
                 registro["qtd_servidores_matched_mesmo_socio"] = linha["qtd_servidores_matched_mesmo_socio"]
+                registro["tem_alerta_severidade_alta"] = linha["tem_alerta_severidade_alta"]
+                registro["tem_sancao"] = linha["tem_sancao"]
+                registro["qtd_servidores_mesmo_nome"] = linha["qtd_servidores_mesmo_nome"]
             else:
                 id_ = self._proximo_id
                 self._linhas_por_chave[chave] = id_
@@ -100,6 +105,9 @@ def _candidato(
     contrato_ativo: bool = False,
     valor_total_contratos: float | None = None,
     qtd_servidores_matched_mesmo_socio: int = 1,
+    tem_alerta_severidade_alta: bool = False,
+    tem_sancao: bool = False,
+    qtd_servidores_mesmo_nome: int = 1,
 ) -> CandidatoConflito:
     return CandidatoConflito(
         fornecedor_ni=fornecedor_ni,
@@ -115,6 +123,9 @@ def _candidato(
         contrato_ativo=contrato_ativo,
         valor_total_contratos=valor_total_contratos,
         qtd_servidores_matched_mesmo_socio=qtd_servidores_matched_mesmo_socio,
+        tem_alerta_severidade_alta=tem_alerta_severidade_alta,
+        tem_sancao=tem_sancao,
+        qtd_servidores_mesmo_nome=qtd_servidores_mesmo_nome,
     )
 
 
@@ -238,6 +249,9 @@ def test_salvar_candidatos_usa_sql_correta(conn):
     assert "contrato_ativo = EXCLUDED.contrato_ativo" in sql
     assert "valor_total_contratos = EXCLUDED.valor_total_contratos" in sql
     assert "qtd_servidores_matched_mesmo_socio = EXCLUDED.qtd_servidores_matched_mesmo_socio" in sql
+    assert "tem_alerta_severidade_alta = EXCLUDED.tem_alerta_severidade_alta" in sql
+    assert "tem_sancao = EXCLUDED.tem_sancao" in sql
+    assert "qtd_servidores_mesmo_nome = EXCLUDED.qtd_servidores_mesmo_nome" in sql
     assert "status" not in sql.split("DO UPDATE SET")[1].split("RETURNING")[0]
     assert "RETURNING id" in sql
 
@@ -254,9 +268,15 @@ def test_salvar_candidatos_reprocessamento_atualiza_sinais_de_priorizacao(conn):
             contrato_ativo=True,
             valor_total_contratos=1500.5,
             qtd_servidores_matched_mesmo_socio=3,
+            tem_alerta_severidade_alta=True,
+            tem_sancao=True,
+            qtd_servidores_mesmo_nome=7,
         )]
     )
 
     assert conn.tabela[id_]["contrato_ativo"] == "True"
     assert conn.tabela[id_]["valor_total_contratos"] == "1500.5"
     assert conn.tabela[id_]["qtd_servidores_matched_mesmo_socio"] == "3"
+    assert conn.tabela[id_]["tem_alerta_severidade_alta"] == "True"
+    assert conn.tabela[id_]["tem_sancao"] == "True"
+    assert conn.tabela[id_]["qtd_servidores_mesmo_nome"] == "7"

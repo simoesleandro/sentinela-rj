@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS candidatos_conflito_interesse (
     contrato_ativo                 BOOLEAN NOT NULL DEFAULT FALSE,
     valor_total_contratos          NUMERIC(14,2),
     qtd_servidores_matched_mesmo_socio INTEGER NOT NULL DEFAULT 1,
+    tem_alerta_severidade_alta     BOOLEAN NOT NULL DEFAULT FALSE,
+    tem_sancao                     BOOLEAN NOT NULL DEFAULT FALSE,
+    qtd_servidores_mesmo_nome      INTEGER NOT NULL DEFAULT 1,
     status                         TEXT NOT NULL DEFAULT 'aberto',
     detectado_em                   TIMESTAMP NOT NULL DEFAULT now(),
     revisado_em                    TIMESTAMP,
@@ -66,3 +69,16 @@ BEGIN
     END IF;
 END $$;
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS qtd_servidores_matched_mesmo_socio INTEGER NOT NULL DEFAULT 1;
+
+-- Mais 3 sinais de priorização (jul/2026), também sem fonte externa nova:
+-- tem_alerta_severidade_alta e tem_sancao cruzam com 'alertas'/'fornecedor_sancoes'
+-- (evidência de irregularidade do fornecedor já existente, independente do
+-- match de nome sócio-servidor). qtd_servidores_mesmo_nome é só informativo
+-- pro revisor (quantos servidores de TODA a base, 286k, têm esse nome exato —
+-- um nome comum dentro do próprio funcionalismo do Rio, ex. "LUIZ CARLOS
+-- SILVA" com 28 homônimos, não deve ser lido como forte mesmo com match
+-- exato) — não entra na fórmula de prioridade, só explicita pro humano o que
+-- ele teria que descobrir manualmente.
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS tem_alerta_severidade_alta BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS tem_sancao BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS qtd_servidores_mesmo_nome INTEGER NOT NULL DEFAULT 1;

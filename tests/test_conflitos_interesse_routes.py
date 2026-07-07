@@ -28,6 +28,8 @@ class _FakeCursor:
                 "faixa_etaria_socio", "primeira_competencia_servidor",
                 "contrato_ativo", "valor_total_contratos",
                 "qtd_servidores_matched_mesmo_socio",
+                "tem_alerta_severidade_alta", "tem_sancao",
+                "qtd_servidores_mesmo_nome",
                 "status", "detectado_em", "revisado_em",
             ]
             rows = list(self._tabela.values())
@@ -110,6 +112,9 @@ def _candidato(
         "contrato_ativo": False,
         "valor_total_contratos": None,
         "qtd_servidores_matched_mesmo_socio": 1,
+        "tem_alerta_severidade_alta": False,
+        "tem_sancao": False,
+        "qtd_servidores_mesmo_nome": 1,
         "status": status,
         "detectado_em": datetime.now(timezone.utc),
         "revisado_em": None,
@@ -223,6 +228,30 @@ def test_lista_ordena_por_prioridade_investigacao_antes_do_score(client, monkeyp
             **_candidato(2, score=81.0, fornecedor_ni="99999999000199", matricula_servidor="0002"),
             "contrato_ativo": True,
             "qtd_servidores_matched_mesmo_socio": 2,
+        },
+    }
+    monkeypatch.setattr(wa, "get_conflito_conn", lambda: _FakeConn(tabela))
+
+    res = client.get("/api/conflitos-interesse?status=todos")
+    assert res.status_code == 200
+    items = res.get_json()["items"]
+
+    assert [it["id"] for it in items] == [2, 1]
+    assert items[0]["prioridade_investigacao"] is True
+    assert items[1]["prioridade_investigacao"] is False
+
+
+def test_lista_prioriza_por_alerta_severidade_alta_sem_reforco_de_nome(client, monkeypatch) -> None:
+    """Fornecedor com alerta de contrato de severidade alta deve vir antes de
+    um candidato de score maior sem nenhum sinal — evidência independente do
+    match de nome, não precisa de contrato_ativo nem qtd>=2."""
+    import web_app as wa
+
+    tabela = {
+        1: _candidato(1, score=99.0, matricula_servidor="0001"),
+        2: {
+            **_candidato(2, score=81.0, fornecedor_ni="99999999000199", matricula_servidor="0002"),
+            "tem_alerta_severidade_alta": True,
         },
     }
     monkeypatch.setattr(wa, "get_conflito_conn", lambda: _FakeConn(tabela))
