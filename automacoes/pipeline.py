@@ -376,6 +376,31 @@ def executar_empenhos_diarios(config: PipelineConfig | None = None) -> EtapaResu
     return _etapa_empenhos_diarios(config)
 
 
+def _etapa_conflito_interesse() -> EtapaResult:
+    from run_matcher import executar_matching
+
+    logger.info("[pipeline] conflito_interesse iniciado")
+    try:
+        metricas = executar_matching()
+        msg = (
+            f"gerados={metricas['candidatos_gerados']} "
+            f"afetados={metricas['afetados']}"
+        )
+        logger.info("[pipeline] conflito_interesse OK — %s", msg)
+        return EtapaResult(True, msg, metricas=metricas)
+    except Exception as exc:
+        logger.exception("[pipeline] conflito_interesse FALHOU")
+        return EtapaResult(False, "falha no matcher de conflito de interesse", erro=str(exc))
+
+
+def executar_conflito_interesse(config: PipelineConfig | None = None) -> EtapaResult:
+    """Executa só o matcher de conflito de interesse (usada pelo cron
+    CONFLITO_INTERESSE_CRON) — domínio independente da esteira principal
+    coletar→enriquecer→analisar→investigar→notificar, roda no seu próprio
+    agendamento, como empenhos_diarios."""
+    return _etapa_conflito_interesse()
+
+
 def _notificar_falha_critica(erro: str) -> None:
     if not os.getenv("DISCORD_WEBHOOK_URL", "").strip():
         return
@@ -504,10 +529,19 @@ def iniciar_scheduler(config: PipelineConfig | None = None) -> None:
         id="sentinela_empenhos",
         name="Sentinela RJ Empenhos Diários",
     )
+    conflito_interesse_cron = os.getenv("CONFLITO_INTERESSE_CRON", "0 10 * * 1").strip()
+    scheduler.add_job(
+        executar_conflito_interesse,
+        CronTrigger.from_crontab(conflito_interesse_cron, timezone=config.timezone),
+        kwargs={"config": config},
+        id="sentinela_conflito_interesse",
+        name="Sentinela RJ Conflito de Interesse",
+    )
     logger.info(
-        "[pipeline] daemon iniciado cron=%s empenhos_cron=%s tz=%s",
+        "[pipeline] daemon iniciado cron=%s empenhos_cron=%s conflito_interesse_cron=%s tz=%s",
         config.cron,
         empenhos_cron,
+        conflito_interesse_cron,
         config.timezone,
     )
     if config.run_on_start:
