@@ -12,13 +12,21 @@ data/*.db-wal
 # Relatórios de investigação manuais (ex: sentinela_rj_relatorio_01.md) SÃO versionados.
 relatorios/relatorio_*.md
 data/processed/
+data/painel_controle.html
 logs/*.txt
+logs/*.log
 
 # ── Variáveis de ambiente ─────────────────────────────────────────────────────
 .env
 
 # ── Artefatos de runtime ──────────────────────────────────────────────────────
 flask_pid.txt
+
+# ── Serviço Windows (WinSW) — binário e scripts de controle locais ────────────
+*.exe
+query
+start
+stop
 
 # ── Ambientes virtuais ────────────────────────────────────────────────────────
 venv/

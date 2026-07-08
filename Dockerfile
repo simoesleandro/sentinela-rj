@@ -8,8 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar dependências Python
-COPY requirements-web.txt requirements-ia.txt requirements.txt ./
-RUN pip install --no-cache-dir -r requirements-web.txt -r requirements-ia.txt
+# web (Flask) + ia (Gemini/Groq) + conflito (psycopg2/rapidfuzz — usado pela
+# rota /conflitos-interesse). requirements-conflito puxa folha e o núcleo.
+COPY requirements.txt requirements-web.txt requirements-ia.txt requirements-folha.txt requirements-conflito.txt ./
+RUN pip install --no-cache-dir -r requirements-web.txt -r requirements-ia.txt -r requirements-conflito.txt
 
 # Copiar código
 COPY . .

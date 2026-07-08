@@ -13,6 +13,7 @@
 [![Gemma](https://img.shields.io/badge/Gemma4-12B--local-8b5cf6?style=flat-square)](https://ollama.ai)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org)
 <br/>
+[![CI](https://img.shields.io/github/actions/workflow/status/simoesleandro/sentinela-rj/ci.yml?style=flat-square&label=CI&logo=github)](https://github.com/simoesleandro/sentinela-rj/actions)
 [![Deploy](https://img.shields.io/badge/deploy-Fly.io-7C3AED?style=flat-square&logo=fly.io)](https://sentinela-rj.fly.dev/dashboard)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/simoesleandro/sentinela-rj?style=flat-square&color=8b5cf6)](https://github.com/simoesleandro/sentinela-rj/commits)
@@ -91,7 +92,7 @@ The goal is not to replace institutional oversight or legal analysis. It is a te
 | IA aplicada | Narrativas investigativas, comparação A/B de vereditos e fallback entre provedores |
 | Civic tech | Uso de dados públicos para transparência e priorização de investigação |
 | Deploy | Fly.io com volume SQLite persistente e configuração por variáveis de ambiente |
-| Testes | Pytest cobrindo detectores, banco, pipeline, dashboard, dossiê e triagem |
+| Testes | 272 testes pytest cobrindo detectores, banco, pipeline, dashboard, dossiê, triagem e conflito de interesse |
 
 ---
 
@@ -203,7 +204,7 @@ Gemma 4 sintetiza as evidências e emite conclusão estruturada:
 | Enriquecimento | BrasilAPI · DataJud CNJ |
 | Scraping | Playwright (TCM-RJ) |
 | Deploy | Fly.io · região gru · SQLite volume 1GB |
-| Testes | pytest — 101+ testes |
+| Testes | pytest — 272 testes |
 
 ---
 
@@ -350,6 +351,9 @@ fly sftp shell
 ## 🧪 Testes / Tests
 
 ```bash
+# Instalar as dependências de desenvolvimento (inclui pytest + libs de todos os domínios)
+pip install -r requirements-dev.txt
+
 # Rodar todos os testes
 pytest
 
@@ -360,7 +364,7 @@ pytest --cov=analise --cov-report=term-missing
 pytest tests/test_motor_ia.py -v
 ```
 
-> **101+ testes** cobrindo motor IA, detectores, pipeline, dashboard e dossiê.
+> **272 testes** cobrindo motor IA, detectores, pipeline, dashboard, dossiê e conflito de interesse.
 
 ---
 

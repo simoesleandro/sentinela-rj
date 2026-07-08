@@ -1,0 +1,5 @@
+# Ambiente de desenvolvimento — roda a suíte de testes completa.
+# Inclui web + conflito (que puxa folha e psycopg2/rapidfuzz) + pytest.
+-r requirements-web.txt
+-r requirements-conflito.txt
+pytest>=8.0.0
