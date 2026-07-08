@@ -155,6 +155,9 @@ The goal is not to replace institutional oversight or legal analysis. It is a te
 | `empresa_jovem_contrato_grande` | Empresa nova com contrato de alto valor |
 | `socios_compartilhados` | Fornecedores com sócios em comum |
 
+> 📖 **Metodologia completa** — método estatístico, limiares reais e fundamento legal
+> de cada detector em [`docs/DETECTORES.md`](docs/DETECTORES.md).
+
 ---
 
 ## 🤖 Pipeline de IA / AI Pipeline
