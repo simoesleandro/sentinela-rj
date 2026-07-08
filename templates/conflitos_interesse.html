@@ -80,6 +80,26 @@
 
     .nota-raridade { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
 
+    .ci-passos, .ci-ia { margin-top: 1.25rem; }
+    .ci-passos h3, .ci-ia h3 {
+      font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--muted); margin-bottom: 0.5rem;
+    }
+    .ci-passos ol { padding-left: 1.1rem; }
+    .ci-passos li { font-size: 0.8rem; line-height: 1.5; margin-bottom: 0.5rem; }
+    .ci-passos code { font-size: 0.78rem; background: var(--surface); padding: 1px 5px; border-radius: 4px; }
+    .btn-copiar {
+      font-size: 0.7rem; padding: 1px 8px; margin-left: 4px; cursor: pointer;
+      background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 4px;
+    }
+    .btn-copiar:hover { color: var(--text); }
+    .ci-ia-texto {
+      white-space: pre-wrap; font-family: inherit; font-size: 0.8rem; line-height: 1.55;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.75rem 0.9rem; margin-bottom: 0.4rem; max-height: 280px; overflow-y: auto;
+    }
+    .ci-ia-meta { font-size: 0.7rem; color: var(--muted); margin-bottom: 0.6rem; }
+
     /* Tabela enxuta de propósito: só as colunas que cabem sem quebrar o
        layout de 1200px do app (mesmo princípio da tabela de /alertas). Os
        sinais extras (matrícula, unidade, entrada na sociedade, faixa etária,
@@ -244,6 +264,16 @@
       return prioritario ? '<span class="selo-prioridade">Prioritário</span>' : '';
     }
 
+    function seloQualificacaoHtml(classe) {
+      if (classe === 'gestao') {
+        return '<span class="selo-risco" title="A qualificação no QSA indica poder de gestão (administrador, diretor, presidente...). Para servidor público, ADMINISTRAR empresa é vedado pelo estatuto; ser cotista, em regra, não. Relevante apenas SE a identidade se confirmar. 84,7% da base tem qualificação de gestão — por isso este selo informa, mas não altera a prioridade sozinho.">Gestão da empresa</span>';
+      }
+      if (classe === 'cotista') {
+        return '<span class="selo-compat compativel" title="Participação societária simples (cotista) — em regra permitida a servidor público.">Cotista</span>';
+      }
+      return '';
+    }
+
     function seloEvidenciasHtml(c) {
       const partes = [];
       if (c.lotacao_orgao_contratante) {
@@ -397,8 +427,7 @@
       document.getElementById('detail-content').innerHTML = `
         <h2 style="font-size:1.15rem;font-weight:700;margin-bottom:0.25rem">${escapeHtml(c.nome_socio || '—')}</h2>
         <p style="color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem">${escapeHtml(c.qualificacao_socio || '—')}</p>
-        ${statusBadge(c.status)} ${selocompatHtml(c.compatibilidade_data)} ${seloPrioridadeHtml(c.prioridade_investigacao)}
-        <p style="margin-top:0.75rem">${linkDiarioOficial(c.nome_servidor)}</p>
+        ${statusBadge(c.status)} ${selocompatHtml(c.compatibilidade_data)} ${seloPrioridadeHtml(c.prioridade_investigacao)} ${seloQualificacaoHtml(c.qualificacao_classe)}
         <dl class="ci-detalhe-grid">
           <div><dt>Fornecedor</dt><dd><a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link">${formatCNPJ(c.fornecedor_ni)}</a></dd></div>
           <div><dt>Score</dt><dd>${(c.score_similaridade ?? 0).toFixed(1)}</dd></div>
@@ -414,6 +443,28 @@
           <div><dt>Nome exato entre servidores</dt><dd>${c.qtd_servidores_mesmo_nome ?? 1} homônimo(s) na base inteira</dd></div>
           <div><dt>Outras evidências do fornecedor</dt><dd>${seloEvidenciasHtml(c)}</dd></div>
         </dl>
+
+        <div class="ci-passos">
+          <h3>Próximos passos de verificação</h3>
+          <ol>
+            <li>${linkDiarioOficial(c.nome_servidor)} — nomeações, exonerações e aposentadorias confirmam a trajetória do servidor (matrícula ${escapeHtml(c.matricula_servidor || '—')}).</li>
+            <li><a href="https://www.jucerja.rj.gov.br/" target="_blank" rel="noopener noreferrer" class="diario-link">Consultar a JUCERJA ↗</a> — a certidão do contrato social (paga) traz o CPF completo do sócio e é a confirmação documental de identidade. CNPJ: <code>${escapeHtml(c.fornecedor_ni)}</code> <button type="button" class="btn-copiar" onclick="copiarTexto('${escapeHtml(c.fornecedor_ni)}', this)">copiar</button></li>
+            <li>Conferir a <strong>qualificação do sócio</strong> na certidão: gestão (administrador/diretor) é vedada a servidor; cota simples, em regra, não.</li>
+          </ol>
+        </div>
+
+        <div class="ci-ia">
+          <h3>Parecer de IA</h3>
+          ${c.analise_ia
+            ? `<pre class="ci-ia-texto">${escapeHtml(c.analise_ia)}</pre>
+               <p class="ci-ia-meta">Gerado por ${escapeHtml(c.analise_ia_provedor || 'IA')} em ${formatDate(c.analise_ia_em)} — síntese dos sinais acima; não confirma identidade.</p>`
+            : '<p class="ci-ia-meta">Nenhum parecer gerado ainda.</p>'}
+          <button type="button" class="btn-page" id="ci-ia-btn-${c.id}" onclick="gerarParecerIA(${c.id})">
+            ${c.analise_ia ? 'Regerar parecer (gasta 1 análise da cota)' : 'Analisar com IA (gasta 1 análise da cota)'}
+          </button>
+          <div class="ci-erro" id="ci-ia-erro-${c.id}"></div>
+        </div>
+
         ${acaoHtml}`;
 
       document.getElementById('detail-backdrop').classList.add('backdrop-open');
@@ -423,6 +474,47 @@
     window.fecharDetalhe = function() {
       document.getElementById('detail-backdrop').classList.remove('backdrop-open');
       document.getElementById('detail-panel').classList.remove('panel-open');
+    };
+
+    window.copiarTexto = async function(texto, btn) {
+      try {
+        await navigator.clipboard.writeText(texto);
+        btn.textContent = 'copiado!';
+        setTimeout(() => { btn.textContent = 'copiar'; }, 1500);
+      } catch (e) { /* clipboard indisponível (http) — sem drama */ }
+    };
+
+    window.gerarParecerIA = async function(id) {
+      const btn = document.getElementById(`ci-ia-btn-${id}`);
+      const erroEl = document.getElementById(`ci-ia-erro-${id}`);
+      erroEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Analisando… (pode levar ~30s)';
+      try {
+        const res = await fetch(`/conflitos-interesse/${id}/analise-ia`, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': CSRF_TOKEN },
+        });
+        const payload = await res.json();
+        if (!res.ok) {
+          if (payload.auth === 'login') {
+            throw new Error('Faça login para usar a análise por IA — a página /login abre em nova aba.');
+          }
+          throw new Error(payload.error || res.statusText);
+        }
+        const item = ITENS_ATUAIS.find(i => i.id === id);
+        if (item) {
+          item.analise_ia = payload.analise_ia;
+          item.analise_ia_provedor = payload.analise_ia_provedor;
+          item.analise_ia_em = new Date().toISOString();
+        }
+        abrirDetalhe(id);  // re-renderiza o painel com o parecer
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Analisar com IA (gasta 1 análise da cota)';
+        erroEl.textContent = e.message;
+        erroEl.style.display = 'block';
+      }
     };
 
     window.toggleMotivo = function(id) {

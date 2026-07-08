@@ -13,7 +13,9 @@ def _serializar_candidato_conflito(item: dict) -> dict:
     nenhum dos dois é serializável por jsonify sem conversão explícita."""
     from conflito_interesse.compatibilidade import calcular_compatibilidade
     from conflito_interesse.priorizacao import calcular_prioridade_investigacao
+    from conflito_interesse.qualificacao import classificar_qualificacao
 
+    item["qualificacao_classe"] = classificar_qualificacao(item.get("qualificacao_socio"))
     if item.get("score_similaridade") is not None:
         item["score_similaridade"] = float(item["score_similaridade"])
     if item.get("valor_total_contratos") is not None:
@@ -29,7 +31,7 @@ def _serializar_candidato_conflito(item: dict) -> dict:
         item.get("tem_sancao"),
         item.get("lotacao_orgao_contratante"),
     )
-    for campo in ("detectado_em", "revisado_em", "data_entrada_sociedade", "primeira_competencia_servidor"):
+    for campo in ("detectado_em", "revisado_em", "data_entrada_sociedade", "primeira_competencia_servidor", "analise_ia_em"):
         if item.get(campo) is not None:
             item[campo] = item[campo].isoformat()
     return item
@@ -67,6 +69,7 @@ def api_conflitos_interesse_list():
                        qtd_servidores_matched_mesmo_socio,
                        tem_alerta_severidade_alta, tem_sancao,
                        qtd_servidores_mesmo_nome, lotacao_orgao_contratante,
+                       analise_ia, analise_ia_em, analise_ia_provedor,
                        status, detectado_em, revisado_em
                 FROM candidatos_conflito_interesse
                 """
@@ -82,6 +85,7 @@ def api_conflitos_interesse_list():
                        qtd_servidores_matched_mesmo_socio,
                        tem_alerta_severidade_alta, tem_sancao,
                        qtd_servidores_mesmo_nome, lotacao_orgao_contratante,
+                       analise_ia, analise_ia_em, analise_ia_provedor,
                        status, detectado_em, revisado_em
                 FROM candidatos_conflito_interesse
                 WHERE status = %s
@@ -142,6 +146,69 @@ def api_conflitos_interesse_status(candidato_id: int):
         return jsonify({"error": "not found"}), 404
     except TriagemError as exc:
         return jsonify({"error": str(exc)}), 422
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        conn.close()
+
+
+_COLUNAS_ANALISE_IA = """
+    id, fornecedor_ni, nome_socio, qualificacao_socio,
+    matricula_servidor, nome_servidor, sigla_ua,
+    score_similaridade, data_entrada_sociedade,
+    faixa_etaria_socio, primeira_competencia_servidor,
+    contrato_ativo, valor_total_contratos,
+    qtd_servidores_matched_mesmo_socio,
+    tem_alerta_severidade_alta, tem_sancao,
+    qtd_servidores_mesmo_nome, lotacao_orgao_contratante,
+    status, detectado_em, revisado_em
+"""
+
+
+@bp.route("/conflitos-interesse/<int:candidato_id>/analise-ia", methods=["POST"])
+def api_conflitos_interesse_analise_ia(candidato_id: int):
+    """Parecer de IA sobre o candidato — mesma cota diária dos endpoints de
+    investigação de alertas (checar_cota_ia). O parecer é persistido para não
+    gastar cota de novo em quem já foi analisado."""
+    from conflito_interesse.analise_ia import analisar_candidato
+
+    usuario, erro = core.checar_cota_ia()
+    if erro:
+        return erro
+
+    conn = core.get_conflito_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT {_COLUNAS_ANALISE_IA} FROM candidatos_conflito_interesse WHERE id = %s",
+            (candidato_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return jsonify({"error": "not found"}), 404
+
+        colunas = [d[0] for d in cur.description]
+        item = _serializar_candidato_conflito(dict(zip(colunas, row)))
+
+        try:
+            parecer, provedor = analisar_candidato(item)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 503
+
+        cur.execute(
+            """UPDATE candidatos_conflito_interesse
+               SET analise_ia = %s, analise_ia_em = now(), analise_ia_provedor = %s
+               WHERE id = %s""",
+            (parecer, provedor, candidato_id),
+        )
+        conn.commit()
+        core.registrar_consumo_ia(usuario, "conflito_analise_ia")
+
+        return jsonify({
+            "id": candidato_id,
+            "analise_ia": parecer,
+            "analise_ia_provedor": provedor,
+        })
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
     finally:

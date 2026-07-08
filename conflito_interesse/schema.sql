@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS candidatos_conflito_interesse (
     tem_sancao                     BOOLEAN NOT NULL DEFAULT FALSE,
     qtd_servidores_mesmo_nome      INTEGER NOT NULL DEFAULT 1,
     lotacao_orgao_contratante      BOOLEAN NOT NULL DEFAULT FALSE,
+    analise_ia                     TEXT,
+    analise_ia_em                  TIMESTAMP,
+    analise_ia_provedor            TEXT,
     status                         TEXT NOT NULL DEFAULT 'aberto',
     detectado_em                   TIMESTAMP NOT NULL DEFAULT now(),
     revisado_em                    TIMESTAMP,
@@ -91,3 +94,13 @@ ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS qtd_servidore
 -- "MUNICIPIO DE RIO DE JANEIRO". Medido em jul/2026: 118/966 candidatos
 -- (12,2%). Mapa e limitações em conflito_interesse/lotacao.py.
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS lotacao_orgao_contratante BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Parecer de IA sob demanda (jul/2026): sintetiza os sinais do candidato num
+-- parecer estruturado (plausibilidade/confiança/análise/verificar) via cascata
+-- Gemma4→Gemini→Groq do motor central. Persistido para não gastar cota de IA
+-- repetida no mesmo candidato. A qualificação do sócio (84,7% da base é
+-- "gestão") NÃO virou coluna nem prioridade — é derivada na serialização
+-- (conflito_interesse/qualificacao.py) para não saturar a fila.
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS analise_ia TEXT;
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS analise_ia_em TIMESTAMP;
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS analise_ia_provedor TEXT;
