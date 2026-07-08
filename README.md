@@ -28,7 +28,9 @@
 
 <br/>
 
-<img src="docs/screenshot.png" alt="Sentinela RJ Dashboard" width="920">
+<img src="docs/demo.gif" alt="Demonstração do Sentinela RJ — do alerta à narrativa investigativa" width="920">
+
+<sub>Do alerta detectado à narrativa investigativa da IA · <a href="https://sentinela-rj.fly.dev/dashboard">experimente ao vivo</a></sub>
 
 </div>
 
