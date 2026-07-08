@@ -11,6 +11,8 @@ import os
 import secrets
 import sqlite3
 import functools
+import threading
+import time
 
 from flask import jsonify, render_template, request, session
 
@@ -18,6 +20,45 @@ from db import auth as auth_db
 from db.conexao import DB_PATH, aplicar_migracoes
 
 IA_LIMITE_DIARIO = int(os.getenv("SENTINELA_IA_LIMITE_DIARIO", "3"))
+
+# ---------------------------------------------------------------------------
+# Rate limiting dos endpoints de autenticação (anti brute-force / spam)
+# ---------------------------------------------------------------------------
+# Janela deslizante em memória por IP. Suficiente para o deploy single-instance
+# (Fly.io + waitress); reinicia com o processo. Ajustável por env.
+_AUTH_RATE_MAX = int(os.getenv("SENTINELA_AUTH_RATE_MAX", "10"))
+_AUTH_RATE_JANELA_S = int(os.getenv("SENTINELA_AUTH_RATE_JANELA_S", "300"))
+_AUTH_RATE_LOCK = threading.Lock()
+_AUTH_RATE_HITS: dict[str, list[float]] = {}
+
+
+def _cliente_ip() -> str:
+    fwd = request.headers.get("X-Forwarded-For", "").strip()
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.remote_addr or "desconhecido"
+
+
+def _rate_limit_excedido(chave: str) -> bool:
+    """Registra 1 tentativa e diz se a janela estourou o limite."""
+    agora = time.time()
+    with _AUTH_RATE_LOCK:
+        if len(_AUTH_RATE_HITS) > 5000:  # poda defensiva contra crescimento sob ataque
+            _AUTH_RATE_HITS.clear()
+        hits = [t for t in _AUTH_RATE_HITS.get(chave, []) if agora - t < _AUTH_RATE_JANELA_S]
+        hits.append(agora)
+        _AUTH_RATE_HITS[chave] = hits
+        return len(hits) > _AUTH_RATE_MAX
+
+
+def _erro_rate_limit():
+    return (
+        jsonify({
+            "error": "Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.",
+            "auth": "rate_limit",
+        }),
+        429,
+    )
 
 
 def _conn() -> sqlite3.Connection:
@@ -230,6 +271,8 @@ def init_auth(app) -> None:
 
     @app.route("/api/auth/registrar", methods=["POST"])
     def auth_registrar():
+        if _rate_limit_excedido(f"registrar:{_cliente_ip()}"):
+            return _erro_rate_limit()
         body = request.get_json(silent=True) or {}
         conn = _conn()
         try:
@@ -293,6 +336,8 @@ def init_auth(app) -> None:
 
     @app.route("/api/auth/login", methods=["POST"])
     def auth_login():
+        if _rate_limit_excedido(f"login:{_cliente_ip()}"):
+            return _erro_rate_limit()
         body = request.get_json(silent=True) or {}
         conn = _conn()
         try:

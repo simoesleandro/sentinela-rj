@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from analise.motivos_descarte import MOTIVOS_FALSO_POSITIVO, extrair_motivo_descarte
-from analise.score_composto import calcular_score_composto
+from analise.score_composto import calcular_score_composto, score_composto_sql
 from db.conexao import DB_PATH, aplicar_migracoes
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -63,12 +63,9 @@ def health():
     return jsonify({"status": "ok", "app": "sentinela-rj"}), 200
 
 
-_SCORE_SQL = """(
-    COALESCE(a.score, 0) * 0.35
-    + CASE COALESCE(a.severidade, 'baixa')
-      WHEN 'alta' THEN 0.4 WHEN 'media' THEN 0.25 ELSE 0.1 END
-    + MIN(COALESCE(a.valor_referencia, 0) / 50000000.0, 1.0) * 0.25
-)"""
+# Mesma fórmula de calcular_score_composto, gerada a partir das mesmas
+# constantes (fonte única em analise/score_composto.py).
+_SCORE_SQL = score_composto_sql("a")
 _migracoes_aplicadas = False
 
 
@@ -93,11 +90,18 @@ def fornecedor_page(fornecedor_ni: str):
         return redirect(f'/fornecedor/{ni}', 301)
     return render_template('fornecedor.html', ni=ni)
 
+_CORS_METODOS_SEGUROS = {"GET", "HEAD", "OPTIONS"}
+
+
 @app.after_request
 def add_cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRFToken"
+    # Só a leitura é exposta cross-origin (reuso de dados abertos). Escrita
+    # (POST/PATCH/DELETE) fica same-origin — protegida por sessão e CSRF. O SPA
+    # é servido pela própria app, então não depende de CORS para funcionar.
+    if request.method in _CORS_METODOS_SEGUROS:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRFToken"
     return response
 
 
