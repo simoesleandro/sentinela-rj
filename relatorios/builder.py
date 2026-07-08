@@ -201,7 +201,7 @@ def _secao_anomalia(
         f"**Severidade:** {icon} {a.severidade.upper()}  ",
         f"**Score:** `{_barra_score(a.score)}`  ",
         "",
-        f"**Descrição:**  ",
+        "**Descrição:**  ",
         a.descricao,
         "",
         "**Métricas:**",

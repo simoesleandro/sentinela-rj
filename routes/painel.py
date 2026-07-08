@@ -65,7 +65,7 @@ def stats():
         ).fetchone()[0]
 
         if ibge:
-            alertas_sql = f"""
+            alertas_sql = """
                 SELECT COUNT(*) FROM alertas a
                 JOIN contratos c ON c.numero_controle_pncp = a.numero_controle_pncp
                 JOIN orgaos o ON o.cnpj = c.orgao_cnpj

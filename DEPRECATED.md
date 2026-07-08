@@ -37,8 +37,10 @@ Pipeline paralelo ao PNCP — nunca integrado ao CLI nem a `automacoes/pipeline.
 |----------|------|
 | `analise/analise_exploratoria.py` | EDA one-off com path hardcoded |
 
-## Painel HTML estático
+## Painel HTML estático (removido)
 
-`relatorios/painel_html.py` e CLI `python __main__.py painel` permanecem como **export offline**; a UI canônica é a SPA Flask.
+| Removido | Motivo |
+|----------|--------|
+| `relatorios/painel_html.py` + CLI `painel` | Export offline pré-SPA sem uso; a UI canônica é a SPA Flask (`/dashboard`) |
 
 **CLI canônica:** `python __main__.py status|coletar|analisar|investigar|relatorio|dossie|publicar|pipeline`

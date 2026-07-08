@@ -32,7 +32,7 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 # Reexportados aqui de propósito: os blueprints (e os testes, via monkeypatch
 # de web_app.checar_cota_ia / web_app.registrar_consumo_ia) resolvem esses
 # nomes como atributos deste módulo em tempo de request.
-from web_auth import checar_cota_ia, registrar_consumo_ia, requer_admin, requer_login, init_auth
+from web_auth import checar_cota_ia, registrar_consumo_ia, requer_admin, requer_login, init_auth  # noqa: F401 — reexport intencional (ver comentário acima)
 
 init_auth(app)
 

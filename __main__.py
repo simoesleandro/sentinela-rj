@@ -14,7 +14,6 @@ Executar a partir da raiz do projeto (onde fica este arquivo).
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import time
 from collections import Counter
@@ -412,33 +411,6 @@ def cmd_enriquecer(args) -> int:
     return 0
 
 
-# ── Sub-comando: painel ─────────────────────────────────────────────────────
-
-def cmd_painel(_args) -> int:
-    from relatorios.painel_html import GeradorPainelHTML
-
-    _header("painel")
-    t0 = time.perf_counter()
-
-    try:
-        caminho = GeradorPainelHTML().gerar()
-    except FileNotFoundError as exc:
-        _warn(str(exc))
-        _warn("Execute primeiro: python -m sentinela coletar")
-        print()
-        return 1
-
-    print()
-    print(SEP)
-    print("  RESUMO DO PAINEL")
-    print(SEP)
-    print(f"  Arquivo : {caminho}")
-    print(f"  Tamanho : {caminho.stat().st_size:,} bytes")
-    print(f"  Tempo   : {_elapsed(t0)}")
-    print()
-    return 0
-
-
 # ── Sub-comando: investigar ─────────────────────────────────────────────────
 
 def cmd_investigar(args) -> int:
@@ -815,9 +787,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Gera narrativa via Ollama se narrativa_ia estiver vazia",
     )
 
-    # painel
-    sub.add_parser("painel", help="Gera painel HTML estatico de controle")
-
     # investigar
     inv = sub.add_parser(
         "investigar",
@@ -903,7 +872,6 @@ def main() -> None:
         "relatorio": cmd_relatorio,
         "dossie":    cmd_dossie,
         "publicar":  cmd_publicar,
-        "painel":      cmd_painel,
         "investigar":  cmd_investigar,
         "investigar_profundo": cmd_investigar_profundo,
         "enriquecer":  cmd_enriquecer,

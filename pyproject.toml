@@ -1,0 +1,15 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["scratch", "plans"]
+
+[tool.ruff.lint]
+# Regras padrão do Ruff: erros de sintaxe/semântica (E4/E7/E9) + Pyflakes (F).
+# Estilo agressivo (line-length etc.) fica de fora de propósito — o objetivo
+# é pegar código morto e erros reais, não travar o fluxo.
+
+[tool.ruff.lint.per-file-ignores]
+# web_app.py precisa de imports fora do topo: o alias de sys.modules e o
+# load_dotenv() vêm antes dos imports do projeto, e os blueprints são
+# importados no fim (dependem dos recursos compartilhados já definidos).
+"web_app.py" = ["E402"]

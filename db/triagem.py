@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from analise.motivos_descarte import MOTIVOS_FALSO_POSITIVO, formatar_nota_descarte
-from db.triagem_core import (
+from db.triagem_core import (  # noqa: F401 — reexport: consumidores importam os status daqui
     STATUS_ABERTO,
     STATUS_CONFIRMADO,
     STATUS_DESCARTADO,

@@ -25,7 +25,6 @@ import requests
 from db.conexao import init_db
 from extrator.config_municipio import (
     MunicipioMonitorado,
-    municipio_esfera,
     municipios_monitorados,
     rotulo_filtro,
 )
@@ -289,7 +288,7 @@ def coletar(data_inicial: str, data_final: str) -> dict:
         "municipios_monitorados": len(alvos),
         "paginas_falhas": todas_falhas,
     }
-    print(f"\n=== Coleta concluida ===")
+    print("\n=== Coleta concluida ===")
     print(f"Brutos varridos: {tot_brutos} | Salvos (todos os alvos): {tot_salvos}")
     for item in sumario["salvos_por_municipio"]:
         if item["salvos"]:

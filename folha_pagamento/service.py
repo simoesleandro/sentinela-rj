@@ -32,10 +32,10 @@ def _agregar_por_matricula_competencia(
                 sigla_ua=linhas[0].sigla_ua,
                 competencia=competencia,
                 remuneracao_bruta_total=sum(
-                    l.remuneracao_bruta or 0 for l in linhas
+                    linha.remuneracao_bruta or 0 for linha in linhas
                 ),
                 excedeu_teto=any(
-                    (l.desconto_excedente_teto or 0) > 0 for l in linhas
+                    (linha.desconto_excedente_teto or 0) > 0 for linha in linhas
                 ),
             )
         )

@@ -5,7 +5,7 @@ import sqlite3
 
 import pytest
 
-from analisador.engine import AnomaliaResult, executar_e_persistir, persistir_alertas
+from analisador.engine import AnomaliaResult, persistir_alertas
 from db.conexao import SCHEMA_PATH, aplicar_migracoes
 
 
