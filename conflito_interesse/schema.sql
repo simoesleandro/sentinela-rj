@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS candidatos_conflito_interesse (
     tem_alerta_severidade_alta     BOOLEAN NOT NULL DEFAULT FALSE,
     tem_sancao                     BOOLEAN NOT NULL DEFAULT FALSE,
     qtd_servidores_mesmo_nome      INTEGER NOT NULL DEFAULT 1,
+    lotacao_orgao_contratante      BOOLEAN NOT NULL DEFAULT FALSE,
     status                         TEXT NOT NULL DEFAULT 'aberto',
     detectado_em                   TIMESTAMP NOT NULL DEFAULT now(),
     revisado_em                    TIMESTAMP,
@@ -82,3 +83,11 @@ ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS qtd_servidore
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS tem_alerta_severidade_alta BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS tem_sancao BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS qtd_servidores_mesmo_nome INTEGER NOT NULL DEFAULT 1;
+
+-- Lotação × órgão contratante (jul/2026): o sinal mais forte do domínio.
+-- Cruza a raiz da sigla_ua do servidor (S/, E/, GM/, RS/...) com o prefixo de
+-- órgão do campo `processo` dos contratos do fornecedor (SMS-PRO, SME-PRO...),
+-- já que o PNCP registra todos os contratos da PCRJ sob o órgão genérico
+-- "MUNICIPIO DE RIO DE JANEIRO". Medido em jul/2026: 118/966 candidatos
+-- (12,2%). Mapa e limitações em conflito_interesse/lotacao.py.
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS lotacao_orgao_contratante BOOLEAN NOT NULL DEFAULT FALSE;

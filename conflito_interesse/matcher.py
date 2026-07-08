@@ -35,6 +35,7 @@ class CandidatoConflito:
     tem_alerta_severidade_alta: bool = False
     tem_sancao: bool = False
     qtd_servidores_mesmo_nome: int = 1
+    lotacao_orgao_contratante: bool = False
 
 
 class ConflictMatcherService:

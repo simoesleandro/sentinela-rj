@@ -15,6 +15,7 @@ from collections import defaultdict
 from typing import Iterable
 
 from .indice_servidores import IndiceServidoresPorToken
+from .lotacao import lotacao_bate_orgao, prefixos_processo_fornecedor
 from .matcher import CandidatoConflito
 from .normalizador import normalizar_nome
 
@@ -128,6 +129,7 @@ def enriquecer_candidatos(
     cache_alerta_alta: dict[str, bool] = {}
     cache_sancao: dict[str, bool] = {}
     cache_freq_nome: dict[str, int] = {}
+    cache_prefixos_processo: dict[str, frozenset[str]] = {}
 
     enriquecidos = []
     for c in candidatos:
@@ -137,6 +139,7 @@ def enriquecer_candidatos(
             cache_valor_total[ni] = somar_valor_contratos(conn_sentinela, ni)
             cache_alerta_alta[ni] = tem_alerta_severidade_alta(conn_sentinela, ni)
             cache_sancao[ni] = tem_sancao(conn_sentinela, ni)
+            cache_prefixos_processo[ni] = prefixos_processo_fornecedor(conn_sentinela, ni)
         chave_socio = (ni, normalizar_nome(c.nome_socio))
         # Piso de 1: um candidato cujo próprio match é fuzzy (score < 100) não
         # entra no dict acima (não é "confiável" o bastante pra contar), mas
@@ -159,6 +162,9 @@ def enriquecer_candidatos(
                 tem_alerta_severidade_alta=cache_alerta_alta[ni],
                 tem_sancao=cache_sancao[ni],
                 qtd_servidores_mesmo_nome=freq_nome,
+                lotacao_orgao_contratante=lotacao_bate_orgao(
+                    c.sigla_ua, cache_prefixos_processo[ni]
+                ),
             )
         )
     return enriquecidos

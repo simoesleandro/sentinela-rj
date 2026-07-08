@@ -49,6 +49,7 @@ class CandidatoConflitoRepository:
                 c.tem_alerta_severidade_alta,
                 c.tem_sancao,
                 c.qtd_servidores_mesmo_nome,
+                c.lotacao_orgao_contratante,
             )
             for c in candidatos_dedup
         ]
@@ -66,7 +67,7 @@ class CandidatoConflitoRepository:
                    contrato_ativo, valor_total_contratos,
                    qtd_servidores_matched_mesmo_socio,
                    tem_alerta_severidade_alta, tem_sancao,
-                   qtd_servidores_mesmo_nome
+                   qtd_servidores_mesmo_nome, lotacao_orgao_contratante
                ) VALUES %s
                ON CONFLICT (fornecedor_ni, matricula_servidor) DO UPDATE SET
                    data_entrada_sociedade = EXCLUDED.data_entrada_sociedade,
@@ -77,7 +78,8 @@ class CandidatoConflitoRepository:
                    qtd_servidores_matched_mesmo_socio = EXCLUDED.qtd_servidores_matched_mesmo_socio,
                    tem_alerta_severidade_alta = EXCLUDED.tem_alerta_severidade_alta,
                    tem_sancao = EXCLUDED.tem_sancao,
-                   qtd_servidores_mesmo_nome = EXCLUDED.qtd_servidores_mesmo_nome
+                   qtd_servidores_mesmo_nome = EXCLUDED.qtd_servidores_mesmo_nome,
+                   lotacao_orgao_contratante = EXCLUDED.lotacao_orgao_contratante
                RETURNING id""",
             valores,
             page_size=self._batch_size,

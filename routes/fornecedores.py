@@ -418,7 +418,8 @@ def _listar_conflitos_interesse_fornecedor(fornecedor_ni: str) -> list[dict]:
         cur.execute(
             """
             SELECT id, nome_socio, qualificacao_socio, matricula_servidor,
-                   nome_servidor, sigla_ua, score_similaridade, status
+                   nome_servidor, sigla_ua, score_similaridade, status,
+                   lotacao_orgao_contratante
             FROM candidatos_conflito_interesse
             WHERE fornecedor_ni = %s
             ORDER BY score_similaridade DESC

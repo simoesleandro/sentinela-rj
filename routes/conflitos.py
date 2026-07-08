@@ -27,6 +27,7 @@ def _serializar_candidato_conflito(item: dict) -> dict:
         item["compatibilidade_data"],
         item.get("tem_alerta_severidade_alta"),
         item.get("tem_sancao"),
+        item.get("lotacao_orgao_contratante"),
     )
     for campo in ("detectado_em", "revisado_em", "data_entrada_sociedade", "primeira_competencia_servidor"):
         if item.get(campo) is not None:
@@ -65,7 +66,7 @@ def api_conflitos_interesse_list():
                        contrato_ativo, valor_total_contratos,
                        qtd_servidores_matched_mesmo_socio,
                        tem_alerta_severidade_alta, tem_sancao,
-                       qtd_servidores_mesmo_nome,
+                       qtd_servidores_mesmo_nome, lotacao_orgao_contratante,
                        status, detectado_em, revisado_em
                 FROM candidatos_conflito_interesse
                 """
@@ -80,7 +81,7 @@ def api_conflitos_interesse_list():
                        contrato_ativo, valor_total_contratos,
                        qtd_servidores_matched_mesmo_socio,
                        tem_alerta_severidade_alta, tem_sancao,
-                       qtd_servidores_mesmo_nome,
+                       qtd_servidores_mesmo_nome, lotacao_orgao_contratante,
                        status, detectado_em, revisado_em
                 FROM candidatos_conflito_interesse
                 WHERE status = %s

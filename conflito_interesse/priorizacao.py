@@ -15,14 +15,19 @@ def calcular_prioridade_investigacao(
     compatibilidade_data: str | None,
     tem_alerta_severidade_alta: bool | None = False,
     tem_sancao: bool | None = False,
+    lotacao_orgao_contratante: bool | None = False,
 ) -> bool:
     """True quando o candidato merece revisão prioritária.
 
     Nada que já indique falso positivo (idade improvável) nunca é
     prioritário, mesmo com os outros sinais batendo.
 
-    Dentro disso, prioriza por QUALQUER UMA de duas evidências
+    Dentro disso, prioriza por QUALQUER UMA de três evidências
     independentes:
+    - o servidor é lotado no MESMO órgão de origem dos contratos do
+      fornecedor (lotação × prefixo de processo) — o sinal mais forte do
+      domínio: a Lei 14.133/2021 (art. 14) impede de licitar quem mantém
+      vínculo com o órgão contratante;
     - fornecedor com contrato vigente E o MESMO sócio batendo com mais de
       um servidor (não apenas vários sócios distintos do fornecedor
       batendo cada um com o seu);
@@ -35,4 +40,9 @@ def calcular_prioridade_investigacao(
         return False
 
     reforco_nome = bool(contrato_ativo) and (qtd_servidores_matched_mesmo_socio or 0) >= 2
-    return reforco_nome or bool(tem_alerta_severidade_alta) or bool(tem_sancao)
+    return (
+        bool(lotacao_orgao_contratante)
+        or reforco_nome
+        or bool(tem_alerta_severidade_alta)
+        or bool(tem_sancao)
+    )

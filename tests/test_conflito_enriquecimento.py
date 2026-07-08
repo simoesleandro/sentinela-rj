@@ -24,11 +24,11 @@ def _conn_contratos(contratos: list[tuple[str, str, str, float]]) -> sqlite3.Con
     conn = sqlite3.connect(":memory:")
     conn.execute(
         "CREATE TABLE contratos (numero_controle_pncp TEXT PRIMARY KEY, fornecedor_ni TEXT, "
-        "data_vigencia_inicio TEXT, data_vigencia_fim TEXT, valor_global REAL)"
+        "data_vigencia_inicio TEXT, data_vigencia_fim TEXT, valor_global REAL, processo TEXT)"
     )
     for i, (ni, inicio, fim, valor) in enumerate(contratos):
         conn.execute(
-            "INSERT INTO contratos VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO contratos VALUES (?, ?, ?, ?, ?, NULL)",
             (f"pncp-{i}", ni, inicio, fim, valor),
         )
     conn.execute("CREATE TABLE alertas (numero_controle_pncp TEXT, severidade TEXT)")

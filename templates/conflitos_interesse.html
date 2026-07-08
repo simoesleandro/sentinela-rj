@@ -246,6 +246,9 @@
 
     function seloEvidenciasHtml(c) {
       const partes = [];
+      if (c.lotacao_orgao_contratante) {
+        partes.push('<span class="selo-risco" title="O servidor é lotado no mesmo órgão de origem dos contratos deste fornecedor (cruzamento sigla de lotação × prefixo do processo, ex.: E/CRE × SME-PRO). A Lei 14.133/2021 (art. 14) impede de licitar quem mantém vínculo com o órgão contratante — sinal mais forte da fila, mas ainda depende de confirmar a identidade.">Lotação × órgão contratante</span>');
+      }
       if (c.tem_alerta_severidade_alta) {
         partes.push('<span class="selo-risco" title="Este fornecedor já tem um alerta de severidade alta em algum contrato (valor atípico, fornecedor recorrente, adesão suspeita...), independente deste match de nome.">Alerta de contrato</span>');
       }
