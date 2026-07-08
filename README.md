@@ -299,7 +299,9 @@ python __main__.py dossie --alerta 42 --formato pdf
 
 ```
 sentinela-rj/
-├── web_app.py              # Dashboard Flask (:5055/dashboard)
+├── web_app.py              # Núcleo Flask — app, segurança, recursos compartilhados
+├── routes/                 # Blueprints por domínio (alertas, fornecedores,
+│                           #   painel, watchlists, conflitos, casos, exportação)
 ├── __main__.py             # CLI (coletar, analisar, investigar...)
 ├── analise/
 │   └── motor_ia.py         # Gemma4 + Gemini — narrativas e vereditos A/B
