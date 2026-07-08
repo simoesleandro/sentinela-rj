@@ -11,6 +11,12 @@ if _DB_ENV:
     DB_PATH = Path(_DB_ENV)
 else:
     DB_PATH = ROOT / "data" / "sentinela_rj.db"
+
+# Garante que o diretório do banco exista antes de qualquer sqlite3.connect().
+# Sem isso, abrir o banco em um checkout/deploy limpo (onde data/ ainda não foi
+# criado) falha com "unable to open database file".
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 
 _MIGRACOES_DDL = [
