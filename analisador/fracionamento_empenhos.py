@@ -41,7 +41,9 @@ def detectar(conn: sqlite3.Connection) -> list[AnomaliaResult]:
         if len(empenhos) < _MIN_EMPENHOS:
             continue
 
-        datas = [date.fromisoformat(e["data_lancamento"]) for e in empenhos]
+        # data_lancamento pode vir com timestamp ("2026-05-22T14:00:17") em
+        # coletas recentes da Transparência RJ — só a porção de data importa.
+        datas = [date.fromisoformat(e["data_lancamento"][:10]) for e in empenhos]
 
         melhor: dict | None = None
         melhor_score = 0.0
