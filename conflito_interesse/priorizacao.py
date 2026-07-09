@@ -46,3 +46,18 @@ def calcular_prioridade_investigacao(
         or bool(tem_alerta_severidade_alta)
         or bool(tem_sancao)
     )
+
+
+def chave_ordenacao_fila(item: dict) -> tuple:
+    """Chave de ordenação da fila de revisão (menor = mais acima).
+
+    Três níveis: prioritários primeiro; dentro deles, lotação × órgão
+    contratante acima de tudo (é o sinal juridicamente mais forte — um nome
+    90% igual lotado no órgão que assinou o contrato importa mais que um
+    homônimo exato sem vínculo nenhum); o score de nome só desempata.
+    """
+    return (
+        0 if item.get("prioridade_investigacao") else 1,
+        0 if item.get("lotacao_orgao_contratante") else 1,
+        -(item.get("score_similaridade") or 0),
+    )

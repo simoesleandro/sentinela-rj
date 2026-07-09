@@ -99,10 +99,11 @@ def api_conflitos_interesse_list():
             item["transicoes_permitidas"] = status_permitidos(item["status"])
             items.append(item)
 
-        # Prioridade de investigação (contrato ativo + vários sócios do mesmo
-        # fornecedor + sem sinal de falso positivo) manda na ordem — o score
-        # de nome só desempata dentro do mesmo grupo de prioridade.
-        items.sort(key=lambda it: (0 if it["prioridade_investigacao"] else 1, -it["score_similaridade"]))
+        # Prioritários primeiro; dentro deles, lotação × órgão contratante no
+        # topo; score de nome desempata (ver chave_ordenacao_fila).
+        from conflito_interesse.priorizacao import chave_ordenacao_fila
+
+        items.sort(key=chave_ordenacao_fila)
 
         resumo = ConflitoTriagemRepository(conn).resumo_status()
 

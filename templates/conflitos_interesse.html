@@ -285,6 +285,11 @@
       if (c.tem_sancao) {
         partes.push('<span class="selo-risco" title="Este fornecedor tem registro de sanção.">Sancionado</span>');
       }
+      // Reforço de nome: o motivo de prioridade dos casos sem selo acima —
+      // sem isto, a coluna parece vazia justamente nas primeiras linhas.
+      if (c.contrato_ativo && (c.qtd_servidores_matched_mesmo_socio || 0) >= 2) {
+        partes.push(`<span class="selo-risco" title="Fornecedor com contrato vigente E o mesmo sócio batendo, com nome exato, com ${c.qtd_servidores_matched_mesmo_socio} servidores distintos.">Contrato ativo + ${c.qtd_servidores_matched_mesmo_socio} servidores</span>`);
+      }
       return partes.join('') || '—';
     }
 

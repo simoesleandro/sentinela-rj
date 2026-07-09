@@ -153,3 +153,35 @@ def test_idade_incompativel_veta_mesmo_com_lotacao():
         compatibilidade_data="incompativel",
         lotacao_orgao_contratante=True,
     ) is False
+
+
+# ── ordenação da fila ────────────────────────────────────────────────────────
+
+def test_ordenacao_lotacao_acima_de_homonimo_exato():
+    from conflito_interesse.priorizacao import chave_ordenacao_fila
+
+    homonimo_exato = {
+        "prioridade_investigacao": True,
+        "lotacao_orgao_contratante": False,
+        "score_similaridade": 100.0,
+    }
+    lotacao_fuzzy = {
+        "prioridade_investigacao": True,
+        "lotacao_orgao_contratante": True,
+        "score_similaridade": 88.0,
+    }
+    nao_prioritario = {
+        "prioridade_investigacao": False,
+        "lotacao_orgao_contratante": False,
+        "score_similaridade": 100.0,
+    }
+    fila = sorted([homonimo_exato, lotacao_fuzzy, nao_prioritario], key=chave_ordenacao_fila)
+    assert fila == [lotacao_fuzzy, homonimo_exato, nao_prioritario]
+
+
+def test_ordenacao_score_desempata_dentro_do_grupo():
+    from conflito_interesse.priorizacao import chave_ordenacao_fila
+
+    a = {"prioridade_investigacao": True, "lotacao_orgao_contratante": True, "score_similaridade": 86.0}
+    b = {"prioridade_investigacao": True, "lotacao_orgao_contratante": True, "score_similaridade": 95.0}
+    assert sorted([a, b], key=chave_ordenacao_fila) == [b, a]
