@@ -213,6 +213,37 @@ def cmd_backfill(args) -> int:
 
 # ── Sub-comando: sancoes (CEIS/CNEP) ─────────────────────────────────────────
 
+def cmd_sancoes_api(args) -> int:
+    from db.conexao import get_conn, init_db
+    from extrator.sancoes_api import SancoesApiError, chave_configurada, sincronizar_sancoes_api
+
+    _header("sancoes-api — consulta CEIS/CNEP por CNPJ (Portal da Transparencia)")
+    t0 = time.perf_counter()
+
+    if not chave_configurada():
+        _warn("TRANSPARENCIA_API_KEY nao configurada.")
+        _warn("Cadastre em portaldatransparencia.gov.br/api-de-dados e defina no .env")
+        return 1
+
+    init_db()
+    conn = get_conn(row_factory=True)
+    try:
+        resumo = sincronizar_sancoes_api(conn, limite=args.limite, pausa_s=args.pausa)
+    except SancoesApiError as exc:
+        _warn(str(exc))
+        return 1
+    finally:
+        conn.close()
+
+    _ok(f"Fornecedores checados: {resumo['checados']}")
+    _ok(f"Com sancao federal: {resumo['fornecedores_sancionados']} "
+        f"({resumo['sancoes_registradas']} sancoes)")
+    print(f"  Pendentes restantes: {resumo['pendentes_restantes']}")
+    print(f"  Tempo: {_elapsed(t0)}")
+    print()
+    return 0
+
+
 def cmd_sancoes(args) -> int:
     from db.conexao import get_conn, DB_PATH
     from extrator.sancoes_ingestao import ingestir_ceis_cnp
@@ -793,6 +824,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Ingere empenhos Transparencia RJ e cruza com contratos PNCP",
     )
 
+    # sancoes-api
+    sapi = sub.add_parser(
+        "sancoes-api",
+        help="Consulta CEIS/CNEP por CNPJ na API do Portal da Transparencia (incremental)",
+    )
+    sapi.add_argument("--limite", type=int, default=300, metavar="N",
+                      help="Fornecedores a checar por execucao (padrao: 300)")
+    sapi.add_argument("--pausa", type=float, default=0.75, metavar="S",
+                      help="Pausa entre chamadas em segundos (padrao: 0.75, ~80/min)")
+
     # licitacoes
     lic = sub.add_parser(
         "licitacoes",
@@ -918,6 +959,7 @@ def main() -> None:
         "coletar":   cmd_coletar,
         "backfill":  cmd_backfill,
         "sancoes":   cmd_sancoes,
+        "sancoes-api": cmd_sancoes_api,
         "transparencia": cmd_transparencia,
         "licitacoes": cmd_licitacoes,
         "analisar":  cmd_analisar,

@@ -335,6 +335,38 @@ os proxies disponíveis de ausência de disputa.
 
 ---
 
+## Sanções federais — fonte de enriquecimento (CEIS/CNEP)
+
+**Arquivo:** [`extrator/sancoes_api.py`](../extrator/sancoes_api.py) ·
+**CLI:** `python __main__.py sancoes-api`
+
+Não é um detector, é uma **fonte de enriquecimento**: alimenta o sinal
+`tem_sancao` do fornecedor, que aparece como evidência na triagem, na priorização
+de conflito de interesse e reforça os detectores cadastrais.
+
+Consulta a **API do Portal da Transparência** por CNPJ, nos cadastros **CEIS**
+(empresas inidôneas e suspensas) e **CNEP** (empresas punidas), usando o filtro
+`codigoSancionado`. Pega punições de **qualquer esfera** — federal, estadual ou
+municipal — que atinjam um fornecedor que contrata no nosso município (validado
+em jul/2026: um fornecedor com impedimento aplicado por prefeitura de outro estado
+aparece corretamente).
+
+- **Incremental e resumível**: cada execução checa os N fornecedores verificados
+  há mais tempo (coluna `fornecedores.sancoes_verificado_em`); `--limite` e
+  `--pausa` controlam o volume e o respeito ao rate limit (~90 req/min).
+- **Complementa** o `extrator/sancoes_ingestao.py` (que carrega o CSV nacional
+  inteiro): a API é sempre atual, sem hospedar arquivos gigantes, e mira só os
+  nossos fornecedores.
+- **Requer chave** gratuita (`TRANSPARENCIA_API_KEY`, cadastro em
+  portaldatransparencia.gov.br/api-de-dados).
+
+**Limitação documentada:** a página da API é fixa em 15 registros (não dá para
+baixar a base nacional de uma vez), por isso a consulta é por CNPJ; e só CNPJs são
+checados (CPF sancionado é outra base). CEPIM (empresas impedidas) fica como
+extensão futura.
+
+---
+
 ## Watchlists — regras definidas pelo usuário
 
 Além dos detectores estatísticos, o usuário pode cadastrar **watchlists** (por

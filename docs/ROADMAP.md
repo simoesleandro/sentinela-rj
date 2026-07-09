@@ -52,8 +52,8 @@ Em ordem de retorno por esforço:
 
 | # | Item | Fonte | O que detecta | Esforço | Impacto |
 |---|------|-------|---------------|---------|---------|
-| 2.1 | **Licitante único** | PNCP (API de contratações — hoje só coletamos *contratos*) | Certames com 1 proponente; desconto do vencedor vs. valor estimado; certames desertos repetidos que viram dispensa | M | **Altíssimo** — indicador de competição é dos mais fortes da literatura |
-| 2.2 | **Sanções federais** | Portal da Transparência (API CEIS/CNEP/CEPIM) | Fornecedor inidôneo/punido em qualquer esfera contratando no município | S | Alto — expande o `fornecedor_sancoes` local |
+| 2.1 ✅ | **Competição fraca** (proxy de licitante único) | PNCP (API de contratações) | `desconto_zero_licitacao` + `licitacao_itens_desertos` — a API não expõe nº de propostas, então usa proxies. **Entregue jul/2026** | M | **Altíssimo** — indicador de competição é dos mais fortes da literatura |
+| 2.2 ✅ | **Sanções federais** | Portal da Transparência (API CEIS/CNEP) | Fornecedor inidôneo/punido em qualquer esfera, consulta por CNPJ. **Entregue jul/2026** (CEPIM fica como extensão) | S | Alto — expande o `fornecedor_sancoes` local |
 | 2.3 | **Atas e adesões ("carona")** | PNCP (atas de registro de preços) | Adesões em cascata, órgão aderindo a ata alheia acima do razoável | M | Alto — vetor clássico de abuso pós-14.133 |
 | 2.4 | **Doações de campanha × sócios** | TSE (dados abertos de candidaturas e doações) | Fornecedor cujo sócio financiou campanha de quem o contrata; bônus: candidatos têm **CPF completo público** → fecha identidades do conflito de interesse | M | Alto — cruzamento consagrado + resolve o problema do "sem CPF" |
 | 2.5 | **Diário Oficial do Rio (ferramenta do agente)** | doweb.rio.rj.gov.br (scraper, padrão do TCM/Playwright) | Nomeações/exonerações do servidor; extratos de contrato | M | Médio — automatiza o passo manual da triagem guiada |

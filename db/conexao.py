@@ -205,6 +205,9 @@ _MIGRACOES_COLUNAS = [
     "ALTER TABLE usuarios ADD COLUMN email_verificado INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE usuarios ADD COLUMN token_verificacao TEXT",
     "ALTER TABLE usuarios ADD COLUMN token_expira_em TEXT",
+    # rastreio da checagem de sanções federais via API do Portal da Transparência
+    # (independente de ultima_consulta_sancao, que pertence ao enriquecimento BrasilAPI)
+    "ALTER TABLE fornecedores ADD COLUMN sancoes_verificado_em TEXT",
 ]
 
 
