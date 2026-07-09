@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dados e Responsabilidade — Sentinela RJ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .pg-header {
+      padding: 1rem max(2rem, calc((100% - 900px) / 2 + 2rem));
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .back-link { color: var(--muted); text-decoration: none; font-size: 0.875rem; }
+    .back-link:hover { color: var(--text); }
+    .pg-brand { font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; }
+    .pg-main { max-width: 760px; margin: 0 auto; padding: 2rem max(1.5rem, 2vw) 4rem; }
+    .pg-main h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.4rem; }
+    .pg-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+    .pg-main h2 {
+      font-size: 1rem; font-weight: 600; margin: 2rem 0 0.6rem; padding-top: 1.2rem;
+      border-top: 1px solid var(--border);
+    }
+    .pg-main p, .pg-main li { font-size: 0.9rem; line-height: 1.6; color: #d4d4d4; }
+    .pg-main p { margin-bottom: 0.75rem; }
+    .pg-main ul { padding-left: 1.2rem; margin-bottom: 0.75rem; }
+    .pg-main li { margin-bottom: 0.35rem; }
+    .pg-main a { color: var(--blue); text-decoration: none; }
+    .pg-main a:hover { text-decoration: underline; }
+    .pg-main strong { color: var(--text); }
+    .callout {
+      background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.3);
+      border-radius: 8px; padding: 0.9rem 1rem; margin: 1rem 0;
+    }
+    .callout strong { color: #fbbf24; }
+    .fonte-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin: 0.5rem 0 1rem; }
+    .fonte-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 0.9rem; }
+    .fonte-card dt { font-weight: 600; color: var(--text); font-size: 0.85rem; margin-bottom: 0.2rem; }
+    .fonte-card dd { color: var(--muted); font-size: 0.78rem; line-height: 1.45; margin: 0; }
+    @media (max-width: 620px) { .fonte-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="pg-header">
+    <a href="/dashboard" class="back-link">← Voltar ao Sentinela RJ</a>
+    <span class="pg-brand">Sentinela RJ</span>
+  </header>
+
+  <main class="pg-main">
+    <h1>Dados e Responsabilidade</h1>
+    <p class="pg-sub">Como o Sentinela RJ trata dados, qual a base legal e como contestar.</p>
+
+    <div class="callout">
+      <strong>Indício, não acusação.</strong> O Sentinela é uma camada técnica de
+      triagem: aponta padrões que merecem verificação humana. Nenhum alerta afirma
+      irregularidade, ilegalidade ou culpa — um contrato ou pessoa sinalizado pode
+      ter justificativa legal completa. A decisão final é sempre da análise humana e
+      dos órgãos de controle competentes.
+    </div>
+
+    <h2>Origem e natureza dos dados</h2>
+    <p>
+      Todos os dados processados pelo Sentinela RJ são <strong>públicos e obtidos de
+      fontes oficiais</strong> do governo brasileiro. Contratos e licitações são
+      públicos por força da <strong>Lei de Acesso à Informação (Lei 12.527/2011)</strong>;
+      a remuneração e a lotação de servidores públicos são de publicidade obrigatória;
+      o quadro societário de empresas e as sanções administrativas são de acesso público.
+    </p>
+
+    <div class="fonte-grid">
+      <dl class="fonte-card"><dt>Contratos e licitações</dt><dd>Portal Nacional de Contratações Públicas (PNCP)</dd></dl>
+      <dl class="fonte-card"><dt>Cadastro de empresas e sócios</dt><dd>BrasilAPI (dados da Receita Federal)</dd></dl>
+      <dl class="fonte-card"><dt>Folha de pagamento municipal</dt><dd>Portal da Transparência do Município do Rio</dd></dl>
+      <dl class="fonte-card"><dt>Sanções (CEIS/CNEP)</dt><dd>Portal da Transparência do Governo Federal</dd></dl>
+    </div>
+
+    <h2>Base legal do tratamento (LGPD)</h2>
+    <p>
+      O tratamento de dados pessoais eventualmente presentes (nomes de sócios e de
+      servidores) observa a <strong>Lei Geral de Proteção de Dados (Lei 13.709/2018)</strong>:
+    </p>
+    <ul>
+      <li><strong>Dados de acesso público</strong> (art. 7º, §4º) — os dados tratados já
+        são tornados públicos pelas fontes oficiais citadas.</li>
+      <li><strong>Interesse público e controle social</strong> (art. 7º, III e IX) — a
+        finalidade é a transparência de contratações públicas e o exercício do controle
+        social, não interesse comercial.</li>
+      <li><strong>Finalidade específica e proporcional</strong> — os dados são cruzados
+        apenas para sinalizar padrões relevantes à fiscalização, na medida necessária.</li>
+    </ul>
+
+    <h2>O que o Sentinela NÃO faz</h2>
+    <ul>
+      <li>Não coleta dados sensíveis (saúde, biometria, opinião política, etc.).</li>
+      <li>Não faz perfilamento comercial nem publicidade direcionada.</li>
+      <li>Não vende, aluga ou compartilha dados com terceiros para fins comerciais.</li>
+      <li>Não afirma culpa, fraude ou ilegalidade — apenas indícios para verificação.</li>
+    </ul>
+
+    <h2>Retenção e atualização</h2>
+    <p>
+      Os dados refletem o que está publicado nas fontes oficiais e são atualizados
+      periodicamente. Como se trata de dados públicos de contratação, são mantidos
+      enquanto forem relevantes ao controle social e à finalidade de transparência.
+    </p>
+
+    <h2>Direito de contestação e correção</h2>
+    <p>
+      Qualquer pessoa física ou jurídica citada que entenda haver dado incorreto,
+      desatualizado ou indevidamente sinalizado pode solicitar revisão. Analisamos
+      cada pedido e corrigimos o que for cabível — inclusive removendo ou reclassificando
+      sinais que se mostrem improcedentes. Divergências sobre o dado de origem devem
+      também ser dirigidas à fonte oficial correspondente.
+    </p>
+    <p>
+      Canal de contestação: <a href="https://github.com/simoesleandro/sentinela-rj/issues">abrir uma solicitação no repositório</a>
+      ou pelo contato do <a href="https://github.com/simoesleandro">autor</a>.
+    </p>
+
+    <h2>Metodologia</h2>
+    <p>
+      Como cada detector funciona, com método, limiares reais e fundamento legal, está
+      documentado em <a href="https://github.com/simoesleandro/sentinela-rj/blob/main/docs/DETECTORES.md">docs/DETECTORES.md</a>.
+      A taxa de acerto medida por detector fica em <a href="/precisao">/precisao</a>.
+    </p>
+
+    <p style="margin-top:2rem;color:var(--muted);font-size:0.8rem">
+      Todos os dados são públicos e obtidos de fontes oficiais do governo brasileiro.
+    </p>
+  </main>
+</body>
+</html>

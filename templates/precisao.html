@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Precisão Medida — Sentinela RJ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .pg-header {
+      padding: 1rem max(2rem, calc((100% - 1000px) / 2 + 2rem));
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .back-link { color: var(--muted); text-decoration: none; font-size: 0.875rem; }
+    .back-link:hover { color: var(--text); }
+    .pg-brand { font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; }
+    .pg-main { max-width: 1000px; margin: 0 auto; padding: 2rem max(1.5rem, 2vw) 4rem; }
+    .pg-main h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.4rem; }
+    .pg-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; max-width: 70ch; line-height: 1.55; }
+    .metodo {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.9rem 1rem; margin-bottom: 1.5rem; font-size: 0.83rem; color: #d4d4d4; line-height: 1.55;
+    }
+    .metodo code { background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead th {
+      text-align: left; color: var(--muted); font-weight: 600; font-size: 0.72rem;
+      text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.7rem;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td { padding: 0.6rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .td-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .tipo-nome { font-weight: 600; color: var(--text); }
+    .barra-wrap { display: flex; align-items: center; gap: 0.5rem; }
+    .barra { flex: 1; height: 7px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden; min-width: 60px; }
+    .barra > span { display: block; height: 100%; border-radius: 999px; }
+    .pct { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 46px; text-align: right; }
+    .insuf { color: var(--muted); font-size: 0.78rem; font-style: italic; }
+    .aviso-amostra { color: var(--muted); font-size: 0.8rem; margin-top: 1.25rem; line-height: 1.5; }
+    .loading, .erro { color: var(--muted); padding: 2rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <header class="pg-header">
+    <a href="/dashboard" class="back-link">← Voltar ao Sentinela RJ</a>
+    <span class="pg-brand">Sentinela RJ</span>
+  </header>
+
+  <main class="pg-main">
+    <h1>Precisão Medida</h1>
+    <p class="pg-sub">
+      Quão confiável é cada detector, medido contra a triagem humana real — não uma
+      estimativa. Um detector só é útil se o que ele marca como risco se confirma na
+      revisão. Publicamos esse número, inclusive quando ele é baixo ou quando ainda
+      não há dados suficientes.
+    </p>
+
+    <div class="metodo">
+      <strong>Como é calculado:</strong> para cada detector,
+      <code>precisão = confirmados ÷ (confirmados + descartados)</code>, contando as
+      decisões humanas de triagem. Um alerta <em>confirmado</em> conta como acerto;
+      um <em>descartado</em> (falso positivo) como erro. Alertas ainda em aberto ou em
+      investigação não entram no cálculo. Exigimos ao menos
+      <strong id="min-amostra">10</strong> alertas rotulados por detector para exibir
+      a taxa — abaixo disso, mostramos "amostra insuficiente" em vez de um número não
+      confiável.
+    </div>
+
+    <div id="conteudo"><p class="loading">Carregando…</p></div>
+
+    <p class="aviso-amostra" id="rodape"></p>
+  </main>
+
+  <script>
+    function cor(p) {
+      if (p >= 0.8) return 'var(--green)';
+      if (p >= 0.5) return 'var(--yellow)';
+      return 'var(--red)';
+    }
+    function fmtTipo(t) {
+      return (t || 'desconhecido').replace(/_/g, ' ');
+    }
+
+    async function carregar() {
+      const alvo = document.getElementById('conteudo');
+      try {
+        const res = await fetch('/api/precisao');
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || res.statusText);
+        document.getElementById('min-amostra').textContent = d.min_amostra;
+
+        const medidos = d.itens.filter(i => i.amostra_status === 'medida');
+        const insuf = d.itens.filter(i => i.amostra_status !== 'medida');
+
+        const linhas = [...medidos, ...insuf].map(i => {
+          const p = i.precisao;
+          const celPct = (p === null)
+            ? '<span class="insuf">amostra insuficiente</span>'
+            : `<div class="barra-wrap">
+                 <span class="pct" style="color:${cor(p)}">${(p*100).toFixed(0)}%</span>
+                 <div class="barra"><span style="width:${(p*100).toFixed(0)}%;background:${cor(p)}"></span></div>
+               </div>`;
+          return `<tr>
+            <td class="tipo-nome">${fmtTipo(i.tipo)}</td>
+            <td>${celPct}</td>
+            <td class="td-num">${i.confirmados || 0}</td>
+            <td class="td-num">${i.descartados || 0}</td>
+            <td class="td-num">${i.pendentes || 0}</td>
+            <td class="td-num">${i.total}</td>
+          </tr>`;
+        }).join('');
+
+        alvo.innerHTML = `
+          <table>
+            <thead><tr>
+              <th>Detector</th><th>Precisão</th>
+              <th style="text-align:right">Confirmados</th>
+              <th style="text-align:right">Descartados</th>
+              <th style="text-align:right">Pendentes</th>
+              <th style="text-align:right">Total</th>
+            </tr></thead>
+            <tbody>${linhas}</tbody>
+          </table>`;
+
+        const rodape = document.getElementById('rodape');
+        if (d.rotulados_total === 0) {
+          rodape.textContent = 'Ainda não há alertas triados (confirmados ou descartados). '
+            + 'À medida que a triagem humana avança, as taxas de precisão aparecem aqui automaticamente.';
+        } else {
+          rodape.textContent = `${d.rotulados_total} alertas já rotulados na triagem. `
+            + 'As taxas se atualizam conforme a revisão humana continua.';
+        }
+      } catch (e) {
+        alvo.innerHTML = `<p class="erro">Erro ao carregar: ${e.message}</p>`;
+      }
+    }
+    carregar();
+  </script>
+</body>
+</html>

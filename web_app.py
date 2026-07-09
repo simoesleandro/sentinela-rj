@@ -197,6 +197,7 @@ from routes.casos import bp as casos_bp
 from routes.conflitos import bp as conflitos_bp
 from routes.exportacao import bp as exportacao_bp
 from routes.fornecedores import bp as fornecedores_bp
+from routes.institucional import bp as institucional_bp
 from routes.painel import bp as painel_bp
 from routes.watchlists import bp as watchlists_bp
 
@@ -205,6 +206,7 @@ app.register_blueprint(casos_bp)
 app.register_blueprint(conflitos_bp)
 app.register_blueprint(exportacao_bp)
 app.register_blueprint(fornecedores_bp)
+app.register_blueprint(institucional_bp)
 app.register_blueprint(painel_bp)
 app.register_blueprint(watchlists_bp)
 
