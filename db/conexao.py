@@ -144,6 +144,40 @@ _MIGRACOES_DDL = [
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_ia_consumo_usuario_dia ON ia_consumo(usuario_id, criado_em)",
+    """
+    CREATE TABLE IF NOT EXISTS licitacoes (
+        numero_controle_pncp        TEXT PRIMARY KEY,
+        orgao_cnpj                  TEXT NOT NULL,
+        ano_compra                  INTEGER NOT NULL,
+        sequencial_compra           INTEGER NOT NULL,
+        modalidade_id               INTEGER,
+        modalidade_nome             TEXT,
+        situacao_nome               TEXT,
+        objeto                      TEXT,
+        valor_estimado              REAL,
+        valor_homologado            REAL,
+        srp                         INTEGER NOT NULL DEFAULT 0,
+        data_publicacao             TEXT,
+        data_encerramento_proposta  TEXT,
+        municipio_ibge              TEXT,
+        itens_coletados_em          TEXT,
+        coletado_em                 TEXT DEFAULT (datetime('now'))
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS licitacao_itens (
+        numero_controle_pncp TEXT NOT NULL REFERENCES licitacoes(numero_controle_pncp),
+        numero_item          INTEGER NOT NULL,
+        descricao            TEXT,
+        situacao_nome        TEXT,
+        quantidade           REAL,
+        tem_resultado        INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (numero_controle_pncp, numero_item)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_licitacoes_orgao ON licitacoes(orgao_cnpj)",
+    "CREATE INDEX IF NOT EXISTS idx_licitacoes_municipio ON licitacoes(municipio_ibge)",
+    "CREATE INDEX IF NOT EXISTS idx_licitacao_itens_pncp ON licitacao_itens(numero_controle_pncp)",
 ]
 
 _MIGRACOES_CASOS_CNPJ = [

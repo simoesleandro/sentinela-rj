@@ -241,6 +241,46 @@ def cmd_sancoes(args) -> int:
     return 0
 
 
+# ── Sub-comando: licitacoes ──────────────────────────────────────────────────
+
+def cmd_licitacoes(args) -> int:
+    from db.conexao import get_conn, init_db
+    from extrator.licitacoes import coletar, coletar_itens, janela_padrao
+
+    _header("licitacoes — coleta de certames PNCP")
+    t0 = time.perf_counter()
+
+    init_db()
+    inicio, fim = args.inicio, args.fim
+    if not inicio or not fim:
+        inicio, fim = janela_padrao()
+    print(f"  Janela: {inicio} → {fim}")
+
+    conn = get_conn(row_factory=True)
+    try:
+        resumo = coletar(conn, inicio, fim)
+        _ok(f"Licitações coletadas/atualizadas: {resumo.pop('total', 0)}")
+        for modalidade, qtd in sorted(resumo.items()):
+            print(f"    {modalidade}: {qtd}")
+
+        if not args.sem_itens:
+            resumo_itens = coletar_itens(conn, limite=args.itens_limite)
+            _ok(
+                f"Itens: {resumo_itens['itens']} coletados em "
+                f"{resumo_itens['licitacoes_processadas']} licitações "
+                f"(pendentes: {resumo_itens['pendentes_restantes']})"
+            )
+    except Exception as exc:
+        _warn(f"Erro na coleta: {exc}")
+        return 1
+    finally:
+        conn.close()
+
+    print(f"  Tempo: {_elapsed(t0)}")
+    print()
+    return 0
+
+
 # ── Sub-comando: transparencia ───────────────────────────────────────────────
 
 def cmd_transparencia(args) -> int:
@@ -753,6 +793,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Ingere empenhos Transparencia RJ e cruza com contratos PNCP",
     )
 
+    # licitacoes
+    lic = sub.add_parser(
+        "licitacoes",
+        help="Coleta certames competitivos do PNCP (estimado x homologado, itens)",
+    )
+    lic.add_argument("--inicio", metavar="AAAAMMDD", help="Data inicial (padrao: 6 meses atras)")
+    lic.add_argument("--fim", metavar="AAAAMMDD", help="Data final (padrao: hoje)")
+    lic.add_argument("--sem-itens", action="store_true", help="Pula a coleta de itens")
+    lic.add_argument("--itens-limite", type=int, default=200, metavar="N",
+                     help="Maximo de licitacoes com itens por execucao (padrao: 200)")
+
     # relatorio
     rel = sub.add_parser("relatorio", help="Gera relatorio Markdown de anomalias")
     rel.add_argument("--dir", metavar="DIR",
@@ -868,6 +919,7 @@ def main() -> None:
         "backfill":  cmd_backfill,
         "sancoes":   cmd_sancoes,
         "transparencia": cmd_transparencia,
+        "licitacoes": cmd_licitacoes,
         "analisar":  cmd_analisar,
         "relatorio": cmd_relatorio,
         "dossie":    cmd_dossie,

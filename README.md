@@ -154,6 +154,8 @@ The goal is not to replace institutional oversight or legal analysis. It is a te
 | `capital_social_baixo` | Capital incompatível com valor contratado |
 | `empresa_jovem_contrato_grande` | Empresa nova com contrato de alto valor |
 | `socios_compartilhados` | Fornecedores com sócios em comum |
+| `desconto_zero_licitacao` | Certame homologado ~no valor estimado (mediana real: 22,6% de desconto) |
+| `licitacao_itens_desertos` | Maioria dos itens do certame deserta/fracassada |
 
 > 📖 **Metodologia completa** — método estatístico, limiares reais e fundamento legal
 > de cada detector em [`docs/DETECTORES.md`](docs/DETECTORES.md).

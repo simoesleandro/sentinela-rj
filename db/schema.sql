@@ -211,6 +211,38 @@ CREATE TABLE IF NOT EXISTS casos (
     atualizado_em   TEXT DEFAULT (datetime('now'))
 );
 
+-- Licitações (contratações PNCP) — matéria-prima do detector de competição
+-- fraca. A API de consulta não expõe quantidade de propostas; guardamos os
+-- proxies: valor estimado vs. homologado e situação dos itens.
+CREATE TABLE IF NOT EXISTS licitacoes (
+    numero_controle_pncp        TEXT PRIMARY KEY,
+    orgao_cnpj                  TEXT NOT NULL,
+    ano_compra                  INTEGER NOT NULL,
+    sequencial_compra           INTEGER NOT NULL,
+    modalidade_id               INTEGER,
+    modalidade_nome             TEXT,
+    situacao_nome               TEXT,
+    objeto                      TEXT,
+    valor_estimado              REAL,
+    valor_homologado            REAL,
+    srp                         INTEGER NOT NULL DEFAULT 0,
+    data_publicacao             TEXT,
+    data_encerramento_proposta  TEXT,
+    municipio_ibge              TEXT,
+    itens_coletados_em          TEXT,
+    coletado_em                 TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS licitacao_itens (
+    numero_controle_pncp TEXT NOT NULL REFERENCES licitacoes(numero_controle_pncp),
+    numero_item          INTEGER NOT NULL,
+    descricao            TEXT,
+    situacao_nome        TEXT,
+    quantidade           REAL,
+    tem_resultado        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (numero_controle_pncp, numero_item)
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_sancoes_fornecedor    ON fornecedor_sancoes(fornecedor_ni);
 CREATE INDEX IF NOT EXISTS idx_contratos_fornecedor  ON contratos(fornecedor_ni);
@@ -229,3 +261,6 @@ CREATE INDEX IF NOT EXISTS idx_regras_alerta_ativo    ON regras_alerta(ativo);
 CREATE INDEX IF NOT EXISTS idx_regras_alerta_tipo     ON regras_alerta(tipo);
 CREATE INDEX IF NOT EXISTS idx_transp_rj_fornecedor   ON transparencia_rj_lancamentos(fornecedor_ni);
 CREATE INDEX IF NOT EXISTS idx_transp_rj_cruz_pncp    ON transparencia_rj_cruzamentos(numero_controle_pncp);
+CREATE INDEX IF NOT EXISTS idx_licitacoes_orgao       ON licitacoes(orgao_cnpj);
+CREATE INDEX IF NOT EXISTS idx_licitacoes_municipio   ON licitacoes(municipio_ibge);
+CREATE INDEX IF NOT EXISTS idx_licitacao_itens_pncp   ON licitacao_itens(numero_controle_pncp);

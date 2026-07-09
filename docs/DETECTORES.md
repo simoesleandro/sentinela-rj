@@ -53,6 +53,7 @@ do detector é modesto.
 | 8 | Risco de empenho | `contrato_sem_empenho` · `empenho_total_dia_unico` · `empenho_acima_contrato` | PNCP × Transparência RJ | Cruzamento |
 | 9 | Anomalias cadastrais | `empresa_inativa` · `capital_social_baixo` · `empresa_jovem_contrato_grande` | BrasilAPI | Cadastral |
 | 10 | Sócios em comum | `socio_compartilhado` | BrasilAPI (QSA) | Relacional |
+| 11 | Competição fraca | `desconto_zero_licitacao` · `licitacao_itens_desertos` | Licitações PNCP | Estatístico |
 | + | Watchlists | definido pelo usuário | Contratos PNCP | Regra manual |
 
 > **Fundamento legal.** As referências abaixo (Lei 14.133/2021, Lei 4.320/1964 etc.)
@@ -299,6 +300,38 @@ existem. É um ponto de partida para investigar vínculos, não uma prova de con
 > fornecedores com **servidores públicos** por nome — ver a
 > [tela de Conflito de Interesse](../templates/conflitos_interesse.html), que traz seu
 > próprio aviso sobre homônimos.
+
+---
+
+## 11. Competição fraca — `desconto_zero_licitacao` · `licitacao_itens_desertos`
+
+**Arquivo:** [`analisador/competicao.py`](../analisador/competicao.py) ·
+**Fonte:** [`extrator/licitacoes.py`](../extrator/licitacoes.py) (certames do PNCP,
+modalidades competitivas: pregões e concorrências)
+
+Enquanto os demais detectores olham o contrato assinado, este olha o **certame**:
+valor estimado vs. homologado e a situação dos itens.
+
+**11.1 `desconto_zero_licitacao`** — certame competitivo homologado praticamente
+no valor estimado. **Calibração empírica (jul/2026, 230 pregões homologados da
+PCRJ):** o desconto mediano é **22,6%**; desconto ≤ 0,5% ocorre em só **10%** dos
+certames. Dispara com desconto ≤ 0,5% e homologado ≥ R$ 500 mil.
+Severidade: ≥ R$ 5M → alta · ≥ R$ 1M → média · demais → baixa.
+*É o indicador de "desconto zero" dos painéis do TCU — sugere combinação de
+preços ou orçamento direcionado.* (Caso real da calibração: R$ 9,26M em pneus
+homologado no centavo exato do estimado.)
+
+**11.2 `licitacao_itens_desertos`** — a **maioria** dos itens do certame deserta
+ou fracassada. Calibração: ter *algum* item fracassado é comum (35% das compras
+da amostra) — só dispara com proporção ≥ 50%, ≥ 4 itens e estimado ≥ R$ 500 mil.
+Severidade alta com proporção ≥ 80% e valor ≥ R$ 5M. *Sugere edital mal
+dimensionado, exigência restritiva ou afastamento de competidores — e costuma
+preceder contratação direta.*
+
+**Limitação documentada:** a API de consulta do PNCP **não expõe a quantidade de
+propostas** recebidas (a lista de licitantes fica no sistema de origem), então
+"licitante único" literal não é computável por esta fonte — estes dois sinais são
+os proxies disponíveis de ausência de disputa.
 
 ---
 
