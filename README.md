@@ -388,6 +388,9 @@ pytest tests/test_motor_ia.py -v
 
 ## 🗺 Roadmap
 
+> 📋 **Plano estratégico completo** — pilares, fases e métricas para tornar o Sentinela
+> referência em fiscalização pública: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
 - [x] Dashboard Flask com triagem, dossiê, grafo e narrativa IA
 - [x] 9 detectores de anomalia (IQR, concentração, fracionamento, etc.)
 - [x] Pipeline agendado com notificações Discord
