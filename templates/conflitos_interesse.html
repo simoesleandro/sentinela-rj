@@ -241,10 +241,20 @@
       return '';
     }
 
-    function linkDiarioOficial(nome) {
-      if (!nome) return '';
-      const url = `https://doweb.rio.rj.gov.br/buscanova/#/p=1&q=${encodeURIComponent(nome)}`;
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="diario-link">Buscar no Diário Oficial do Rio ↗</a>`;
+    function linkDiarioOficial(nome, matricula) {
+      // Medido em jul/2026: buscar a MATRÍCULA devolve ~2 resultados (o ato
+      // concreto); buscar o nome devolve centenas (listas de nomeações casam
+      // até fronteiras entre nomes). Matrícula é o link primário; nome fica
+      // como fallback — atos antigos nem sempre imprimem a matrícula.
+      const base = 'https://doweb.rio.rj.gov.br/buscanova/#/p=1&q=';
+      const partes = [];
+      if (matricula) {
+        partes.push(`<a href="${base}${encodeURIComponent(matricula)}" target="_blank" rel="noopener noreferrer" class="diario-link">Buscar a matrícula no Diário Oficial ↗</a>`);
+      }
+      if (nome) {
+        partes.push(`<a href="${base}${encodeURIComponent(nome)}" target="_blank" rel="noopener noreferrer" class="diario-link">${matricula ? 'buscar por nome ↗' : 'Buscar no Diário Oficial do Rio ↗'}</a>`);
+      }
+      return partes.join(' <span class="texto-muted">·</span> ');
     }
 
     function formatCurrency(val) {
@@ -461,7 +471,7 @@
         <div class="ci-passos">
           <h3>Próximos passos de verificação</h3>
           <ol>
-            <li>${linkDiarioOficial(c.nome_servidor)} — nomeações, exonerações e aposentadorias confirmam a trajetória do servidor (matrícula ${escapeHtml(c.matricula_servidor || '—')}).</li>
+            <li>${linkDiarioOficial(c.nome_servidor, c.matricula_servidor)} — nomeações, exonerações e aposentadorias confirmam a trajetória do servidor (matrícula ${escapeHtml(c.matricula_servidor || '—')}). A busca por matrícula é muito mais precisa que por nome.</li>
             <li><a href="https://www.jucerja.rj.gov.br/" target="_blank" rel="noopener noreferrer" class="diario-link">Consultar a JUCERJA ↗</a> — a certidão do contrato social (paga) traz o CPF completo do sócio e é a confirmação documental de identidade. CNPJ: <code>${escapeHtml(c.fornecedor_ni)}</code> <button type="button" class="btn-copiar" onclick="copiarTexto('${escapeHtml(c.fornecedor_ni)}', this)">copiar</button></li>
             <li>Conferir a <strong>qualificação do sócio</strong> na certidão: gestão (administrador/diretor) é vedada a servidor; cota simples, em regra, não.</li>
           </ol>
