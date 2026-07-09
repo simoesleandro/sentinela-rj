@@ -312,6 +312,38 @@ def cmd_licitacoes(args) -> int:
     return 0
 
 
+# ── Sub-comando: tse (doações de campanha) ───────────────────────────────────
+
+def cmd_tse(args) -> int:
+    from db.conexao import get_conn, init_db
+    from extrator.tse import sincronizar_tse
+    from analisador.doacoes import resolver_cpf_confirmado
+
+    _header(f"tse — doações de campanha {args.uf} {args.ano}")
+    t0 = time.perf_counter()
+
+    init_db()
+    conn = get_conn(row_factory=True)
+    try:
+        _info("Baixando só o CSV da UF do zip nacional (HTTP range)...")
+        resumo = sincronizar_tse(conn, ano=args.ano, uf=args.uf)
+        _ok(f"Linhas lidas: {resumo['linhas_lidas']}")
+        _ok(f"Doações PF ingeridas: {resumo['doacoes_pf_inseridas']} "
+            f"(PJ ignoradas: {resumo['pj_ignoradas']})")
+
+        confirmados = resolver_cpf_confirmado(conn)
+        _ok(f"CPFs de sócio confirmados (fecha identidade): {confirmados}")
+    except Exception as exc:
+        _warn(f"Erro no TSE: {exc}")
+        return 1
+    finally:
+        conn.close()
+
+    print(f"  Tempo: {_elapsed(t0)}")
+    print()
+    return 0
+
+
 # ── Sub-comando: transparencia ───────────────────────────────────────────────
 
 def cmd_transparencia(args) -> int:
@@ -845,6 +877,16 @@ def _build_parser() -> argparse.ArgumentParser:
     lic.add_argument("--itens-limite", type=int, default=200, metavar="N",
                      help="Maximo de licitacoes com itens por execucao (padrao: 200)")
 
+    # tse
+    tse = sub.add_parser(
+        "tse",
+        help="Ingere doacoes de campanha do TSE e confirma CPF de socios (fecha identidade)",
+    )
+    tse.add_argument("--ano", type=int, default=2024, metavar="AAAA",
+                     help="Ano da eleicao (padrao: 2024)")
+    tse.add_argument("--uf", default="RJ", metavar="UF",
+                     help="UF a coletar (padrao: RJ)")
+
     # relatorio
     rel = sub.add_parser("relatorio", help="Gera relatorio Markdown de anomalias")
     rel.add_argument("--dir", metavar="DIR",
@@ -961,6 +1003,7 @@ def main() -> None:
         "sancoes":   cmd_sancoes,
         "sancoes-api": cmd_sancoes_api,
         "transparencia": cmd_transparencia,
+        "tse":         cmd_tse,
         "licitacoes": cmd_licitacoes,
         "analisar":  cmd_analisar,
         "relatorio": cmd_relatorio,

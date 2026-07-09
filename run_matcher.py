@@ -22,6 +22,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from conflito_interesse.cpf_confirmado import atualizar_cpf_confirmado
 from conflito_interesse.enriquecimento import enriquecer_candidatos
 from conflito_interesse.indice_servidores import IndiceServidoresPorToken
 from conflito_interesse.matcher import ConflictMatcherService
@@ -63,12 +64,17 @@ def executar_matching() -> dict[str, int]:
 
         afetados = CandidatoConflitoRepository(conn_supabase).salvar_candidatos(candidatos)
 
+        # Fecha identidade: propaga o CPF de sócio confirmado via TSE
+        # (socios_cpf_confirmado no core) para os candidatos do Supabase.
+        cpf_confirmados = atualizar_cpf_confirmado(conn_supabase, conn_sentinela)
+
         return {
             "fornecedores_processados": fornecedores_processados,
             "candidatos_gerados": len(candidatos),
             "alta_confianca": alta_confianca,
             "media_confianca": media_confianca,
             "afetados": afetados,
+            "cpf_confirmados": cpf_confirmados,
         }
     finally:
         conn_folha.close()
@@ -93,6 +99,10 @@ def main() -> int:
     )
     logger.info(
         "Candidatos inseridos ou atualizados (upsert, status preservado): %d", metricas["afetados"]
+    )
+    logger.info(
+        "CPF de sócio confirmado via TSE e propagado (fecha identidade): %d",
+        metricas.get("cpf_confirmados", 0),
     )
     return 0
 

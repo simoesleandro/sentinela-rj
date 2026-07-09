@@ -36,6 +36,7 @@ def _carregar_detectores() -> _Detectores:
         asfalto_fatiado,
         competicao,
         concentracao,
+        doacoes,
         empenhos_risk,
         evolucao_temporal,
         fracionamento,
@@ -58,6 +59,7 @@ def _carregar_detectores() -> _Detectores:
         ("sancoes", sancoes.detectar),
         ("socios", socios.detectar),
         ("competicao", competicao.detectar),
+        ("doacoes", doacoes.detectar),
     ]
 
 

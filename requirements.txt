@@ -4,3 +4,5 @@
 requests>=2.31.0
 python-dotenv>=1.0.0
 APScheduler>=3.10.0
+# extração parcial (HTTP range) do zip nacional de doações do TSE — extrator/tse.py
+remotezip>=0.12.0

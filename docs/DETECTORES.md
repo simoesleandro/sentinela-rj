@@ -54,6 +54,7 @@ do detector é modesto.
 | 9 | Anomalias cadastrais | `empresa_inativa` · `capital_social_baixo` · `empresa_jovem_contrato_grande` | BrasilAPI | Cadastral |
 | 10 | Sócios em comum | `socio_compartilhado` | BrasilAPI (QSA) | Relacional |
 | 11 | Competição fraca | `desconto_zero_licitacao` · `licitacao_itens_desertos` | Licitações PNCP | Estatístico |
+| 12 | Sócio-doador de campanha | `socio_doou_campanha` | TSE × QSA (BrasilAPI) | Relacional |
 | + | Watchlists | definido pelo usuário | Contratos PNCP | Regra manual |
 
 > **Fundamento legal.** As referências abaixo (Lei 14.133/2021, Lei 4.320/1964 etc.)
@@ -332,6 +333,53 @@ preceder contratação direta.*
 propostas** recebidas (a lista de licitantes fica no sistema de origem), então
 "licitante único" literal não é computável por esta fonte — estes dois sinais são
 os proxies disponíveis de ausência de disputa.
+
+---
+
+## 12. Sócio-doador de campanha — `socio_doou_campanha`
+
+**Arquivo:** [`analisador/doacoes.py`](../analisador/doacoes.py) ·
+**Fonte:** [`extrator/tse.py`](../extrator/tse.py) (prestação de contas eleitorais
+do TSE) · **CLI:** `python __main__.py tse`
+
+Cruza os **sócios** dos fornecedores (QSA/BrasilAPI) com as **doações de campanha**
+do TSE. Confirma identidade por **nome + os 6 dígitos do meio do CPF**: o QSA traz
+o CPF do sócio mascarado (`***MMMMMM**`) e a prestação de contas traz o CPF
+**completo** do doador — quando o nome bate e os 6 dígitos conferem, é a mesma
+pessoa com falso-positivo desprezível.
+
+**Natureza do sinal — leia com atenção.** Doação de **pessoa física é legal**.
+Este detector **não** aponta ilegalidade; aponta **alinhamento político** entre
+quem controla um fornecedor e quem exerce (ou disputou) mandato no município que o
+contrata. É contexto para o dossiê, não acusação.
+
+**Por que só pessoa física.** Doação de **empresa** para campanha é **proibida
+desde 2015** (Lei 13.165/2015 + ADI 4650/STF). Medição empírica (jul/2026, RJ
+2024): só 531 CNPJs "doadores" no estado inteiro, todos comitês/transferências
+partidárias — o cruzamento clássico "empresa doou para quem a contrata" **não
+existe mais no Brasil**. O valor está no doador pessoa física (25,4 mil no RJ),
+em especial sócios-administradores.
+
+**Severidade.** Sobe com dois fatores: doação a candidato do **mesmo município**
+que contrata a empresa (alinhamento) e **cargo do Executivo** (Prefeito/Vice,
+que controla a contratação).
+- **alta** — alinhado ao município **e** (cargo Executivo **ou** contratos ≥ R$ 10M);
+- **média** — alinhado **ou** contratos ≥ R$ 10M;
+- **baixa** — demais.
+
+**Efeito colateral (fecha identidade).** Cada match confirma o **CPF completo** do
+sócio e é gravado em `socios_cpf_confirmado` — resolvendo a lacuna "sem CPF" que
+limitava o [conflito de interesse](../conflito_interesse/). O CPF é exibido
+mascarado nos alertas.
+
+**Limitação de cobertura.** Só entram fornecedores com QSA enriquecido
+(`fornecedor_cadastro`). Enriquecer mais fornecedores aumenta os achados. A coleta
+baixa **apenas o CSV da UF** do zip nacional do TSE (~1,2 GB) por HTTP range, sem
+hospedar o arquivo inteiro.
+
+*Fundamento:* Lei 14.133/2021 (impedimentos e conflito de interesse em
+contratações) e Lei 12.813/2013 (conflito de interesses no serviço público) — o
+vínculo político-eleitoral é um dos elementos que a análise humana pondera.
 
 ---
 

@@ -178,6 +178,41 @@ _MIGRACOES_DDL = [
     "CREATE INDEX IF NOT EXISTS idx_licitacoes_orgao ON licitacoes(orgao_cnpj)",
     "CREATE INDEX IF NOT EXISTS idx_licitacoes_municipio ON licitacoes(municipio_ibge)",
     "CREATE INDEX IF NOT EXISTS idx_licitacao_itens_pncp ON licitacao_itens(numero_controle_pncp)",
+    """
+    CREATE TABLE IF NOT EXISTS doacoes_campanha (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        ano_eleicao         INTEGER NOT NULL,
+        uf                  TEXT NOT NULL,
+        municipio_ue        TEXT,
+        cargo               TEXT,
+        candidato_nome      TEXT,
+        candidato_sq        TEXT,
+        partido             TEXT,
+        doador_cpf          TEXT NOT NULL,
+        doador_nome         TEXT,
+        doador_nome_norm    TEXT NOT NULL,
+        valor               REAL,
+        data_receita        TEXT,
+        sq_receita          TEXT UNIQUE,
+        importado_em        TEXT DEFAULT (datetime('now'))
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS socios_cpf_confirmado (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        fornecedor_ni       TEXT NOT NULL,
+        nome_socio          TEXT NOT NULL,
+        nome_socio_norm     TEXT NOT NULL,
+        cpf                 TEXT NOT NULL,
+        fonte               TEXT NOT NULL DEFAULT 'TSE',
+        detalhe             TEXT,
+        confirmado_em       TEXT DEFAULT (datetime('now')),
+        UNIQUE(fornecedor_ni, nome_socio, cpf)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_doacoes_nome_norm ON doacoes_campanha(doador_nome_norm)",
+    "CREATE INDEX IF NOT EXISTS idx_doacoes_cpf ON doacoes_campanha(doador_cpf)",
+    "CREATE INDEX IF NOT EXISTS idx_socios_cpf_nome_norm ON socios_cpf_confirmado(nome_socio_norm)",
 ]
 
 _MIGRACOES_CASOS_CNPJ = [

@@ -104,3 +104,13 @@ ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS lotacao_orgao
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS analise_ia TEXT;
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS analise_ia_em TIMESTAMP;
 ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS analise_ia_provedor TEXT;
+
+-- CPF do sócio confirmado por cruzamento com o TSE (jul/2026): o QSA traz o CPF
+-- do sócio mascarado; quando o nome bate com um doador de campanha e os 6
+-- dígitos do meio conferem, temos o CPF COMPLETO (público na prestação de
+-- contas). Fecha a lacuna "sem CPF" que era a maior limitação do match
+-- sócio×servidor. Preenchido por conflito_interesse/cpf_confirmado.py a partir
+-- da tabela socios_cpf_confirmado do banco core (alimentada pelo detector
+-- socio_doou_campanha / extrator TSE). Casamento exato por (fornecedor_ni,
+-- nome_socio) — ambos vêm do mesmo QSA, então não precisa de fuzzy.
+ALTER TABLE candidatos_conflito_interesse ADD COLUMN IF NOT EXISTS cpf_socio_confirmado TEXT;

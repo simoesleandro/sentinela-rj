@@ -55,11 +55,22 @@ Em ordem de retorno por esforço:
 | 2.1 ✅ | **Competição fraca** (proxy de licitante único) | PNCP (API de contratações) | `desconto_zero_licitacao` + `licitacao_itens_desertos` — a API não expõe nº de propostas, então usa proxies. **Entregue jul/2026** | M | **Altíssimo** — indicador de competição é dos mais fortes da literatura |
 | 2.2 ✅ | **Sanções federais** | Portal da Transparência (API CEIS/CNEP) | Fornecedor inidôneo/punido em qualquer esfera, consulta por CNPJ. **Entregue jul/2026** (CEPIM fica como extensão) | S | Alto — expande o `fornecedor_sancoes` local |
 | 2.3 | **Atas e adesões ("carona")** | PNCP (atas de registro de preços) | Adesões em cascata, órgão aderindo a ata alheia acima do razoável | M | Alto — vetor clássico de abuso pós-14.133 |
-| 2.4 | **Doações de campanha × sócios** | TSE (dados abertos de candidaturas e doações) | Fornecedor cujo sócio financiou campanha de quem o contrata; bônus: candidatos têm **CPF completo público** → fecha identidades do conflito de interesse | M | Alto — cruzamento consagrado + resolve o problema do "sem CPF" |
+| 2.4 ✅ | **Doações de campanha × sócios** | TSE (prestação de contas de candidatos) | `socio_doou_campanha` — sócio-PF de fornecedor que doou a campanha municipal, confirmado por nome + 6 dígitos do CPF; fecha o CPF do sócio no conflito de interesse. **Entregue jul/2026** | M | Alto — resolve o "sem CPF"; ver pivô abaixo |
 | 2.5 | **Diário Oficial do Rio (ferramenta do agente)** | doweb.rio.rj.gov.br (scraper, padrão do TCM/Playwright) | Nomeações/exonerações do servidor; extratos de contrato | M | Médio — automatiza o passo manual da triagem guiada |
 | 2.6 | **Preço unitário por item** | PNCP (API de itens de contrato) | Sobrepreço vs. mediana de outros municípios na mesma categoria/item | **L** | Altíssimo, mas pesado — fica para a fase 3 |
 
 **Critério de sucesso do pilar:** 2.1 e 2.2 em produção com alertas na triagem.
+
+> **Pivô empírico do 2.4 (jul/2026).** A premissa "empresa doou para quem a
+> contrata" está morta por lei: doação de PJ é proibida desde 2015 (Lei 13.165 +
+> ADI 4650/STF). Medição no RJ 2024: 0 fornecedores doadores; só 531 CNPJs no
+> estado, todos comitês/transferências partidárias. O valor migrou para o **sócio
+> pessoa física**: cruzando o QSA com as doações de PF do TSE e confirmando por
+> nome + 6 dígitos do CPF, 11 sócios-administradores confirmados — incluindo os
+> casos MJRE (R$ 363M) e Entre os Rios (R$ 126M). Doação de PF é legal, então o
+> sinal é de **alinhamento político** (contexto), não de ilegalidade. O bônus se
+> confirmou: o cruzamento devolve o **CPF completo** do sócio, fechando a lacuna
+> "sem CPF" do conflito de interesse. Detalhes em [DETECTORES.md](DETECTORES.md#12-sócio-doador-de-campanha--socio_doou_campanha).
 
 ## Pilar 3 — IA aplicada
 
@@ -118,7 +129,7 @@ Pré-requisitos para ser levado a sério (e proteção jurídica):
 ### Fase 2 — Profundidade + distribuição (≈ 90 dias)
 | Ordem | Item | Pilar |
 |-------|------|-------|
-| 5 | Cruzamento TSE — doações + CPF de candidatos (2.4) | Profundidade |
+| 5 ✅ | Cruzamento TSE — sócio-doador + fecha CPF (2.4) | Profundidade |
 | 6 | Boletim semanal por IA + assinatura (3.1 + 5.1) | IA/Distribuição |
 | 7 | Ferramenta Diário Oficial no agente ReAct (2.5) | Profundidade |
 | 8 | API pública documentada (5.2) | Distribuição |

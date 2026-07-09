@@ -243,6 +243,44 @@ CREATE TABLE IF NOT EXISTS licitacao_itens (
     PRIMARY KEY (numero_controle_pncp, numero_item)
 );
 
+-- Doações de campanha (TSE, prestação de contas de candidatos). Só pessoa
+-- física: doação de empresa é proibida desde 2015 (Lei 13.165 + ADI 4650/STF).
+-- Guarda o doador com CPF completo (público na prestação de contas) para fechar
+-- a identidade de sócios via nome + 6 dígitos do CPF do QSA (analisador/doacoes.py).
+CREATE TABLE IF NOT EXISTS doacoes_campanha (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    ano_eleicao         INTEGER NOT NULL,
+    uf                  TEXT NOT NULL,
+    municipio_ue        TEXT,               -- NM_UE (município da candidatura)
+    cargo               TEXT,               -- Prefeito/Vereador/...
+    candidato_nome      TEXT,
+    candidato_sq        TEXT,               -- SQ_CANDIDATO
+    partido             TEXT,               -- SG_PARTIDO
+    doador_cpf          TEXT NOT NULL,      -- 11 dígitos (pessoa física)
+    doador_nome         TEXT,
+    doador_nome_norm    TEXT NOT NULL,      -- normalizado para o match
+    valor               REAL,
+    data_receita        TEXT,
+    sq_receita          TEXT UNIQUE,        -- id da receita no TSE (idempotência)
+    importado_em        TEXT DEFAULT (datetime('now'))
+);
+
+-- CPF de sócio confirmado por cruzamento externo (TSE): nome do QSA bate com um
+-- doador E os 6 dígitos do meio do CPF mascarado (***MMMMMM**) conferem com o
+-- CPF completo do doador. Fecha a identidade "sem CPF" do sócio — alimenta o
+-- conflito de interesse.
+CREATE TABLE IF NOT EXISTS socios_cpf_confirmado (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    fornecedor_ni       TEXT NOT NULL,
+    nome_socio          TEXT NOT NULL,
+    nome_socio_norm     TEXT NOT NULL,
+    cpf                 TEXT NOT NULL,      -- 11 dígitos, confirmado
+    fonte               TEXT NOT NULL DEFAULT 'TSE',
+    detalhe             TEXT,               -- JSON: doações que confirmaram
+    confirmado_em       TEXT DEFAULT (datetime('now')),
+    UNIQUE(fornecedor_ni, nome_socio, cpf)
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_sancoes_fornecedor    ON fornecedor_sancoes(fornecedor_ni);
 CREATE INDEX IF NOT EXISTS idx_contratos_fornecedor  ON contratos(fornecedor_ni);
@@ -264,3 +302,6 @@ CREATE INDEX IF NOT EXISTS idx_transp_rj_cruz_pncp    ON transparencia_rj_cruzam
 CREATE INDEX IF NOT EXISTS idx_licitacoes_orgao       ON licitacoes(orgao_cnpj);
 CREATE INDEX IF NOT EXISTS idx_licitacoes_municipio   ON licitacoes(municipio_ibge);
 CREATE INDEX IF NOT EXISTS idx_licitacao_itens_pncp   ON licitacao_itens(numero_controle_pncp);
+CREATE INDEX IF NOT EXISTS idx_doacoes_nome_norm      ON doacoes_campanha(doador_nome_norm);
+CREATE INDEX IF NOT EXISTS idx_doacoes_cpf            ON doacoes_campanha(doador_cpf);
+CREATE INDEX IF NOT EXISTS idx_socios_cpf_nome_norm   ON socios_cpf_confirmado(nome_socio_norm);
