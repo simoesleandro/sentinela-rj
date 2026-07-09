@@ -48,37 +48,40 @@
     .diario-link { color: var(--blue); text-decoration: none; font-size: 0.8rem; }
     .diario-link:hover { text-decoration: underline; }
 
-    .selo-compat {
-      display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
-      border: 1px solid var(--border);
+    /* ── Sistema unificado de selos ────────────────────────────────────────
+       Uma única métrica (linha única, nunca quebra) e quatro cores por
+       função: risco (vermelho), atenção (âmbar), ok (verde), neutro. Texto
+       longo vive no title (tooltip), nunca dentro do selo. */
+    .selo-compat, .selo-contrato, .selo-prioridade, .selo-risco {
+      display: inline-block; font-size: 0.68rem; font-weight: 500; line-height: 1.5;
+      padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border);
+      white-space: nowrap; background: rgba(255,255,255,0.04); color: var(--muted);
     }
-    .selo-compat.incompativel { background: rgba(220,38,38,0.15); color: #f87171; border-color: rgba(220,38,38,0.4); }
-    .selo-compat.compativel { background: rgba(255,255,255,0.05); color: var(--muted); }
+    .selo-compat.incompativel,
+    .selo-risco { background: rgba(220,38,38,0.12); color: #f87171; border-color: rgba(220,38,38,0.35); }
+    .selo-contrato.ativo { background: rgba(34,197,94,0.12); color: #4ade80; border-color: rgba(34,197,94,0.35); }
+    .selo-prioridade { background: rgba(251,191,36,0.12); color: #fbbf24; border-color: rgba(251,191,36,0.35); font-weight: 600; }
 
-    .selo-contrato {
-      display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
-      border: 1px solid var(--border);
-    }
-    .selo-contrato.ativo { background: rgba(34,197,94,0.15); color: #4ade80; border-color: rgba(34,197,94,0.4); }
-    .selo-contrato.inativo { background: rgba(255,255,255,0.05); color: var(--muted); }
+    /* pilha vertical de selos (coluna Evidências) */
+    .selo-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 
-    .selo-socios {
-      display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
-      background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border);
-    }
+    /* metadados discretos sob o dado principal — mesmo tom em toda a tabela */
+    .nota-raridade, .nota-meta { display: block; font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+    .texto-muted { color: var(--muted); font-size: 0.75rem; }
 
-    .selo-prioridade {
-      display: inline-block; font-size: 0.68rem; font-weight: 600; padding: 2px 8px; border-radius: 999px;
-      background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.4);
-    }
-
-    .selo-risco {
-      display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 999px;
-      background: rgba(220,38,38,0.15); color: #f87171; border: 1px solid rgba(220,38,38,0.4);
-      margin-right: 4px;
-    }
-
-    .nota-raridade { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+    /* tabela: hierarquia e alinhamento. Padding horizontal menor que o padrão
+       global (16px): são 9 colunas — com 16px a última coluna estourava o
+       container em ~23px e cortava os selos de evidência. */
+    .ci-tabela th, .ci-tabela td { padding-left: 10px; padding-right: 10px; }
+    .ci-tabela td { vertical-align: middle; }
+    .ci-tabela tbody tr { cursor: pointer; }
+    .ci-tabela tbody tr:hover td { background: rgba(255,255,255,0.03); }
+    .td-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .td-score { font-weight: 600; color: var(--text); white-space: nowrap; }
+    .td-nome { min-width: 150px; }
+    .ci-tabela th:last-child, .ci-tabela td:last-child { padding-right: 14px; }
+    .nome-principal { font-weight: 600; color: var(--text); font-size: 0.82rem; line-height: 1.35; }
+    .fornecedor-link { white-space: nowrap; }
 
     .ci-passos, .ci-ia { margin-top: 1.25rem; }
     .ci-passos h3, .ci-ia h3 {
@@ -228,10 +231,12 @@
 
     function selocompatHtml(compat) {
       if (compat === 'incompativel') {
-        return '<span class="selo-compat incompativel" title="Idade estimada do sócio tornaria a entrada no serviço público improvável (menos de 16 anos) — provável coincidência de nome, não a mesma pessoa.">Incompatível: idade improvável</span>';
+        return '<span class="selo-compat incompativel" title="Idade estimada do sócio tornaria a entrada no serviço público improvável (menos de 16 anos) — provável coincidência de nome, não a mesma pessoa.">Idade improvável</span>';
       }
       if (compat === 'compativel') {
-        return '<span class="selo-compat compativel">Compatível</span>';
+        // compatível é o caso esperado — texto discreto, sem pill, para não
+        // competir com os selos que pedem atenção
+        return '<span class="texto-muted">Compatível</span>';
       }
       return '';
     }
@@ -250,14 +255,15 @@
     }
 
     function seloContratoHtml(ativo) {
+      // só o estado que pede atenção vira selo; ausência é texto discreto
       return ativo
-        ? '<span class="selo-contrato ativo">Contrato ativo</span>'
-        : '<span class="selo-contrato inativo">Sem contrato vigente</span>';
+        ? '<span class="selo-contrato ativo">Vigente</span>'
+        : '<span class="texto-muted">sem vigência</span>';
     }
 
     function seloServidoresHtml(qtd) {
       if (!qtd || qtd <= 1) return '';
-      return `<span class="selo-socios">${qtd} servidores para este sócio</span>`;
+      return `<span class="nota-meta">${qtd} servidores p/ este sócio</span>`;
     }
 
     function seloPrioridadeHtml(prioritario) {
@@ -275,9 +281,10 @@
     }
 
     function seloEvidenciasHtml(c) {
+      // rótulos curtos (linha única); a explicação completa vive no tooltip
       const partes = [];
       if (c.lotacao_orgao_contratante) {
-        partes.push('<span class="selo-risco" title="O servidor é lotado no mesmo órgão de origem dos contratos deste fornecedor (cruzamento sigla de lotação × prefixo do processo, ex.: E/CRE × SME-PRO). A Lei 14.133/2021 (art. 14) impede de licitar quem mantém vínculo com o órgão contratante — sinal mais forte da fila, mas ainda depende de confirmar a identidade.">Lotação × órgão contratante</span>');
+        partes.push('<span class="selo-risco" title="O servidor é lotado no mesmo órgão de origem dos contratos deste fornecedor (cruzamento sigla de lotação × prefixo do processo, ex.: E/CRE × SME-PRO). A Lei 14.133/2021 (art. 14) impede de licitar quem mantém vínculo com o órgão contratante — sinal mais forte da fila, mas ainda depende de confirmar a identidade.">Lotação × órgão</span>');
       }
       if (c.tem_alerta_severidade_alta) {
         partes.push('<span class="selo-risco" title="Este fornecedor já tem um alerta de severidade alta em algum contrato (valor atípico, fornecedor recorrente, adesão suspeita...), independente deste match de nome.">Alerta de contrato</span>');
@@ -288,9 +295,10 @@
       // Reforço de nome: o motivo de prioridade dos casos sem selo acima —
       // sem isto, a coluna parece vazia justamente nas primeiras linhas.
       if (c.contrato_ativo && (c.qtd_servidores_matched_mesmo_socio || 0) >= 2) {
-        partes.push(`<span class="selo-risco" title="Fornecedor com contrato vigente E o mesmo sócio batendo, com nome exato, com ${c.qtd_servidores_matched_mesmo_socio} servidores distintos.">Contrato ativo + ${c.qtd_servidores_matched_mesmo_socio} servidores</span>`);
+        partes.push(`<span class="selo-risco" title="Fornecedor com contrato vigente E o mesmo sócio batendo, com nome exato, com ${c.qtd_servidores_matched_mesmo_socio} servidores distintos.">Contrato + ${c.qtd_servidores_matched_mesmo_socio} servidores</span>`);
       }
-      return partes.join('') || '—';
+      if (!partes.length) return '<span class="texto-muted">—</span>';
+      return `<div class="selo-stack">${partes.join('')}</div>`;
     }
 
     const LIMIAR_NOME_COMUM = 5;
@@ -349,36 +357,38 @@
         return;
       }
 
+      // Linha inteira clicável (abre o painel de detalhe/triagem) — elimina a
+      // coluna de botão, que estourava a largura de 1200px do layout.
       const rows = items.map(c => `
-        <tr>
-          <td style="font-size:0.8rem;color:#d4d4d4">
-            ${seloPrioridadeHtml(c.prioridade_investigacao)}
-            ${escapeHtml(c.nome_socio || '—')}
+        <tr onclick="abrirDetalhe(${c.id})" title="Ver detalhes e triagem">
+          <td class="td-nome">
+            ${c.prioridade_investigacao ? seloPrioridadeHtml(true) + '<br>' : ''}
+            <span class="nome-principal">${escapeHtml(c.nome_socio || '—')}</span>
+            <span class="nota-meta">${escapeHtml(c.qualificacao_socio || '')}</span>
           </td>
           <td>
-            <a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link">
+            <a href="/fornecedor/${escapeHtml(c.fornecedor_ni)}" class="fornecedor-link" onclick="event.stopPropagation()">
               ${formatCNPJ(c.fornecedor_ni)}
             </a>
             ${seloServidoresHtml(c.qtd_servidores_matched_mesmo_socio)}
           </td>
-          <td style="font-size:0.8rem;color:#d4d4d4">
-            ${escapeHtml(c.nome_servidor || '—')}
-            <div style="font-size:0.7rem;color:var(--muted)">matrícula ${escapeHtml(c.matricula_servidor || '—')}</div>
+          <td class="td-nome">
+            <span class="nome-principal">${escapeHtml(c.nome_servidor || '—')}</span>
+            <span class="nota-meta">matrícula ${escapeHtml(c.matricula_servidor || '—')}</span>
             ${notaRaridadeHtml(c.qtd_servidores_mesmo_nome)}
           </td>
-          <td style="white-space:nowrap">${(c.score_similaridade ?? 0).toFixed(1)}</td>
+          <td class="td-score">${(c.score_similaridade ?? 0).toFixed(1)}</td>
           <td>${statusBadge(c.status)}</td>
-          <td>${selocompatHtml(c.compatibilidade_data) || '—'}</td>
+          <td>${selocompatHtml(c.compatibilidade_data) || '<span class="texto-muted">—</span>'}</td>
           <td>${seloContratoHtml(c.contrato_ativo)}</td>
-          <td style="white-space:nowrap">${formatCurrency(c.valor_total_contratos)}</td>
+          <td class="td-num">${formatCurrency(c.valor_total_contratos)}</td>
           <td>${seloEvidenciasHtml(c)}</td>
-          <td><button type="button" class="ci-detalhe-btn" onclick="abrirDetalhe(${c.id})">Detalhes</button></td>
         </tr>`
       ).join('');
 
       content.innerHTML = `
         <div class="table-wrap">
-          <table>
+          <table class="ci-tabela">
             <thead>
               <tr>
                 <th>Sócio</th>
@@ -388,9 +398,8 @@
                 <th>Status</th>
                 <th>Compat.</th>
                 <th>Contrato</th>
-                <th>Valor total</th>
+                <th style="text-align:right">Valor total</th>
                 <th>Evidências</th>
-                <th>Detalhes</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
