@@ -58,6 +58,27 @@ def _handle_csrf_error(exc: CSRFError):
     return jsonify({"error": "Token CSRF inválido ou ausente.", "csrf": True}), 400
 
 
+# ---------------------------------------------------------------------------
+# Rate limiting — só a API pública (/api/v1) é limitada; ver web_ratelimit.py
+# ---------------------------------------------------------------------------
+from web_ratelimit import limiter  # noqa: E402
+
+limiter.init_app(app)
+
+
+@app.errorhandler(429)
+def _handle_rate_limit(exc):
+    return (
+        jsonify(
+            {
+                "error": "Limite de requisições excedido. Tente novamente em instantes.",
+                "rate_limit": True,
+            }
+        ),
+        429,
+    )
+
+
 def csrf_required(fn):
     """Valida o token CSRF (campo csrf_token ou header X-CSRFToken) antes da view."""
     @functools.wraps(fn)

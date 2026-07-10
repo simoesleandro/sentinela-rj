@@ -298,7 +298,7 @@ python __main__.py dossie --alerta 42 --formato pdf
 
 ### API pública (leitura) / Public API
 
-Documentação interativa em **`/api/docs`** (Swagger UI). Só GET, sem autenticação, CORS liberado:
+Documentação interativa em **`/api/docs`** (Swagger UI). Só GET, sem autenticação, CORS liberado, com **rate limit por IP** (60 req/min por padrão; resposta `429` + cabeçalhos `X-RateLimit-*`):
 
 ```bash
 # Alertas de alto risco no Rio de Janeiro (IBGE 3304557)
@@ -330,6 +330,7 @@ curl "https://sentinela-rj.fly.dev/api/v1/openapi.json"
 | `GEMMA4_MODEL` | Modelo Gemma4 no Ollama | `gemma4:12b` |
 | `MUNICIPIO_IBGE` | Código IBGE do município | `3304557` (Rio) |
 | `PIPELINE_CRON` | Expressão cron do pipeline | `0 8 * * 1` |
+| `SENTINELA_API_RATELIMIT` | Limite por IP da API pública (`/api/v1`) | `60 per minute` |
 
 > Lista completa em: [`.env.example`](.env.example)
 

@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify, render_template, request
 
 import web_app as core
 from routes.openapi_spec import build_spec
+from web_ratelimit import LIMITE_API_PUBLICA, limiter
 
 bp = Blueprint("api_v1", __name__, url_prefix="/api")
 
@@ -73,6 +74,7 @@ def openapi_json():
 
 
 @bp.route("/v1/alertas")
+@limiter.limit(LIMITE_API_PUBLICA)
 def v1_alertas():
     """Lista alertas de anomalia com o contrato associado (paginado)."""
     db = core.get_db()
@@ -148,6 +150,7 @@ def v1_alertas():
 
 
 @bp.route("/v1/contratos")
+@limiter.limit(LIMITE_API_PUBLICA)
 def v1_contratos():
     """Lista contratos monitorados (paginado)."""
     db = core.get_db()
@@ -193,6 +196,7 @@ def v1_contratos():
 
 
 @bp.route("/v1/precisao")
+@limiter.limit(LIMITE_API_PUBLICA)
 def v1_precisao():
     """Precisão medida por detector (mesma fonte de /api/precisao)."""
     from analise.precisao import calcular_precisao

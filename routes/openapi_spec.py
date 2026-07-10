@@ -42,7 +42,9 @@ def build_spec(server_url: str | None = None) -> dict:
                 "API pública de leitura do Sentinela RJ: alertas de anomalia em "
                 "contratos públicos, contratos monitorados e a precisão medida de "
                 "cada detector. Dados abertos do PNCP, livres para reuso "
-                "jornalístico e acadêmico. Somente leitura (GET); sem autenticação."
+                "jornalístico e acadêmico. Somente leitura (GET); sem autenticação.\n\n"
+                "**Limite de requisições:** por IP. Ao exceder, a resposta é `429` "
+                "com `Retry-After`; os cabeçalhos `X-RateLimit-*` indicam o saldo."
             ),
             "contact": {"name": "Sentinela RJ", "url": "https://sentinela-rj.fly.dev"},
             "license": {"name": "Dados abertos (PNCP)"},
@@ -233,9 +235,28 @@ def build_spec(server_url: str | None = None) -> dict:
                         "rotulados_total": {"type": "integer"},
                     },
                 },
+                "Erro": {
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string"},
+                        "rate_limit": {"type": "boolean"},
+                    },
+                },
             }
         },
     }
+
+    # Toda operação pode ser barrada pelo rate limit — documenta o 429 uma vez.
+    resp_429 = {
+        "description": "Limite de requisições excedido (rate limit).",
+        "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/Erro"}}
+        },
+    }
+    for caminho in spec["paths"].values():
+        for operacao in caminho.values():
+            operacao["responses"]["429"] = resp_429
+
     if server_url:
         spec["servers"] = [{"url": server_url}]
     return spec

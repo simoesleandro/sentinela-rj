@@ -140,3 +140,32 @@ def test_v1_precisao_mesma_fonte(client) -> None:
 def test_v1_alertas_tem_cors(client) -> None:
     res = client.get("/api/v1/alertas")
     assert res.headers.get("Access-Control-Allow-Origin") == "*"
+
+
+def test_client_ip_prefere_fly_header() -> None:
+    import web_app as wa
+    from web_ratelimit import client_ip
+
+    with wa.app.test_request_context(
+        headers={"Fly-Client-IP": "9.9.9.9", "X-Forwarded-For": "1.1.1.1"}
+    ):
+        assert client_ip() == "9.9.9.9"
+    # sem Fly-Client-IP, usa o primeiro IP do X-Forwarded-For
+    with wa.app.test_request_context(headers={"X-Forwarded-For": "1.1.1.1, 2.2.2.2"}):
+        assert client_ip() == "1.1.1.1"
+
+
+def test_rate_limit_headers_presentes(client) -> None:
+    res = client.get("/api/v1/alertas", headers={"Fly-Client-IP": "203.0.113.5"})
+    assert any(h.lower().startswith("x-ratelimit") for h in res.headers.keys())
+
+
+def test_rate_limit_retorna_429_ao_exceder(client) -> None:
+    # IP dedicado isola este teste do balde dos demais (127.0.0.1).
+    ip = {"Fly-Client-IP": "203.0.113.99"}
+    codes = [client.get("/api/v1/precisao", headers=ip).status_code for _ in range(61)]
+    assert 200 in codes and 429 in codes
+    # o 429 vem em JSON estruturado
+    barrado = client.get("/api/v1/precisao", headers=ip)
+    assert barrado.status_code == 429
+    assert barrado.get_json()["rate_limit"] is True

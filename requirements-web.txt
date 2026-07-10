@@ -4,3 +4,5 @@ Flask>=3.0.0
 Flask-WTF>=1.2.0
 waitress>=3.0.0
 fpdf2>=2.7.0
+# rate limiting da API pública (/api/v1) — routes/api_v1.py + web_ratelimit.py
+Flask-Limiter>=3.5.0
