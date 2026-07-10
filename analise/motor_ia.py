@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 import warnings
 from dataclasses import dataclass
 from typing import Any
@@ -178,9 +179,16 @@ _PROMPT_PARECER = (
     "'Valor rotineiro para a categoria', 'Categoria/objeto não se aplica ao detector', "
     "'Dados insuficientes ou inconsistentes', 'Alerta duplicado ou já investigado', "
     "'Outro motivo'; caso contrário escreva '—'>\n\n"
-    "Coerência obrigatória: 'Provavelmente explicável' combina com Status Descartado; "
-    "'Provável problema' com Investigando ou Confirmado (Confirmado só com evidência "
-    "clara nos dados); 'Inconclusivo' com Aberto ou Investigando. "
+    "Coerência obrigatória:\n"
+    "- 'Provavelmente explicável' -> Descartado; 'Provável problema' -> Investigando "
+    "ou Confirmado (Confirmado só com evidência clara nos dados); 'Inconclusivo' -> "
+    "Aberto ou Investigando.\n"
+    "- Se a Análise recomenda CONFIRMAR, VERIFICAR, CHECAR ou INVESTIGAR algo antes "
+    "de concluir (ou seja, há pendência), o Status NÃO pode ser Descartado — use "
+    "Investigando. Descartar exige que o indício esteja explicado, sem pendências.\n"
+    "- NÃO descarte um alerta só porque o contrato é de outro município: o Sentinela "
+    "monitora vários municípios da região metropolitana do Rio, então ele está no "
+    "escopo de fiscalização.\n"
     "Linguagem prudente — indício, não acusação."
 )
 
@@ -205,6 +213,33 @@ def _mapear_motivo(txt: str) -> str | None:
         if termo in chave:
             return key
     return None
+
+
+# Pistas de que a análise ainda pede apuração — incompatíveis com "Descartado".
+_PISTAS_INVESTIGACAO = (
+    "proximo passo",
+    "confirmar",
+    "verificar",
+    "checar",
+    "investigar",
+    "apurar",
+    "esclarecer",
+    "aprofundar",
+    "assegurar que",
+    "e preciso",
+    "seria necessario",
+)
+
+
+def _pede_apuracao(analise: str) -> bool:
+    """True se a análise recomenda uma checagem antes de concluir."""
+    norm = (
+        unicodedata.normalize("NFKD", analise or "")
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .lower()
+    )
+    return any(p in norm for p in _PISTAS_INVESTIGACAO)
 
 
 def _parse_parecer(texto: str) -> dict[str, Any] | None:
@@ -556,6 +591,16 @@ class InvestigadorIA:
             "motivo_sugerido": None,
         }
         parecer["analise"] = _limpar_latex(parecer.get("analise") or "").strip()
+
+        # Trava de coerência: um "Descartado" cuja análise ainda pede apuração é
+        # contraditório (descartar = encerrado, sem pendências). Rebaixa para
+        # Investigando e limpa o motivo, que só faz sentido em descarte.
+        if parecer.get("status_sugerido") == "descartado" and _pede_apuracao(parecer["analise"]):
+            parecer["status_sugerido"] = "investigando"
+            parecer["motivo_sugerido"] = None
+            if parecer.get("plausibilidade") == "provavel_explicavel":
+                parecer["plausibilidade"] = "inconclusivo"
+
         parecer["provedor"] = provedor
         self._gemini_utilizado = provedor == "gemini"
         self._gemma4_utilizado = provedor == "gemma4"

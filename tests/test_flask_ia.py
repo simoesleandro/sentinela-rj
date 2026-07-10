@@ -146,3 +146,30 @@ def test_parse_parecer_investigar_sem_motivo() -> None:
     assert p["plausibilidade"] == "provavel_problema"
     assert p["status_sugerido"] == "investigando"
     assert p["motivo_sugerido"] is None
+
+
+def test_pede_apuracao_detecta_pendencia() -> None:
+    from analise.motor_ia import _pede_apuracao
+
+    assert _pede_apuracao("O próximo passo é confirmar a entidade contratante.")
+    assert _pede_apuracao("É preciso verificar a origem dos recursos.")
+    # descarte legítimo, sem pendência, não dispara
+    assert not _pede_apuracao("Valor rotineiro para energia por concessionária.")
+
+
+def test_parecer_descartado_incoerente_vira_investigando(monkeypatch) -> None:
+    import analise.motor_ia as m
+
+    texto = (
+        "**[Parecer]**\n"
+        "Plausibilidade: Provavelmente explicável\n"
+        "Análise: Contrato de outro município. O próximo passo é confirmar a entidade.\n"
+        "Status sugerido: Descartado\n"
+        "Motivo do descarte: Outro motivo"
+    )
+    monkeypatch.setattr(m, "_provedores_disponiveis", lambda: ["gemini"])
+    monkeypatch.setattr(m, "gerar_texto", lambda *a, **k: (texto, "gemini"))
+
+    parecer = m.InvestigadorIA().emitir_parecer({"id": 1, "tipo": "outlier_valor"})
+    assert parecer["status_sugerido"] == "investigando"
+    assert parecer["motivo_sugerido"] is None
