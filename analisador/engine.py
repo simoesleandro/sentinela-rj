@@ -33,6 +33,7 @@ class AnomaliaResult:
 
 def _carregar_detectores() -> _Detectores:
     from analisador import (
+        adesao,
         asfalto_fatiado,
         competicao,
         concentracao,
@@ -60,6 +61,7 @@ def _carregar_detectores() -> _Detectores:
         ("socios", socios.detectar),
         ("competicao", competicao.detectar),
         ("doacoes", doacoes.detectar),
+        ("adesao", adesao.detectar),
     ]
 
 

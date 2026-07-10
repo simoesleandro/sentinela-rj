@@ -55,6 +55,7 @@ do detector é modesto.
 | 10 | Sócios em comum | `socio_compartilhado` | BrasilAPI (QSA) | Relacional |
 | 11 | Competição fraca | `desconto_zero_licitacao` · `licitacao_itens_desertos` | Licitações PNCP | Estatístico |
 | 12 | Sócio-doador de campanha | `socio_doou_campanha` | TSE × QSA (BrasilAPI) | Relacional |
+| 13 | Carona (adesão a ata) | `adesao_carona` | Contratos PNCP | Textual + flag |
 | + | Watchlists | definido pelo usuário | Contratos PNCP | Regra manual |
 
 > **Fundamento legal.** As referências abaixo (Lei 14.133/2021, Lei 4.320/1964 etc.)
@@ -380,6 +381,34 @@ hospedar o arquivo inteiro.
 *Fundamento:* Lei 14.133/2021 (impedimentos e conflito de interesse em
 contratações) e Lei 12.813/2013 (conflito de interesses no serviço público) — o
 vínculo político-eleitoral é um dos elementos que a análise humana pondera.
+
+---
+
+## 13. Carona (adesão a ata) — `adesao_carona`
+
+**Arquivo:** [`analisador/adesao.py`](../analisador/adesao.py) ·
+**Fonte:** contratos do PNCP (flag `fruto_adesao` + texto do objeto)
+
+Carona é a adesão de um órgão à ata de registro de preços de **outro** órgão
+(Lei 14.133/2021, art. 86). É legal, mas concentra risco: o órgão aderente pula
+a própria licitação, **herda preços que não negociou** (risco de sobrepreço) e o
+instituto é vetor conhecido de direcionamento.
+
+**Detecção por duas fontes** — o flag `fruto_adesao` do PNCP vem quase sempre
+vazio (medido jul/2026: 0 preenchidos), então o **texto do objeto** complementa:
+23 contratos diziam "Adesão à Ata" no objeto. Dispara por `fruto_adesao = 1`
+**ou** menção a "adesão a ata / ao registro" / "carona".
+
+**Distingue carona de rotina.** Exclui prorrogação e saldo da **própria** ata do
+órgão (não é carona). E aplica um **piso de R$ 500 mil**: a mediana das caronas
+medidas é R$ 98 mil — a maioria é rotina administrativa de baixo risco; só as
+materiais sobem. Calibração jul/2026: das 23 caronas por texto, **4** passam o
+piso (R$ 16,4M · 8,4M · 3,8M · 3,6M).
+
+Severidade: ≥ R$ 5M → alta · ≥ R$ 1M → média · demais → baixa.
+*Fundamento:* Lei 14.133/2021, art. 86 (adesão a ata) e o princípio da
+vantajosidade — a adesão precisa ser comprovadamente mais vantajosa que uma
+contratação própria.
 
 ---
 
