@@ -173,3 +173,24 @@ def test_parecer_descartado_incoerente_vira_investigando(monkeypatch) -> None:
     parecer = m.InvestigadorIA().emitir_parecer({"id": 1, "tipo": "outlier_valor"})
     assert parecer["status_sugerido"] == "investigando"
     assert parecer["motivo_sugerido"] is None
+
+
+def test_parecer_confirmado_nao_e_rebaixado(monkeypatch) -> None:
+    """A trava anti-descarte-incoerente só age sobre 'descartado': um
+    'confirmado' cuja análise oriente o próximo passo continua terminal."""
+    import analise.motor_ia as m
+
+    texto = (
+        "**[Parecer]**\n"
+        "Plausibilidade: Provável problema\n"
+        "Análise: Valor 100× acima do teto da categoria, sem objeto que justifique. "
+        "Indício se sustenta; o próximo passo é o órgão de controle apurar.\n"
+        "Status sugerido: Confirmado\n"
+        "Motivo do descarte: —"
+    )
+    monkeypatch.setattr(m, "_provedores_disponiveis", lambda: ["gemini"])
+    monkeypatch.setattr(m, "gerar_texto", lambda *a, **k: (texto, "gemini"))
+
+    parecer = m.InvestigadorIA().emitir_parecer({"id": 1, "tipo": "outlier_valor"})
+    assert parecer["status_sugerido"] == "confirmado"
+    assert parecer["plausibilidade"] == "provavel_problema"
