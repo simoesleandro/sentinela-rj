@@ -40,7 +40,7 @@ Todo item deste plano serve a um desses três.
 | # | Item | Como | Esforço | Impacto |
 |---|------|------|---------|---------|
 | 1.1 | **Taxa de falso-positivo por detector, publicada** | Triagem por amostragem (50–100 rótulos/detector, começando pelos 118 prioritários do conflito de interesse) → página pública "Precisão medida", com intervalo de confiança e data da medição | M | **Altíssimo** — nenhuma ferramenta civic tech BR publica isso por detector |
-| 1.2 | **Backtesting contra casos conhecidos** | Rodar os detectores no histórico e conferir contra decisões públicas do TCM-RJ e casos noticiados: "o Sentinela teria detectado?" Documentar acertos e misses | M | Alto — prova de valor verificável por terceiros |
+| 1.2 ✅ | **Backtesting contra casos conhecidos** | Página `/backtesting` roda os detectores contra os casos investigados (MJRE, Bônus Track, Entre os Rios, Asfalto Fatiado): 4/4 detectados, com o detector temático disparando em todos. **Entregue jul/2026** (extensão: decisões públicas do TCM-RJ) | M | Alto — prova de valor verificável por terceiros |
 | 1.3 | **Feedback loop de calibração** | Os motivos de descarte estruturados (já coletados na triagem) alimentam revisão periódica de limiares; cada revisão vira registro em DETECTORES.md | S | Médio — sistema que aprende com o auditor |
 | 1.4 | **Versionamento de metodologia** | Campo `versao_detector` no alerta; mudou limiar → nova versão, alertas antigos preservam a sua | S | Médio — auditabilidade exigida para citação por MP/imprensa |
 

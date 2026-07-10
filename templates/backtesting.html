@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backtesting — o Sentinela teria detectado? — Sentinela RJ</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .pg-header {
+      padding: 1rem max(2rem, calc((100% - 1000px) / 2 + 2rem));
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .back-link { color: var(--muted); text-decoration: none; font-size: 0.875rem; }
+    .back-link:hover { color: var(--text); }
+    .pg-brand { font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; }
+    .pg-main { max-width: 1000px; margin: 0 auto; padding: 2rem max(1.5rem, 2vw) 4rem; }
+    .pg-main h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.4rem; }
+    .pg-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; max-width: 72ch; line-height: 1.55; }
+    .metodo {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.9rem 1rem; margin-bottom: 1.5rem; font-size: 0.83rem; color: #d4d4d4; line-height: 1.55;
+    }
+    .placar {
+      display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+    }
+    .placar-item {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 0.8rem 1.1rem; flex: 1; min-width: 130px;
+    }
+    .placar-num { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .placar-num.ok { color: var(--green); }
+    .placar-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .caso {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1rem 1.1rem; margin-bottom: 0.9rem;
+    }
+    .caso-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+    .caso-nome { font-weight: 650; font-size: 1rem; }
+    .caso-forn { color: var(--muted); font-size: 0.8rem; margin-top: 1px; }
+    .veredito {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+      padding: 0.25rem 0.6rem; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+    }
+    .veredito.detectado { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); border: 1px solid color-mix(in srgb, var(--green) 40%, transparent); }
+    .veredito.parcial { color: var(--yellow); background: color-mix(in srgb, var(--yellow) 14%, transparent); border: 1px solid color-mix(in srgb, var(--yellow) 40%, transparent); }
+    .veredito.nao { color: var(--red); background: color-mix(in srgb, var(--red) 14%, transparent); border: 1px solid color-mix(in srgb, var(--red) 40%, transparent); }
+    .caso-meta { font-size: 0.8rem; color: var(--muted); margin: 0.6rem 0 0.5rem; }
+    .caso-meta strong { color: #d4d4d4; }
+    .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .chip-det {
+      font-size: 0.74rem; padding: 0.22rem 0.55rem; border-radius: 6px;
+      border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: #c4c4c4;
+      display: inline-flex; align-items: center; gap: 0.35rem;
+    }
+    .chip-det.tematico { border-color: color-mix(in srgb, var(--green) 55%, transparent); color: #86efac; background: color-mix(in srgb, var(--green) 10%, transparent); }
+    .chip-det .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .chip-det.tematico .n { color: #86efac; }
+    .sev-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .sev-dot.alta { background: var(--red); }
+    .sev-dot.media { background: var(--yellow); }
+    .sev-dot.baixa { background: var(--muted); }
+    .loading, .erro { color: var(--muted); padding: 2rem; text-align: center; }
+    .rodape { color: var(--muted); font-size: 0.8rem; margin-top: 1.5rem; line-height: 1.5; }
+    .rodape a { color: var(--blue); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header class="pg-header">
+    <a href="/dashboard" class="back-link">← Voltar ao Sentinela RJ</a>
+    <span class="pg-brand">Sentinela RJ</span>
+  </header>
+
+  <main class="pg-main">
+    <h1>O Sentinela teria detectado?</h1>
+    <p class="pg-sub">
+      Backtesting contra casos investigados e noticiados de forma independente
+      (suspensão judicial, inexigibilidade, concentração de fornecedor). Rodamos
+      os detectores automáticos — que não conhecem esses desfechos — e verificamos
+      se eles sinalizam os mesmos atores. Um detector só vale se pega o que já foi
+      confirmado como problema.
+    </p>
+
+    <div class="metodo">
+      <strong>Como é medido:</strong> cada caso tem uma <em>natureza conhecida</em>
+      (o detector esperado — ex.: a Bônus Track foi caso de inexigibilidade). Para
+      cada um, listamos todos os detectores que dispararam sobre os contratos
+      daquele fornecedor e marcamos em verde o <strong>detector temático</strong>
+      (o que casa com a natureza do caso). <em>Detectado</em> = o detector temático
+      disparou; <em>parcial</em> = sinalizado por outros, mas não pelo temático.
+    </div>
+
+    <div class="placar" id="placar"></div>
+    <div id="conteudo"><p class="loading">Carregando…</p></div>
+
+    <p class="rodape" id="rodape"></p>
+  </main>
+
+  <script>
+    const TIPO_LABEL = {
+      outlier_valor: 'Outlier de valor', concentracao_fornecedor: 'Concentração',
+      sem_licitacao_inexigibilidade: 'Inexigibilidade', sem_licitacao_emergencia: 'Emergência',
+      sem_licitacao_dispensa: 'Dispensa', fracionamento_ap: 'Fracionamento (AP)',
+      fracionamento_empenhos: 'Fracionamento empenhos', asfalto_fatiado: 'Asfalto fatiado',
+      capital_social_baixo: 'Capital social baixo', empresa_jovem_contrato_grande: 'Empresa jovem',
+      evolucao_temporal_fornecedor: 'Aceleração', empenho_total_dia_unico: 'Empenho em dia único',
+      contrato_sem_empenho: 'Contrato sem empenho', socio_compartilhado: 'Sócio em comum',
+      socio_doou_campanha: 'Sócio-doador', adesao_carona: 'Carona (adesão)',
+      desconto_zero_licitacao: 'Desconto zero', licitacao_itens_desertos: 'Itens desertos',
+    };
+    const fmtTipo = t => TIPO_LABEL[t] || (t || '').replace(/_/g, ' ');
+    const fmtVerd = { detectado: 'Detectado', parcial: 'Parcial', nao_detectado: 'Não detectado' };
+    const verdClass = { detectado: 'detectado', parcial: 'parcial', nao_detectado: 'nao' };
+    const fmtBRL = v => 'R$ ' + (v >= 1e6 ? (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi'
+                                          : Math.round(v).toLocaleString('pt-BR'));
+
+    async function carregar() {
+      const alvo = document.getElementById('conteudo');
+      try {
+        const res = await fetch('/api/backtesting');
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || res.statusText);
+
+        const r = d.resumo;
+        document.getElementById('placar').innerHTML = `
+          <div class="placar-item"><div class="placar-num ok">${r.detectados}/${r.total}</div><div class="placar-label">Detectados</div></div>
+          <div class="placar-item"><div class="placar-num">${r.parciais}</div><div class="placar-label">Parciais</div></div>
+          <div class="placar-item"><div class="placar-num">${r.nao_detectados}</div><div class="placar-label">Não detectados</div></div>`;
+
+        alvo.innerHTML = d.casos.map(c => {
+          const chips = c.detectores.map(det => `
+            <span class="chip-det ${det.tipo === c.tipo_esperado ? 'tematico' : ''}">
+              <span class="sev-dot ${det.severidade}"></span>${fmtTipo(det.tipo)}
+              <span class="n">${det.n}</span>
+            </span>`).join('') || '<span class="chip-det">Nenhum detector disparou</span>';
+          const valor = c.valor_flagrado ? ` · <strong>${fmtBRL(c.valor_flagrado)}</strong> em contratos sinalizados` : '';
+          return `
+            <div class="caso">
+              <div class="caso-head">
+                <div>
+                  <div class="caso-nome">${c.titulo}</div>
+                  <div class="caso-forn">${c.fornecedor || ''}${c.cnpj ? ' · CNPJ ' + c.cnpj : ' · padrão distribuído'}</div>
+                </div>
+                <span class="veredito ${verdClass[c.veredito]}">${fmtVerd[c.veredito]}</span>
+              </div>
+              <div class="caso-meta">
+                Natureza conhecida: <strong>${fmtTipo(c.tipo_esperado)}</strong> ·
+                ${c.n_detectores} detector(es), ${c.n_alertas} alerta(s)${valor}
+              </div>
+              <div class="chips">${chips}</div>
+            </div>`;
+        }).join('');
+
+        document.getElementById('rodape').innerHTML =
+          'Os casos e seus desfechos são públicos — detalhes em '
+          + '<a href="/casos">/casos</a>. A taxa de acerto por detector na operação real fica em '
+          + '<a href="/precisao">/precisao</a>.';
+      } catch (e) {
+        alvo.innerHTML = `<p class="erro">Erro ao carregar: ${e.message}</p>`;
+      }
+    }
+    carregar();
+  </script>
+</body>
+</html>

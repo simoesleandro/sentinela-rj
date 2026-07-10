@@ -1,7 +1,8 @@
 """Páginas institucionais — transparência de dados (LGPD) e precisão medida.
 
-- /dados     : base legal do tratamento, fontes, retenção, contestação (roadmap 6.1)
-- /precisao  : taxa de acerto por detector, calculada da triagem real (roadmap 1.1)
+- /dados        : base legal do tratamento, fontes, retenção, contestação (roadmap 6.1)
+- /precisao     : taxa de acerto por detector, calculada da triagem real (roadmap 1.1)
+- /backtesting  : "o Sentinela teria detectado?" contra casos conhecidos (roadmap 1.2)
 """
 from flask import Blueprint, jsonify, render_template
 
@@ -22,6 +23,25 @@ def dados_page():
 @bp.route("/precisao")
 def precisao_page():
     return render_template("precisao.html")
+
+
+@bp.route("/backtesting")
+def backtesting_page():
+    return render_template("backtesting.html")
+
+
+@bp.route("/api/backtesting")
+def api_backtesting():
+    """"O Sentinela teria detectado?" — detectores × casos conhecidos (roadmap 1.2)."""
+    from analise.backtesting import executar_backtest
+
+    db = core.get_db()
+    try:
+        return jsonify(executar_backtest(db))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        db.close()
 
 
 @bp.route("/api/precisao")
