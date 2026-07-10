@@ -84,6 +84,12 @@ def test_openapi_server_url_honra_forwarded_proto(client) -> None:
     assert res.get_json()["servers"][0]["url"].startswith("https://")
 
 
+def test_openapi_server_url_host_publico_assume_https(client) -> None:
+    # Sem o header, um host público (não-local) é servido só por HTTPS.
+    res = client.get("/api/v1/openapi.json", base_url="http://sentinela-rj.fly.dev")
+    assert res.get_json()["servers"][0]["url"] == "https://sentinela-rj.fly.dev"
+
+
 def test_docs_page_renderiza(client) -> None:
     res = client.get("/api/docs")
     assert res.status_code == 200

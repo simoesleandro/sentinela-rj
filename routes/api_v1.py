@@ -52,10 +52,18 @@ def api_docs():
 
 def _server_url() -> str:
     """URL base honrando o proxy TLS do Fly (evita http:// em página https)."""
-    # Fly termina o TLS no proxy; a app vê http. X-Forwarded-Proto traz o
-    # esquema original (pode vir como lista "https,http" — usa o primeiro).
-    proto = request.headers.get("X-Forwarded-Proto", request.scheme).split(",")[0].strip()
-    return f"{proto}://{request.host}"
+    host = request.host
+    # 1) Header do proxy é a fonte mais confiável (pode vir "https,http").
+    forwarded = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+    if forwarded:
+        proto = forwarded
+    # 2) Sem header e host não-local: é o deploy público, servido só por HTTPS.
+    elif host.split(":")[0] not in ("localhost", "127.0.0.1"):
+        proto = "https"
+    # 3) Dev local.
+    else:
+        proto = request.scheme
+    return f"{proto}://{host}"
 
 
 @bp.route("/v1/openapi.json")
