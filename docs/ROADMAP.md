@@ -89,10 +89,11 @@ A arquitetura já é multi-município (`MUNICIPIO_IBGE`; Niterói, Caxias, Belfo
 já têm dados coletados). O produto único é o **comparativo**:
 
 - 4.1 — Onboarding formal de 5–10 municípios da região metropolitana (config + volume de coleta) — **M**
-- 4.2 — **Benchmark municipal**: % de dispensa vs. média regional, valor médio por
-  categoria, concentração de fornecedores — "seu município paga X% acima da mediana
-  em pavimentação" — **M–L**, impacto altíssimo (nenhum painel público entrega isso
-  em nível municipal)
+- 4.2 ✅ — **Benchmark municipal**: página `/benchmark` compara os municípios em
+  % sem licitação, concentração (top-1 e HHI) e valor médio, cada um vs. a mediana
+  regional. Medido jul/2026: Japeri 34% sem licitação (6× a mediana de 5,7%).
+  **Entregue jul/2026** — impacto altíssimo (nenhum painel público entrega isso em
+  nível municipal)
 
 ## Pilar 5 — Distribuição e impacto
 
