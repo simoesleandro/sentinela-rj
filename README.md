@@ -160,6 +160,25 @@ The goal is not to replace institutional oversight or legal analysis. It is a te
 > 📖 **Metodologia completa** — método estatístico, limiares reais e fundamento legal
 > de cada detector em [`docs/DETECTORES.md`](docs/DETECTORES.md).
 
+### 📊 Precisão medida em produção / Measured precision
+
+Cada detector é validado contra **triagem humana real** — não é estimativa.
+`precisão = confirmados ÷ (confirmados + descartados)`, com no mínimo 10 alertas
+rotulados por detector. Snapshot de jul/2026 (números ao vivo em `/precisao`):
+
+| Detector | Precisão | Confirmados / Descartados |
+|----------|:--------:|:-------------------------:|
+| `inexigibilidade` | **75,0%** | 15 / 5 |
+| `concentracao_fornecedor` | **72,7%** | 8 / 3 |
+| `emergencia` | **66,7%** | 8 / 4 |
+| `dispensa` | **50,0%** | 5 / 5 |
+| `outlier_valor` | **45,5%** | 5 / 6 |
+
+> Publicamos as taxas **inclusive quando são baixas**: uma precisão de ~50% indica
+> que o detector reduz pela metade o volume de revisão de um fiscal. O número honesto
+> — sem 0% nem 100% — é a prova de que a triagem foi feita de verdade.
+> _Each detector is validated against real human triage, published even when low._
+
 ---
 
 ## 🤖 Pipeline de IA / AI Pipeline

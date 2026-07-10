@@ -450,6 +450,17 @@
       <h3>Limitações</h3>
       <p>Este sistema identifica <em>padrões estatísticos</em> que merecem atenção. Uma anomalia detectada não significa necessariamente irregularidade — pode haver justificativas legais para qualquer contrato. O Sentinela RJ é uma ferramenta de transparência, não de acusação.</p>
 
+      <h3>Precisão medida em produção</h3>
+      <p>Cada detector é validado contra <strong>triagem humana real</strong> (não estimativa): precisão = confirmados ÷ (confirmados + descartados), com no mínimo 10 alertas rotulados por detector. Snapshot de jul/2026 — números ao vivo em <a href="/precisao">📊 Precisão medida</a>:</p>
+      <div class="sobre-severity-table">
+        <div class="sobre-severity-row"><span class="badge badge-green">75,0%</span><span>Inexigibilidade — 15 confirmados / 5 descartados</span></div>
+        <div class="sobre-severity-row"><span class="badge badge-green">72,7%</span><span>Concentração de fornecedor — 8 / 3</span></div>
+        <div class="sobre-severity-row"><span class="badge badge-yellow">66,7%</span><span>Emergência (sem licitação) — 8 / 4</span></div>
+        <div class="sobre-severity-row"><span class="badge badge-yellow">50,0%</span><span>Dispensa (sem licitação) — 5 / 5</span></div>
+        <div class="sobre-severity-row"><span class="badge badge-yellow">45,5%</span><span>Outlier de valor — 5 / 6</span></div>
+      </div>
+      <p>Publicamos essas taxas <em>inclusive quando são baixas</em>. Uma precisão de ~50% significa que o detector reduz pela metade o volume que um fiscal precisaria revisar — e o número honesto (sem 0% nem 100%) é a medida de que a triagem foi feita de verdade.</p>
+
       <h3>Transparência e responsabilidade</h3>
       <p>
         <a href="/precisao">📊 Precisão medida</a> — taxa de acerto de cada detector, calculada da triagem real ·
