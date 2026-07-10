@@ -776,13 +776,20 @@ async function loadAlertas() {
         const gid = grupo.grupo_id;
 
         const prioPct = Math.round((grupo.score_composto || 0) * 100);
+        const totalG = (grupo.alertas || []).length;
+        const triadosG = (grupo.alertas || []).filter(
+          a => a.status === 'confirmado' || a.status === 'descartado'
+        ).length;
+        const progressoHtml = totalG > 1
+          ? `<div class="grupo-progresso${triadosG === totalG ? ' completo' : ''}" title="Cada contrato do grupo é triado individualmente">${triadosG}/${totalG} triados</div>`
+          : '';
         html.push(`
           <tr class="row-group" data-grupo="${gid}">
             <td><button class="expand-btn" data-grupo="${gid}">▶</button></td>
             <td><span class="prio-score" title="Score composto">${prioPct}</span></td>
             <td>${tipoBadge(grupo.tipo)}</td>
             <td>${sevBadge(grupo.severidade)}</td>
-            <td>${statusBadge(grupo.status)}</td>
+            <td>${statusBadge(grupo.status)}${progressoHtml}</td>
             <td style="white-space:nowrap;font-weight:500">${formatCurrency(grupo.valor_total)}</td>
             <td>${truncate(grupo.fornecedor || '—', 30)} ${countBadge}</td>
             <td style="white-space:nowrap;color:var(--muted)">${formatDate(grupo.data_mais_recente)}</td>
@@ -799,6 +806,7 @@ async function loadAlertas() {
             <tr class="row-detail" data-grupo="${gid}">
               <td colspan="9">
                 <div class="detail-compact" style="border-left-color:${tipoColor}">
+                  <span class="detail-compact-status">${statusBadge(a.status)}</span>
                   <span class="detail-compact-valor">${formatCurrency(a.valor_referencia)}</span>
                   <span class="detail-compact-data">${formatDate(a.data_assinatura)}</span>
                   <span class="detail-compact-objeto" title="${esc(a.objeto || '')}">${esc(truncate(a.objeto || '—', 60))}</span>

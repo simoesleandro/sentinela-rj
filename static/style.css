@@ -1103,11 +1103,29 @@ tr:last-child td {
   font-size: 0.83rem;
 }
 
+.detail-compact-status {
+  flex-shrink: 0;
+  min-width: 92px;
+}
+
 .detail-compact-valor {
   white-space: nowrap;
   font-weight: 600;
   color: var(--text);
   min-width: 90px;
+}
+
+/* Progresso de triagem no cabeçalho do grupo (N/M triados) */
+.grupo-progresso {
+  margin-top: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.grupo-progresso.completo {
+  color: var(--green);
 }
 
 .detail-compact-data {
