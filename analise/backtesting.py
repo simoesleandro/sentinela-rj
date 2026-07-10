@@ -102,12 +102,11 @@ def executar_backtest(conn: sqlite3.Connection) -> dict[str, Any]:
         tematico = tipo_esperado in tipos
         n_alertas = sum(d["n"] for d in detectores)
 
-        if not detectores:
-            veredito = "nao_detectado"
-        elif tematico:
-            veredito = "detectado"
-        else:
-            veredito = "parcial"  # sinalizado, mas não pelo detector temático
+        # A pergunta é "o Sentinela teria detectado?" — detectado = QUALQUER
+        # detector sinaliza o ator. Se disparou pelo detector temático (o que
+        # casa com a natureza conhecida do caso) é um refinamento reportado à
+        # parte (detector_tematico_disparou), não um veredito inferior.
+        veredito = "detectado" if detectores else "nao_detectado"
 
         resultados.append({
             "titulo": caso["titulo"],
@@ -124,13 +123,13 @@ def executar_backtest(conn: sqlite3.Connection) -> dict[str, Any]:
         })
 
     detectados = sum(1 for r in resultados if r["veredito"] == "detectado")
-    parciais = sum(1 for r in resultados if r["veredito"] == "parcial")
+    via_tematico = sum(1 for r in resultados if r["detector_tematico_disparou"])
     return {
         "casos": resultados,
         "resumo": {
             "total": len(resultados),
             "detectados": detectados,
-            "parciais": parciais,
-            "nao_detectados": len(resultados) - detectados - parciais,
+            "via_tematico": via_tematico,
+            "nao_detectados": len(resultados) - detectados,
         },
     }

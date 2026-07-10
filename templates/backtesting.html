@@ -109,8 +109,8 @@
       desconto_zero_licitacao: 'Desconto zero', licitacao_itens_desertos: 'Itens desertos',
     };
     const fmtTipo = t => TIPO_LABEL[t] || (t || '').replace(/_/g, ' ');
-    const fmtVerd = { detectado: 'Detectado', parcial: 'Parcial', nao_detectado: 'Não detectado' };
-    const verdClass = { detectado: 'detectado', parcial: 'parcial', nao_detectado: 'nao' };
+    const fmtVerd = { detectado: 'Detectado', nao_detectado: 'Não detectado' };
+    const verdClass = { detectado: 'detectado', nao_detectado: 'nao' };
     const fmtBRL = v => 'R$ ' + (v >= 1e6 ? (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi'
                                           : Math.round(v).toLocaleString('pt-BR'));
 
@@ -124,7 +124,7 @@
         const r = d.resumo;
         document.getElementById('placar').innerHTML = `
           <div class="placar-item"><div class="placar-num ok">${r.detectados}/${r.total}</div><div class="placar-label">Detectados</div></div>
-          <div class="placar-item"><div class="placar-num">${r.parciais}</div><div class="placar-label">Parciais</div></div>
+          <div class="placar-item"><div class="placar-num">${r.via_tematico}/${r.total}</div><div class="placar-label">Via detector temático</div></div>
           <div class="placar-item"><div class="placar-num">${r.nao_detectados}</div><div class="placar-label">Não detectados</div></div>`;
 
         alvo.innerHTML = d.casos.map(c => {
@@ -145,7 +145,10 @@
               </div>
               <div class="caso-meta">
                 Natureza conhecida: <strong>${fmtTipo(c.tipo_esperado)}</strong> ·
-                ${c.n_detectores} detector(es), ${c.n_alertas} alerta(s)${valor}
+                ${c.n_detectores} detector(es), ${c.n_alertas} alerta(s)${valor}<br>
+                ${c.detector_tematico_disparou
+                  ? '✓ Sinalizado pelo detector esperado.'
+                  : `Sinalizado por outros sinais — o detector esperado (<strong>${fmtTipo(c.tipo_esperado)}</strong>) não disparou nesta base.`}
               </div>
               <div class="chips">${chips}</div>
             </div>`;
