@@ -121,7 +121,7 @@ def add_cors(response):
 _CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
     "font-src 'self' https://fonts.gstatic.com; "
     "img-src 'self' data:; "
     "connect-src 'self'; "
@@ -193,6 +193,7 @@ def get_conflito_conn():
 # que todos os recursos compartilhados acima já estejam definidos.
 
 from routes.alertas import bp as alertas_bp
+from routes.api_v1 import bp as api_v1_bp
 from routes.casos import bp as casos_bp
 from routes.conflitos import bp as conflitos_bp
 from routes.exportacao import bp as exportacao_bp
@@ -202,6 +203,7 @@ from routes.painel import bp as painel_bp
 from routes.watchlists import bp as watchlists_bp
 
 app.register_blueprint(alertas_bp)
+app.register_blueprint(api_v1_bp)
 app.register_blueprint(casos_bp)
 app.register_blueprint(conflitos_bp)
 app.register_blueprint(exportacao_bp)

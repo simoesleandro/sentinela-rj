@@ -136,6 +136,7 @@ The goal is not to replace institutional oversight or legal analysis. It is a te
 - ✅ **Dossiê exportável** — Markdown, PDF e JSON por alerta
 - ✅ **Deploy público** — Fly.io com SQLite persistente em volume
 - ✅ **Dados abertos** — export CSV de contratos e alertas
+- ✅ **API pública REST** — OpenAPI 3.0 + Swagger UI (`/api/docs`); alertas, contratos e precisão sob `/api/v1/`
 - ✅ **Multi-município** — monitoramento configurável por IBGE
 - 🚧 **TJRJ processos** — aguardando API pública com campo `partes` (issue #2)
 
@@ -295,6 +296,24 @@ python __main__.py dossie --alerta 42 --formato md
 python __main__.py dossie --alerta 42 --formato pdf
 ```
 
+### API pública (leitura) / Public API
+
+Documentação interativa em **`/api/docs`** (Swagger UI). Só GET, sem autenticação, CORS liberado:
+
+```bash
+# Alertas de alto risco no Rio de Janeiro (IBGE 3304557)
+curl "https://sentinela-rj.fly.dev/api/v1/alertas?severidade=alta&municipio_ibge=3304557"
+
+# Contratos de um fornecedor específico (CNPJ só dígitos)
+curl "https://sentinela-rj.fly.dev/api/v1/contratos?fornecedor_ni=98765432000111"
+
+# Precisão medida de cada detector
+curl "https://sentinela-rj.fly.dev/api/v1/precisao"
+
+# Especificação OpenAPI 3.0
+curl "https://sentinela-rj.fly.dev/api/v1/openapi.json"
+```
+
 ---
 
 ## 🔐 Variáveis de Ambiente / Environment Variables
@@ -421,6 +440,7 @@ pytest tests/test_motor_ia.py -v
 - [x] Investigação profunda em background com polling
 - [x] Deploy público Fly.io com SQLite persistente
 - [x] Multi-município via env
+- [x] API pública REST documentada (OpenAPI 3.0 + Swagger UI em `/api/docs`)
 - [ ] TJRJ processos via Playwright com credencial (issue #2)
 - [ ] Transparência RJ empenhos reais
 - [ ] Busca natural em linguagem humana

@@ -11,10 +11,6 @@ import web_app as core
 
 bp = Blueprint("institucional", __name__)
 
-# Mínimo de alertas rotulados (confirmado + descartado) para exibir uma taxa —
-# abaixo disso o número não é confiável e mostramos "amostra insuficiente".
-_MIN_AMOSTRA_PRECISAO = 10
-
 
 @bp.route("/dados")
 def dados_page():
@@ -71,42 +67,11 @@ def api_precisao():
     Lê a triagem real (coluna alertas.status). Só reporta a taxa quando há
     amostra rotulada suficiente; senão devolve status='amostra_insuficiente'.
     """
+    from analise.precisao import calcular_precisao
+
     db = core.get_db()
     try:
-        rows = db.execute(
-            """
-            SELECT tipo,
-                   COUNT(*) AS total,
-                   SUM(CASE WHEN status = 'confirmado' THEN 1 ELSE 0 END) AS confirmados,
-                   SUM(CASE WHEN status = 'descartado' THEN 1 ELSE 0 END) AS descartados,
-                   SUM(CASE WHEN COALESCE(status, 'aberto') IN ('aberto', 'investigando')
-                            THEN 1 ELSE 0 END) AS pendentes
-            FROM alertas
-            GROUP BY tipo
-            ORDER BY total DESC
-            """
-        ).fetchall()
-
-        itens = []
-        rotulados_total = 0
-        for r in rows:
-            d = dict(r)
-            rotulados = (d["confirmados"] or 0) + (d["descartados"] or 0)
-            rotulados_total += rotulados
-            if rotulados >= _MIN_AMOSTRA_PRECISAO:
-                d["precisao"] = round(d["confirmados"] / rotulados, 3)
-                d["amostra_status"] = "medida"
-            else:
-                d["precisao"] = None
-                d["amostra_status"] = "amostra_insuficiente"
-            d["rotulados"] = rotulados
-            itens.append(d)
-
-        return jsonify({
-            "itens": itens,
-            "min_amostra": _MIN_AMOSTRA_PRECISAO,
-            "rotulados_total": rotulados_total,
-        })
+        return jsonify(calcular_precisao(db))
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
     finally:

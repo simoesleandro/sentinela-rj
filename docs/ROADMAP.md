@@ -100,7 +100,7 @@ já têm dados coletados). O produto único é o **comparativo**:
 | # | Item | Como | Esforço | Impacto |
 |---|------|------|---------|---------|
 | 5.1 | **Alertas por assinatura** | E-mail (infra de email_envio já existe) e/ou Telegram, por órgão/fornecedor/tema — watchlists públicas | M | Alto — transforma visitantes em audiência |
-| 5.2 | **API pública documentada** | Os endpoints REST já existem; documentar (OpenAPI), rate limit público, página para desenvolvedores | S–M | Alto — jornalistas de dados citam quem os serve |
+| 5.2 | **API pública documentada** ✅ (espinha dorsal) | OpenAPI 3.0 + Swagger UI em `/api/docs`; `/api/v1/` versionado para alertas, contratos e precisão (leitura, CORS liberado). Falta: rate limit público | S–M | Alto — jornalistas de dados citam quem os serve |
 | 5.3 | **Representação pré-formatada** | Botão "gerar ofício" no dossiê: documento estruturado com evidências, pronto para protocolar no TCM/MP | M | **Altíssimo** — converte alerta em ação institucional |
 | 5.4 | **Parcerias ativas** | Apresentar o projeto a Open Knowledge BR, Transparência Brasil, cursos de jornalismo de dados | S (contínuo) | Alto — referência é status conferido por terceiros |
 

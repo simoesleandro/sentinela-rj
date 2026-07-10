@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sentinela RJ — API pública (docs)</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin: 0; background: #fafafa; }
+    .topbar-wrap { background: #0d1b2a; color: #fff; padding: 14px 20px; font-family: system-ui, sans-serif; }
+    .topbar-wrap a { color: #8ecae6; }
+  </style>
+</head>
+<body>
+  <div class="topbar-wrap">
+    <strong>Sentinela RJ — API pública v1</strong> · dados abertos de contratos públicos ·
+    <a href="/dashboard">← voltar ao painel</a> ·
+    <a href="/api/v1/openapi.json">openapi.json</a>
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: '/api/v1/openapi.json',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      tryItOutEnabled: true,
+    });
+  </script>
+</body>
+</html>
