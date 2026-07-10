@@ -50,10 +50,18 @@ def api_docs():
     return render_template("api_docs.html")
 
 
+def _server_url() -> str:
+    """URL base honrando o proxy TLS do Fly (evita http:// em página https)."""
+    # Fly termina o TLS no proxy; a app vê http. X-Forwarded-Proto traz o
+    # esquema original (pode vir como lista "https,http" — usa o primeiro).
+    proto = request.headers.get("X-Forwarded-Proto", request.scheme).split(",")[0].strip()
+    return f"{proto}://{request.host}"
+
+
 @bp.route("/v1/openapi.json")
 def openapi_json():
     """Especificação OpenAPI 3.0 servida como JSON."""
-    return jsonify(build_spec(server_url=request.host_url.rstrip("/")))
+    return jsonify(build_spec(server_url=_server_url()))
 
 
 @bp.route("/v1/alertas")

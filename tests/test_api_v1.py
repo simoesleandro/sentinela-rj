@@ -78,6 +78,12 @@ def test_openapi_json_valido(client) -> None:
     assert spec["servers"][0]["url"]
 
 
+def test_openapi_server_url_honra_forwarded_proto(client) -> None:
+    # Atrás do proxy TLS do Fly a app vê http; o header preserva o https real.
+    res = client.get("/api/v1/openapi.json", headers={"X-Forwarded-Proto": "https"})
+    assert res.get_json()["servers"][0]["url"].startswith("https://")
+
+
 def test_docs_page_renderiza(client) -> None:
     res = client.get("/api/docs")
     assert res.status_code == 200
