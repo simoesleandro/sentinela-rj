@@ -366,68 +366,6 @@ async function reenviarConfirmacao() {
 
 const VEREDITO_MARKER = '[Recomendação de Veredito]';
 
-function renderComparacaoVereditoHtml(vereditoGemini, vereditoGemma, nomePrimario, nomeSecundario) {
-  if (!vereditoGemini && !vereditoGemma) return '';
-
-  function renderCol(modelo, dot, veredito, btnId) {
-    if (!veredito) return `
-      <div class="narrativa-col">
-        <div class="narrativa-col-label">
-          <span class="model-dot ${dot}"></span>${modelo}
-        </div>
-        <div class="narrativa-col-text muted">Veredito não disponível.</div>
-      </div>`;
-    const statusKey = String(veredito.status || '').toLowerCase();
-    const statusLabel = STATUS_LABELS[statusKey] || veredito.status || '—';
-    return `
-      <div class="narrativa-col">
-        <div class="narrativa-col-label">
-          <span class="model-dot ${dot}"></span>${modelo}
-        </div>
-        <div class="veredito-status">${escapeHtml(statusLabel)}</div>
-        <div class="veredito-justificativa">${escapeHtml(veredito.justificativa || '')}</div>
-        <button type="button" class="btn-aplicar-veredito" data-btn-id="${btnId}"
-                data-status="${escapeHtml(statusKey)}"
-                data-justificativa="${escapeHtml(veredito.justificativa || '')}">
-          Aplicar este veredito
-        </button>
-      </div>`;
-  }
-
-  return `
-    <div class="narrativa-comparacao">
-      <div class="comparacao-header">
-        <span class="comparacao-title">Comparação de Vereditos</span>
-        <span class="comparacao-badge">EXPERIMENTO</span>
-      </div>
-      <div class="comparacao-grid">
-        ${renderCol(esc(nomePrimario || 'Veredito primário'), 'gemini', vereditoGemini, 'gemini')}
-        ${renderCol(esc(nomeSecundario || 'Veredito secundário'), 'gemma', vereditoGemma, 'gemma')}
-      </div>
-    </div>`;
-}
-
-function wireComparacaoVereditoButtons(alertaId) {
-  document.querySelectorAll('.btn-aplicar-veredito[data-btn-id]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const status = btn.dataset.status;
-      if (!status) return;
-      await aplicarVereditoSugerido(alertaId, status, btn.dataset.justificativa || '');
-      btn.textContent = 'Aplicado ✓';
-      btn.disabled = true;
-    });
-  });
-}
-
-function _vereditoDictFromNarrativa(narrativa) {
-  const parsed = parseVereditoIa(narrativa);
-  if (!parsed.statusSugerido) return null;
-  return {
-    status: parsed.statusSugerido,
-    justificativa: parsed.justificativa || '',
-  };
-}
-
 function parseVereditoIa(narrativa) {
   const texto = String(narrativa || '').trim();
   if (!texto) return { corpo: '', veredito: null, statusSugerido: null, justificativa: null };
@@ -449,40 +387,30 @@ function parseVereditoIa(narrativa) {
   return { corpo, veredito, statusSugerido, justificativa };
 }
 
-function renderNarrativaVereditoHtml(narrativa) {
-  const { corpo, veredito, statusSugerido, justificativa } = parseVereditoIa(narrativa);
-  const corpoHtml = corpo
-    ? `<p id="narrativa-texto">${escapeHtml(corpo)}</p>`
-    : `<p id="narrativa-texto" class="narrativa-empty">Sem parágrafo principal.</p>`;
+const PLAUS_META = {
+  provavel_problema: { label: 'Provável problema', cls: 'plaus-alerta' },
+  provavel_explicavel: { label: 'Provavelmente explicável', cls: 'plaus-ok' },
+  inconclusivo: { label: 'Inconclusivo', cls: 'plaus-neutro' },
+};
 
-  if (!veredito) {
-    return {
-      html: corpoHtml,
-      temVeredito: false,
-      statusSugerido: null,
-      justificativa: null,
-    };
-  }
-
-  const statusLabel = statusSugerido
-    ? (STATUS_LABELS[statusSugerido] || statusSugerido)
-    : '—';
-  const vereditoBlock = `
-    <div id="veredito-ia-block" class="veredito-ia-block">
-      <label>Recomendação de veredito (Gemini)</label>
-      <p class="veredito-status-sugerido">Status sugerido: <strong>${escapeHtml(statusLabel)}</strong></p>
-      ${justificativa ? `<p class="veredito-justificativa">${escapeHtml(justificativa)}</p>` : ''}
-      ${statusSugerido
-        ? `<button type="button" id="btn-aplicar-veredito" class="btn-aplicar-veredito">Aplicar status sugerido</button>`
-        : ''}
+function renderParecerHtml(parecer, provedorNome) {
+  if (!parecer) return '<p class="narrativa-empty">Nenhum parecer gerado.</p>';
+  const plaus = PLAUS_META[parecer.plausibilidade] || PLAUS_META.inconclusivo;
+  const statusKey = String(parecer.status_sugerido || '').toLowerCase();
+  const statusLabel = STATUS_LABELS[statusKey] || statusKey || '—';
+  const motivoLabel = parecer.motivo_sugerido ? (MOTIVOS_DESCARTE[parecer.motivo_sugerido] || '') : '';
+  return `
+    <div class="parecer-card">
+      <div class="parecer-head">
+        <span class="plaus-pill ${plaus.cls}">${plaus.label}</span>
+        <span class="parecer-prov">${provedorNome ? 'IA · ' + escapeHtml(provedorNome) : 'IA'}</span>
+      </div>
+      <p class="parecer-analise">${escapeHtml(parecer.analise || '')}</p>
+      <div class="parecer-sug">
+        <span class="parecer-sug-txt">Sugestão: <strong>${escapeHtml(statusLabel)}</strong>${motivoLabel ? ` — ${escapeHtml(motivoLabel)}` : ''}</span>
+        <button type="button" id="btn-aplicar-parecer" class="btn-aplicar-veredito">Aplicar sugestão</button>
+      </div>
     </div>`;
-
-  return {
-    html: corpoHtml + vereditoBlock,
-    temVeredito: true,
-    statusSugerido,
-    justificativa,
-  };
 }
 
 function tipoBadge(tipo) {
@@ -981,17 +909,13 @@ async function openDetail(id) {
       : '';
 
     const temNarrativa = Boolean(d.narrativa_ia && String(d.narrativa_ia).trim());
-    const narrativaParts = temNarrativa
-      ? renderNarrativaVereditoHtml(d.narrativa_ia)
-      : {
-          html: '<p id="narrativa-texto" class="narrativa-empty">Nenhuma narrativa gerada ainda. O Llama gera o rascunho; o veredito vem da revisão Gemini (requer GEMINI_API_KEY no .env).</p>',
-          temVeredito: false,
-          statusSugerido: null,
-        };
-    const btnIaLabel = temNarrativa ? 'Regenerar narrativa' : 'Investigar com IA';
-    const vereditoGemini = d.veredito_gemini || _vereditoDictFromNarrativa(d.narrativa_ia);
-    const vereditoGemma = d.veredito_gemma || _vereditoDictFromNarrativa(d.narrativa_gemma);
-    const comparacaoHtml = renderComparacaoVereditoHtml(vereditoGemini, vereditoGemma);
+    // Back-compat: narrativas salvas no formato antigo carregam o corpo; mostramos
+    // só o texto da análise (sem o antigo bloco de veredito).
+    const parecerSalvo = temNarrativa ? parseVereditoIa(d.narrativa_ia).corpo : '';
+    const parecerInicialHtml = parecerSalvo
+      ? `<p class="parecer-analise">${escapeHtml(parecerSalvo)}</p>`
+      : '<p class="narrativa-empty">Nenhum parecer ainda. Clique em “Investigar com IA” para um parecer único: plausibilidade, análise e status/motivo sugeridos.</p>';
+    const btnIaLabel = temNarrativa ? 'Regenerar parecer' : 'Investigar com IA';
 
     const transicoes = (d.transicoes_permitidas || []).map(st =>
       `<option value="${st}">${STATUS_LABELS[st] || st}</option>`
@@ -1073,24 +997,18 @@ async function openDetail(id) {
       ${complementar}
       ${renderTransparenciaRjHtml(d.transparencia_rj)}
       <div class="investigation-toolbar">
-        <button type="button" id="btn-investigar-ia" class="btn-investigar" title="IA em nuvem gera a narrativa e o veredito; quando há dois provedores, mostra comparação A/B">
+        <button type="button" id="btn-investigar-ia" class="btn-investigar" title="IA em nuvem emite um parecer único: plausibilidade, análise e status/motivo sugeridos">
           ✨ ${btnIaLabel}
-        </button>
-        <button type="button" id="btn-investigar-profundo" class="btn-investigar-profundo" title="Agente ReAct coleta dados de múltiplas fontes e gera conclusão fundamentada">
-          🔍 Investigar Profundo
         </button>
         <button type="button" id="btn-export-dossie" class="btn-dossie" title="Baixa dossiê Markdown deste alerta">
           📄 Exportar Dossiê
         </button>
         <span id="investigacao-status" class="investigacao-status" aria-live="polite"></span>
       </div>
-      <div id="inv-profunda-status" class="inv-profunda-status"></div>
-      <div id="inv-profunda-container"></div>
-      <div id="narrativa-container" class="narrativa-block">
-        <label>Narrativa IA</label>
-        ${narrativaParts.html}
+      <div id="parecer-container" class="narrativa-block">
+        <label>Parecer da IA</label>
+        ${parecerInicialHtml}
       </div>
-      <div id="comparacao-container">${comparacaoHtml}</div>
       <div class="detail-actions">
         ${pncpLink}
         ${d.fornecedor_ni ? `<a href="/fornecedor/${d.fornecedor_ni}" target="_self" class="detail-link">Ver página do fornecedor →</a>` : ''}
@@ -1114,14 +1032,6 @@ async function openDetail(id) {
     document.getElementById('btn-investigar-ia')?.addEventListener('click', () => {
       investigarComIa(id);
     });
-    document.getElementById('btn-investigar-profundo')?.addEventListener('click', () => {
-      investigarProfundo(id);
-    });
-    _pollInvProfunda(id);
-    document.getElementById('btn-aplicar-veredito')?.addEventListener('click', () => {
-      aplicarVereditoSugerido(id, narrativaParts.statusSugerido, narrativaParts.justificativa);
-    });
-    wireComparacaoVereditoButtons(id);
     document.getElementById('btn-export-dossie')?.addEventListener('click', () => {
       exportarDossie(id);
     });
@@ -1131,8 +1041,8 @@ async function openDetail(id) {
 }
 
 const IA_LOADING_STEPS = [
-  { id: 'corpo', label: 'IA gerando narrativa...' },
-  { id: 'veredito', label: 'Gerando vereditos (comparação A/B)...' },
+  { id: 'analise', label: 'IA analisando o contexto...' },
+  { id: 'parecer', label: 'Formando o parecer...' },
 ];
 
 function _iaLoadingHtml(stepIndex) {
@@ -1163,7 +1073,7 @@ function _iaLoadingHtml(stepIndex) {
 }
 
 function _setIaLoadingUi(stepIndex) {
-  const container = document.getElementById('narrativa-container');
+  const container = document.getElementById('parecer-container');
   const statusEl = document.getElementById('investigacao-status');
   const toolbar = document.querySelector('.investigation-toolbar');
   if (!container) return;
@@ -1197,7 +1107,7 @@ function _startIaLoadingTimers() {
 async function investigarComIa(alertaId) {
   const btn = document.getElementById('btn-investigar-ia');
   const statusEl = document.getElementById('investigacao-status');
-  const container = document.getElementById('narrativa-container');
+  const container = document.getElementById('parecer-container');
   const dossieBtn = document.getElementById('btn-export-dossie');
   const toolbar = document.querySelector('.investigation-toolbar');
   if (!btn || !statusEl || !container) return;
@@ -1205,7 +1115,7 @@ async function investigarComIa(alertaId) {
   const btnLabelOriginal = btn.textContent;
   btn.disabled = true;
   if (dossieBtn) dossieBtn.disabled = true;
-  btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Investigando…';
+  btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Analisando…';
 
   _setIaLoadingUi(0);
   const stopTimers = _startIaLoadingTimers();
@@ -1224,34 +1134,25 @@ async function investigarComIa(alertaId) {
     if (!res.ok) throw new Error(payload.error || res.statusText);
     carregarSessao();
 
-    const narrativaParts = renderNarrativaVereditoHtml(payload.narrativa_ia || '');
+    const parecer = payload.parecer || null;
     container.classList.remove('is-loading');
     container.innerHTML = `
-      <label>Narrativa IA</label>
-      ${narrativaParts.html}
+      <label>Parecer da IA</label>
+      ${renderParecerHtml(parecer, payload.provedor_nome)}
     `;
-    const comparacaoEl = document.getElementById('comparacao-container');
-    if (comparacaoEl) {
-      comparacaoEl.innerHTML = renderComparacaoVereditoHtml(
-        payload.veredito_gemini,
-        payload.veredito_gemma,
-        payload.provedor_primario_nome,
-        payload.provedor_secundario_nome
+    document.getElementById('btn-aplicar-parecer')?.addEventListener('click', () => {
+      aplicarVereditoSugerido(
+        alertaId,
+        parecer && parecer.status_sugerido,
+        parecer && parecer.motivo_sugerido,
+        parecer && parecer.analise
       );
-      wireComparacaoVereditoButtons(alertaId);
-    }
-    document.getElementById('btn-aplicar-veredito')?.addEventListener('click', () => {
-      aplicarVereditoSugerido(alertaId, narrativaParts.statusSugerido, narrativaParts.justificativa);
     });
 
-    btn.textContent = '✨ Regenerar narrativa';
-    if (payload.veredito_gemini || payload.veredito_gemma) {
-      statusEl.textContent = `Narrativa gerada (${payload.chars || 0} caracteres). Compare os vereditos abaixo e aplique o preferido.`;
-    } else if (payload.revisao_gemini === false) {
-      statusEl.textContent = `Narrativa salva (${payload.chars || 0} caracteres). Configure um segundo provedor (Groq/Gemini) para ver a comparação A/B.`;
-    } else {
-      statusEl.textContent = `Narrativa salva (${payload.chars || 0} caracteres), mas sem vereditos gerados.`;
-    }
+    btn.textContent = '✨ Regenerar parecer';
+    statusEl.textContent = parecer
+      ? 'Parecer gerado. Revise e clique em “Aplicar sugestão” para triar.'
+      : 'Parecer indisponível.';
     statusEl.className = 'investigacao-status investigacao-ok';
 
     if (state.currentTab === 'alertas') {
@@ -1260,8 +1161,8 @@ async function investigarComIa(alertaId) {
   } catch (e) {
     container.classList.remove('is-loading');
     container.innerHTML = `
-      <label>Narrativa IA</label>
-      <p class="narrativa-empty">Falha na investigação: ${escapeHtml(e.message)}</p>
+      <label>Parecer da IA</label>
+      <p class="narrativa-empty">Falha ao gerar parecer: ${escapeHtml(e.message)}</p>
     `;
     statusEl.textContent = e.message;
     statusEl.className = 'investigacao-status investigacao-erro';
@@ -1422,18 +1323,41 @@ function renderInvProfundaHtml(data) {
   `;
 }
 
-async function aplicarVereditoSugerido(alertaId, statusSugerido, justificativa) {
+async function aplicarVereditoSugerido(alertaId, statusSugerido, motivoSugerido, analise) {
   const statusEl = document.getElementById('triage-status');
+  const motivoEl = document.getElementById('triage-motivo');
   const notaEl = document.getElementById('triage-nota');
-  const btn = document.getElementById('btn-aplicar-veredito');
+  const btn = document.getElementById('btn-aplicar-parecer');
   if (!statusSugerido || !statusEl) return;
 
+  // Garante que o status sugerido exista como opção antes de selecioná-lo.
+  if (![...statusEl.options].some(o => o.value === statusSugerido)) {
+    const opt = document.createElement('option');
+    opt.value = statusSugerido;
+    opt.textContent = STATUS_LABELS[statusSugerido] || statusSugerido;
+    statusEl.appendChild(opt);
+  }
   statusEl.value = statusSugerido;
-  if (notaEl && justificativa) {
-    const prefixo = `[IA] ${justificativa}`;
+  // Dispara o 'change' para revelar o campo de motivo (o bug era setar por
+  // código sem disparar o evento, deixando o motivo escondido).
+  statusEl.dispatchEvent(new Event('change'));
+
+  if (statusSugerido === 'descartado' && motivoSugerido && motivoEl) {
+    motivoEl.value = motivoSugerido;
+  }
+  if (notaEl && analise) {
+    const prefixo = `[IA] ${analise}`;
     notaEl.value = notaEl.value.trim()
       ? `${prefixo}\n\n${notaEl.value.trim()}`
       : prefixo;
+  }
+
+  // Descarte sem motivo (IA não sugeriu): revela o campo e deixa o humano
+  // escolher, em vez de tentar salvar e falhar.
+  if (statusSugerido === 'descartado' && !(motivoEl && motivoEl.value)) {
+    if (btn) btn.textContent = 'Escolha o motivo e salve';
+    motivoEl?.focus();
+    return;
   }
 
   if (btn) {
@@ -1443,7 +1367,7 @@ async function aplicarVereditoSugerido(alertaId, statusSugerido, justificativa) 
   await salvarTriagem(alertaId);
   if (btn) {
     btn.disabled = false;
-    btn.textContent = 'Aplicar status sugerido';
+    btn.textContent = 'Aplicar sugestão';
   }
 }
 

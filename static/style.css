@@ -710,6 +710,74 @@ tr:last-child td {
   cursor: not-allowed;
 }
 
+/* ── Parecer único da IA (reformulação jul/2026) ── */
+.parecer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.parecer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.plaus-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  letter-spacing: 0.01em;
+}
+.plaus-pill.plaus-alerta {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.plaus-pill.plaus-ok {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+.plaus-pill.plaus-neutro {
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.parecer-prov {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.parecer-analise {
+  font-size: 0.83rem;
+  line-height: 1.65;
+  color: #d4d4d4;
+  margin: 0;
+}
+
+.parecer-sug {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--border);
+}
+
+.parecer-sug-txt {
+  font-size: 0.82rem;
+  color: #e5e5e5;
+}
+
 .detail-link {
   display: inline-block;
   margin-top: 0.5rem;

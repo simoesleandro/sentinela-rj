@@ -447,7 +447,7 @@ def alertas_investigar(alert_id: int):
     if erro:
         return erro
 
-    from analise.motor_ia import InvestigadorIA, _revisao_gemini_disponivel
+    from analise.motor_ia import InvestigadorIA
     from db.conexao import DB_PATH
     from db.database import GerenciadorBanco
 
@@ -476,36 +476,19 @@ def alertas_investigar(alert_id: int):
             return jsonify({"error": str(exc)}), 503
 
         payload = dict(row)
-        resultado = investigador.investigar_anomalia(payload)
+        parecer = investigador.emitir_parecer(payload)
+        # Persiste a análise como narrativa_ia (dossiê e histórico do alerta).
         GerenciadorBanco(db_path=DB_PATH).atualizar_narrativa_anomalia(
-            alert_id,
-            resultado.narrativa_ia,
-            narrativa_gemma=resultado.narrativa_gemma,
-            gemma_utilizado=1 if resultado.narrativa_gemma else 0,
+            alert_id, parecer.get("analise", ""),
         )
         core.registrar_consumo_ia(usuario, "investigar")
         from analise.motor_ia import NOMES_PROVEDOR
 
         return jsonify({
             "id": alert_id,
-            "narrativa_ia": resultado.narrativa_ia,
-            "narrativa_gemma": resultado.narrativa_gemma,
-            "corpo": resultado.corpo,
-            "veredito_gemini": resultado.veredito_gemini,
-            "veredito_gemma": resultado.veredito_gemma,
-            "gemini_utilizado": resultado.gemini_utilizado,
-            "gemma4_utilizado": resultado.gemma4_utilizado,
-            "chars": len(resultado.narrativa_ia),
-            "revisao_gemini": _revisao_gemini_disponivel(),
-            "revisao_gemma4": resultado.gemma4_utilizado,
-            "provedor_primario": resultado.provedor_primario,
-            "provedor_secundario": resultado.provedor_secundario,
-            "provedor_primario_nome": NOMES_PROVEDOR.get(
-                resultado.provedor_primario, resultado.provedor_primario
-            ),
-            "provedor_secundario_nome": NOMES_PROVEDOR.get(
-                resultado.provedor_secundario, resultado.provedor_secundario
-            ),
+            "parecer": parecer,
+            "narrativa_ia": parecer.get("analise", ""),
+            "provedor_nome": NOMES_PROVEDOR.get(parecer.get("provedor"), parecer.get("provedor")),
         })
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 422

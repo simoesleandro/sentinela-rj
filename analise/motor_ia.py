@@ -139,6 +139,98 @@ def _parse_veredito(texto: str) -> dict[str, str] | None:
     }
 
 
+# ── Parecer único de triagem (reformulação jul/2026) ────────────────────────
+# Uma só chamada de IA, domain-aware, que substitui o trio corpo + veredito +
+# comparação A/B. Entrega plausibilidade + análise + status e MOTIVO sugeridos.
+_PLAUSIBILIDADE_CANON = {
+    "provável problema": "provavel_problema",
+    "provavel problema": "provavel_problema",
+    "provavelmente explicável": "provavel_explicavel",
+    "provavelmente explicavel": "provavel_explicavel",
+    "inconclusivo": "inconclusivo",
+}
+# Rótulos idênticos aos do frontend (MOTIVOS_DESCARTE em static/app.js).
+_MOTIVO_DESCARTE_KEYS = {
+    "rotineiro": "valor_rotineiro",
+    "não se aplica": "categoria_diferente",
+    "nao se aplica": "categoria_diferente",
+    "categoria": "categoria_diferente",
+    "insuficient": "dados_incompletos",
+    "inconsistent": "dados_incompletos",
+    "duplicad": "duplicado",
+    "já investigado": "duplicado",
+    "outro": "outro",
+}
+
+_PROMPT_PARECER = (
+    "Você é um auditor sênior de contratos públicos do município do Rio de Janeiro. "
+    "Receberá o JSON factual de um alerta de anomalia. Emita um parecer de triagem "
+    "conciso e ORIENTADO PELO CONTEXTO: pondere a natureza do objeto, do órgão e do "
+    "valor — um contrato alto pode ser rotineiro para o setor (energia, folha, "
+    "merenda, concessão) e não constituir problema.\n\n"
+    "Responda SOMENTE com o bloco abaixo, copiando os títulos exatamente:\n\n"
+    "**[Parecer]**\n"
+    "Plausibilidade: <Provável problema | Provavelmente explicável | Inconclusivo>\n"
+    "Análise: <2 a 4 frases: nomeie o padrão, diga se o indício se sustenta e por quê, "
+    "e oriente o próximo passo do auditor. Sem repetir o JSON, sem exageros jurídicos>\n"
+    "Status sugerido: <Aberto | Investigando | Confirmado | Descartado>\n"
+    "Motivo do descarte: <preencha SÓ se Descartado, com um de: "
+    "'Valor rotineiro para a categoria', 'Categoria/objeto não se aplica ao detector', "
+    "'Dados insuficientes ou inconsistentes', 'Alerta duplicado ou já investigado', "
+    "'Outro motivo'; caso contrário escreva '—'>\n\n"
+    "Coerência obrigatória: 'Provavelmente explicável' combina com Status Descartado; "
+    "'Provável problema' com Investigando ou Confirmado (Confirmado só com evidência "
+    "clara nos dados); 'Inconclusivo' com Aberto ou Investigando. "
+    "Linguagem prudente — indício, não acusação."
+)
+
+
+def _montar_prompt_parecer(anomalia: dict[str, Any]) -> str:
+    return f"{_PROMPT_PARECER}\n\nDados factuais da anomalia:\n{_serializar_anomalia(anomalia)}"
+
+
+def _mapear_plausibilidade(txt: str) -> str:
+    chave = (txt or "").strip().lower()
+    for rotulo, canon in _PLAUSIBILIDADE_CANON.items():
+        if rotulo in chave:
+            return canon
+    return "inconclusivo"
+
+
+def _mapear_motivo(txt: str) -> str | None:
+    chave = (txt or "").strip().lower()
+    if not chave or chave in ("—", "-", "n/a", "nao se aplica"):
+        return None
+    for termo, key in _MOTIVO_DESCARTE_KEYS.items():
+        if termo in chave:
+            return key
+    return None
+
+
+def _parse_parecer(texto: str) -> dict[str, Any] | None:
+    """Extrai plausibilidade, análise, status e motivo do bloco [Parecer]."""
+    if not texto:
+        return None
+    plaus = re.search(r"Plausibilidade:\s*(.+?)(?:\n|$)", texto, re.IGNORECASE)
+    analise = re.search(
+        r"An[aá]lise:\s*(.+?)(?:\n\s*Status sugerido:|\Z)", texto, re.IGNORECASE | re.DOTALL
+    )
+    status = re.search(
+        r"Status sugerido:\s*(Aberto|Investigando|Confirmado|Descartado)", texto, re.IGNORECASE
+    )
+    motivo = re.search(r"Motivo do descarte:\s*(.+?)(?:\n|$)", texto, re.IGNORECASE)
+    if not status and not analise:
+        return None
+    status_val = status.group(1).lower() if status else "aberto"
+    motivo_key = _mapear_motivo(motivo.group(1)) if (motivo and status_val == "descartado") else None
+    return {
+        "plausibilidade": _mapear_plausibilidade(plaus.group(1) if plaus else ""),
+        "analise": analise.group(1).strip() if analise else "",
+        "status_sugerido": status_val,
+        "motivo_sugerido": motivo_key,
+    }
+
+
 def _montar_prompt_revisao(
     anomalia: dict[str, Any],
     rascunho: str,
@@ -440,6 +532,34 @@ class InvestigadorIA:
             logger.warning("Revisão Gemini falhou — usando rascunho Ollama: %s", exc)
             self._gemini_utilizado = False
             return rascunho
+
+    def emitir_parecer(self, anomalia: dict[str, Any]) -> dict[str, Any]:
+        """Parecer único de triagem — uma chamada de IA, domain-aware.
+
+        Substitui o trio corpo + veredito + comparação A/B. Retorna
+        {plausibilidade, analise, status_sugerido, motivo_sugerido, provedor}.
+        """
+        provedores = _provedores_disponiveis()
+        if not provedores:
+            raise ValueError(
+                "Nenhum provedor de IA disponível. "
+                "Configure GEMINI_API_KEY ou GROQ_API_KEY."
+            )
+        prompt = _montar_prompt_parecer(anomalia)
+        if self._prompt_revisao_extra:
+            prompt = f"{prompt}\n\n{self._prompt_revisao_extra}"
+        texto, provedor = gerar_texto(prompt, provedores)
+        parecer = _parse_parecer(texto) or {
+            "plausibilidade": "inconclusivo",
+            "analise": _limpar_latex(texto).strip(),
+            "status_sugerido": "aberto",
+            "motivo_sugerido": None,
+        }
+        parecer["analise"] = _limpar_latex(parecer.get("analise") or "").strip()
+        parecer["provedor"] = provedor
+        self._gemini_utilizado = provedor == "gemini"
+        self._gemma4_utilizado = provedor == "gemma4"
+        return parecer
 
     def investigar_anomalia(
         self, anomalia: dict[str, Any]
