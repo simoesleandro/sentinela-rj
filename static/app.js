@@ -66,6 +66,14 @@ const STATUS_LABELS = {
   descartado: 'Descartado',
 };
 
+// Ícones SVG monocromáticos (herdam currentColor) — substituem emojis no tom sóbrio.
+const ICON = {
+  ia: '<svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M8 1.5l1.15 3.6a2 2 0 0 0 1.3 1.3L14 7.5l-3.55 1.1a2 2 0 0 0-1.3 1.3L8 13.5l-1.15-3.6a2 2 0 0 0-1.3-1.3L2 7.5l3.55-1.1a2 2 0 0 0 1.3-1.3z"/></svg>',
+  lupa: '<svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>',
+  link: '<svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5 9.5 6.5"/><path d="M7.2 4.6 8.6 3.2a2.7 2.7 0 0 1 3.8 3.8L11 8.4"/><path d="M8.8 11.4 7.4 12.8a2.7 2.7 0 0 1-3.8-3.8L5 7.6"/></svg>',
+  check: '<svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5"/></svg>',
+};
+
 const STATUS_BADGE_CLASS = {
   aberto: 'status-aberto',
   investigando: 'status-investigando',
@@ -351,6 +359,8 @@ async function carregarSessao() {
 }
 
 function renderAuthArea() {
+  // Esconde a coluna de seleção em lote para anônimos (a triagem é autenticada).
+  document.body.classList.toggle('is-anon', !sessao.usuario);
   const area = document.getElementById('auth-area');
   if (!area) return;
   if (!sessao.usuario) {
@@ -705,9 +715,29 @@ async function loadChartTipos() {
 
 // ─── Alertas list ──────────────────────────────────────────────────────────
 
+// Seleção para triagem em lote. `sel` guarda ids de alertas marcados;
+// `statusMap` mapeia id→status atual (para decidir as transições na execução).
+const loteState = { sel: new Set(), statusMap: new Map() };
+
+// Popula o filtro de ano de 2023 (início da base) ao ano corrente, sem
+// hardcode — assim vira o ano novo sozinho. Preserva a opção "Todos".
+function populateYearFilter() {
+  const el = document.getElementById('filter-ano');
+  if (!el || el._populated) return;
+  const anoAtual = new Date().getFullYear();
+  const ANO_INICIAL = 2023;
+  const anos = [];
+  for (let a = Math.max(anoAtual, ANO_INICIAL); a >= ANO_INICIAL; a--) anos.push(a);
+  el.insertAdjacentHTML('beforeend',
+    anos.map(a => `<option value="${a}">${a}</option>`).join(''));
+  el._populated = true;
+}
+
 function setupFilters() {
+  populateYearFilter();
   const debouncedLoad = debounce(() => {
     state.alertasPage = 1;
+    limparLote();
     loadAlertas();
   }, 300);
 
@@ -717,6 +747,7 @@ function setupFilters() {
     statusEl.addEventListener('change', () => {
       state.alertasFiltros.status = statusEl.value;
       state.alertasPage = 1;
+      limparLote();
       loadAlertas();
     });
     statusEl._bound = true;
@@ -732,6 +763,7 @@ function setupFilters() {
       el.addEventListener('change', () => {
         state.alertasFiltros[key] = el.value;
         state.alertasPage = 1;
+        limparLote();
         loadAlertas();
       });
       el._bound = true;
@@ -771,6 +803,17 @@ function setupFilters() {
       debouncedLoad();
     });
     valorMinEl._bound = true;
+  }
+
+  const selAll = document.getElementById('lote-select-all');
+  if (selAll && !selAll._bound) {
+    selAll.addEventListener('change', () => {
+      const tbody = document.getElementById('alertas-tbody');
+      const ids = [...tbody.querySelectorAll('.lote-cb-item')].map(cb => parseInt(cb.dataset.id, 10));
+      ids.forEach(id => { if (selAll.checked) loteState.sel.add(id); else loteState.sel.delete(id); });
+      syncLoteUI(tbody);
+    });
+    selAll._bound = true;
   }
 }
 
@@ -817,6 +860,9 @@ async function loadAlertas() {
           }
         });
       }
+      const logado = !!sessao.usuario;
+      const flatIds = [];
+      loteState.statusMap.clear();
       const html = [];
       groups.forEach(grupo => {
         const countBadge = grupo.ocorrencias > 1
@@ -836,9 +882,13 @@ async function loadAlertas() {
         const progressoHtml = totalG > 1
           ? `<div class="grupo-progresso${triadosG === totalG ? ' completo' : ''}" title="Cada contrato do grupo é triado individualmente">${triadosG}/${totalG} triados</div>`
           : '';
+        const grupoIds = (grupo.alertas || []).map(a => a.id);
+        const grupoCb = logado
+          ? `<input type="checkbox" class="lote-cb-grupo" data-ids="${grupoIds.join(',')}" aria-label="Selecionar todos os contratos deste grupo" title="Selecionar todos os contratos deste grupo">`
+          : '';
         html.push(`
           <tr class="row-group" data-grupo="${gid}">
-            <td><button class="expand-btn" data-grupo="${gid}">▶</button></td>
+            <td class="cell-select">${grupoCb}<button class="expand-btn" data-grupo="${gid}">▶</button></td>
             <td><span class="prio-score" title="Score composto">${prioPct}</span></td>
             <td>${tipoBadge(grupo.tipo)}</td>
             <td>${sevBadge(grupo.severidade)}</td>
@@ -851,13 +901,19 @@ async function loadAlertas() {
         `);
 
         grupo.alertas.forEach(a => {
+          flatIds.push(a.id);
+          loteState.statusMap.set(a.id, a.status);
           const pncpBtn = a.numero_controle_pncp
             ? `<a href="https://pncp.gov.br/app/contratos/${a.numero_controle_pncp}" target="_blank" rel="noopener" class="btn-pncp">PNCP ↗</a>`
+            : '';
+          const itemCb = logado
+            ? `<input type="checkbox" class="lote-cb-item" data-id="${a.id}" aria-label="Selecionar este contrato">`
             : '';
           html.push(`
             <tr class="row-detail" data-grupo="${gid}">
               <td colspan="9">
                 <div class="detail-compact">
+                  ${itemCb}
                   <span class="detail-compact-status">${statusBadge(a.status)}</span>
                   <span class="detail-compact-valor">${formatCurrency(a.valor_referencia)}</span>
                   <span class="detail-compact-data">${formatDate(a.data_assinatura)}</span>
@@ -874,6 +930,7 @@ async function loadAlertas() {
       });
 
       tbody.innerHTML = html.join('');
+      state.alertaFlatOrder = flatIds;
 
       tbody.querySelectorAll('.row-group').forEach(tr => {
         const gid = tr.dataset.grupo;
@@ -885,7 +942,7 @@ async function loadAlertas() {
           });
         };
         tr.addEventListener('click', e => {
-          if (e.target.closest('.btn-ver-detalhes, .btn-ver-analise, .btn-acao-principal')) return;
+          if (e.target.closest('.btn-ver-detalhes, .btn-ver-analise, .btn-acao-principal, .lote-cb-grupo, .cell-select')) return;
           expandToggle();
         });
       });
@@ -896,6 +953,8 @@ async function loadAlertas() {
           openDetail(parseInt(btn.dataset.id, 10));
         });
       });
+
+      wireLoteCheckboxes(tbody);
     }
 
     const counter = document.getElementById('resultados-counter');
@@ -909,18 +968,18 @@ async function loadAlertas() {
       }
     }
 
+    // Rótulos das colunas ordenáveis. Todas recebem o mesmo indicador neutro
+    // (⇅) quando inativas e ▲/▼ quando ativas — consistência entre colunas.
     const SORT_BASE = {
-      prioridade: 'Prioridade ▲▼', tipo: 'Tipo', severidade: 'Severidade',
-      valor: 'Valor ▲▼', fornecedor: 'Fornecedor', data: 'Data ▲▼',
+      prioridade: 'Prioridade', tipo: 'Tipo', severidade: 'Severidade',
+      valor: 'Valor', fornecedor: 'Fornecedor', data: 'Data',
     };
     document.querySelectorAll('#alertas-table th[data-sort]').forEach(th => {
       const col = th.dataset.sort;
-      th.classList.toggle('sort-active', col === state.alertasSort.column);
-      if (col === state.alertasSort.column) {
-        th.textContent = SORT_BASE[col].replace(' ▲▼', '') + (state.alertasSort.direction === 'asc' ? ' ▲' : ' ▼');
-      } else {
-        th.textContent = SORT_BASE[col];
-      }
+      const active = col === state.alertasSort.column;
+      th.classList.toggle('sort-active', active);
+      const arrow = active ? (state.alertasSort.direction === 'asc' ? '▲' : '▼') : '⇅';
+      th.innerHTML = `${SORT_BASE[col]}<span class="sort-ind">${arrow}</span>`;
     });
 
     const indicator = document.getElementById('page-indicator');
@@ -936,6 +995,166 @@ async function loadAlertas() {
   }
 }
 
+// ─── Triagem em lote ───────────────────────────────────────────────────────
+// A fila tem ~1.600 alertas triados um-a-um. O lote deixa o fiscal marcar
+// vários (por grupo de fornecedor ou individualmente) e descartar / mover para
+// "investigando" de uma vez — o maior ganho de eficiência na triagem.
+
+function wireLoteCheckboxes(tbody) {
+  tbody.querySelectorAll('.lote-cb-item').forEach(cb => {
+    const id = parseInt(cb.dataset.id, 10);
+    cb.checked = loteState.sel.has(id);
+    cb.addEventListener('change', () => {
+      if (cb.checked) loteState.sel.add(id); else loteState.sel.delete(id);
+      syncLoteUI(tbody);
+    });
+  });
+  tbody.querySelectorAll('.lote-cb-grupo').forEach(cb => {
+    const ids = (cb.dataset.ids || '').split(',').filter(Boolean).map(Number);
+    cb.addEventListener('change', () => {
+      ids.forEach(id => { if (cb.checked) loteState.sel.add(id); else loteState.sel.delete(id); });
+      syncLoteUI(tbody);
+    });
+  });
+  syncLoteUI(tbody);
+}
+
+// Reflete o estado da seleção nos checkboxes (item, grupo, "todos") e na barra.
+function syncLoteUI(tbody) {
+  tbody = tbody || document.getElementById('alertas-tbody');
+  if (!tbody) return;
+  tbody.querySelectorAll('.lote-cb-item').forEach(cb => {
+    cb.checked = loteState.sel.has(parseInt(cb.dataset.id, 10));
+  });
+  tbody.querySelectorAll('.lote-cb-grupo').forEach(cb => {
+    const ids = (cb.dataset.ids || '').split(',').filter(Boolean).map(Number);
+    const marcados = ids.filter(id => loteState.sel.has(id)).length;
+    cb.checked = marcados > 0 && marcados === ids.length;
+    cb.indeterminate = marcados > 0 && marcados < ids.length;
+  });
+  const selAll = document.getElementById('lote-select-all');
+  if (selAll) {
+    const visiveis = [...tbody.querySelectorAll('.lote-cb-item')].map(cb => parseInt(cb.dataset.id, 10));
+    const marcados = visiveis.filter(id => loteState.sel.has(id)).length;
+    selAll.checked = visiveis.length > 0 && marcados === visiveis.length;
+    selAll.indeterminate = marcados > 0 && marcados < visiveis.length;
+  }
+  renderLoteBar();
+}
+
+function limparLote() {
+  loteState.sel.clear();
+  syncLoteUI();
+}
+
+function renderLoteBar() {
+  const bar = document.getElementById('lote-bar');
+  if (!bar) return;
+  const n = loteState.sel.size;
+  if (!n) { bar.classList.remove('visible'); bar.setAttribute('hidden', ''); return; }
+  bar.removeAttribute('hidden');
+  bar.classList.add('visible');
+  const motivoOpts = Object.entries(MOTIVOS_DESCARTE)
+    .map(([k, lbl]) => `<option value="${k}">${lbl}</option>`).join('');
+  bar.innerHTML = `
+    <span class="lote-bar-count"><strong>${n}</strong> ${n === 1 ? 'contrato selecionado' : 'contratos selecionados'}</span>
+    <div class="lote-bar-actions">
+      <label class="lote-bar-motivo">Motivo do descarte
+        <select id="lote-motivo"><option value="">Selecione…</option>${motivoOpts}</select>
+      </label>
+      <button type="button" class="btn-page lote-btn-descartar" id="lote-descartar">Descartar</button>
+      <button type="button" class="btn-page lote-btn-invest" id="lote-investigar">Marcar investigando</button>
+      <button type="button" class="btn-link" id="lote-limpar">Limpar</button>
+    </div>
+    <div id="lote-progresso" class="lote-progresso" hidden></div>`;
+  document.getElementById('lote-limpar').addEventListener('click', limparLote);
+  document.getElementById('lote-investigar').addEventListener('click', () => executarLote('investigando'));
+  document.getElementById('lote-descartar').addEventListener('click', () => {
+    const motivo = document.getElementById('lote-motivo').value;
+    if (!motivo) {
+      const sel = document.getElementById('lote-motivo');
+      sel.classList.add('campo-invalido');
+      sel.focus();
+      return;
+    }
+    executarLote('descartado', motivo);
+  });
+}
+
+// Executa uma transição de status em cada alerta selecionado, respeitando a
+// máquina de estados (aberto→investigando→confirmado; descarte precisa motivo).
+// Roda com concorrência limitada e mostra progresso; recarrega ao final.
+async function executarLote(alvo, motivo) {
+  const ids = [...loteState.sel];
+  const prog = document.getElementById('lote-progresso');
+  const botoes = document.querySelectorAll('#lote-bar button, #lote-bar select');
+  botoes.forEach(b => b.disabled = true);
+  let ok = 0, pulados = 0, falhas = 0, feitos = 0;
+  const mostrar = () => {
+    if (!prog) return;
+    prog.hidden = false;
+    prog.textContent = `Processando ${feitos}/${ids.length}… (${ok} aplicados, ${pulados} ignorados)`;
+  };
+  mostrar();
+
+  const processarUm = async (id) => {
+    const atual = loteState.statusMap.get(id);
+    // Alvo já atingido ou transição inválida: pula sem erro.
+    if (atual === alvo) { pulados++; return; }
+    if (alvo === 'descartado' && atual === 'confirmado') { pulados++; return; }
+    try {
+      // aberto→confirmado não é permitido; descarte de "aberto" é direto.
+      const extra = alvo === 'descartado' ? { motivo_descarte: motivo } : {};
+      const res = await patchAlertaStatus(id, alvo, extra);
+      if (res.ok) { ok++; loteState.statusMap.set(id, alvo); }
+      else if (res.auth) { falhas++; }
+      else { pulados++; }
+    } catch (_) { falhas++; }
+  };
+
+  // Concorrência limitada (4 em paralelo) para não sobrecarregar a API.
+  const fila = [...ids];
+  const trabalhadores = Array.from({ length: Math.min(4, fila.length) }, async () => {
+    while (fila.length) {
+      const id = fila.shift();
+      await processarUm(id);
+      feitos++;
+      mostrar();
+    }
+  });
+  await Promise.all(trabalhadores);
+
+  if (prog) {
+    const partes = [`${ok} aplicado(s)`];
+    if (pulados) partes.push(`${pulados} ignorado(s)`);
+    if (falhas) partes.push(`${falhas} com falha`);
+    prog.textContent = partes.join(' · ');
+  }
+  // Remove da seleção os que foram aplicados; mantém os que falharam.
+  ids.forEach(id => { if (loteState.statusMap.get(id) === alvo) loteState.sel.delete(id); });
+  botoes.forEach(b => b.disabled = false);
+  // Falha total de autenticação: não recarrega (apagaria a mensagem); mostra o
+  // convite a entrar de novo. Nos demais casos, recarrega para refletir o novo
+  // status na tabela e no resumo.
+  if (falhas && !ok) {
+    const href = `/login?next=${encodeURIComponent(location.pathname)}`;
+    if (prog) prog.innerHTML = `Sua sessão expirou. <a href="${href}">Entre novamente</a> para triar em lote.`;
+    return;
+  }
+  setTimeout(() => loadAlertas(), 700);
+}
+
+async function patchAlertaStatus(id, status, extra = {}) {
+  const res = await fetch(`${BASE}/api/alertas/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, ...extra }),
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (res.status === 401 || payload.auth === 'login') return { ok: false, auth: true };
+  return { ok: res.ok, payload };
+}
+
 // ─── Detail panel ──────────────────────────────────────────────────────────
 
 // Elemento que tinha o foco antes de abrir o painel — para devolvê-lo ao fechar.
@@ -947,6 +1166,7 @@ async function openDetail(id) {
   const content  = document.getElementById('detail-content');
 
   _stopInvProfundaPolling();
+  state.currentAlertaId = id;
   // Guarda o foco de origem só na primeira abertura (openDetail se re-chama
   // após salvar a triagem; não queremos sobrescrever com o botão interno).
   if (!panel.classList.contains('panel-open')) {
@@ -1001,13 +1221,21 @@ async function openDetail(id) {
     ).join('');
 
     const historicoHtml = (d.historico || []).length
-      ? (d.historico || []).map(h => `
+      ? (d.historico || []).map(h => {
+          // Salvar só uma nota registra uma transição X → X. Nesses casos
+          // mostramos "anotação" em vez de repetir o mesmo status dos dois lados.
+          const semMudanca = (h.status_anterior || '') === h.status_novo;
+          const transicao = semMudanca
+            ? `<span class="triage-hist-anotacao">Anotação</span> ${statusBadge(h.status_novo)}`
+            : `${statusBadge(h.status_anterior || '—')} → ${statusBadge(h.status_novo)}`;
+          return `
           <li>
             <span class="triage-hist-meta">${formatDate(h.criado_em)}</span>
-            ${statusBadge(h.status_anterior || '—')} → ${statusBadge(h.status_novo)}
+            ${transicao}
             ${h.nota ? `<span class="triage-hist-nota">${escapeHtml(h.nota)}</span>` : ''}
           </li>
-        `).join('')
+        `;
+        }).join('')
       : '<li class="triage-hist-empty">Nenhuma movimentação registrada.</li>';
 
     // Modo leitor: a triagem e a IA são operações de escrita autenticadas
@@ -1035,6 +1263,7 @@ async function openDetail(id) {
           <textarea id="triage-nota" rows="3" placeholder="Observações da investigação…">${escapeHtml(d.notas_triagem || '')}</textarea>
           <button type="button" id="triage-save" class="btn-page">Salvar triagem</button>
           <div id="triage-erro" class="error-msg" style="display:none;margin-top:0.5rem"></div>
+          <p class="triage-atalhos">Atalhos: <kbd>I</kbd> investigar · <kbd>C</kbd> confirmar · <kbd>D</kbd> descartar · <kbd>S</kbd> salvar · <kbd>J</kbd>/<kbd>K</kbd> próximo/anterior</p>
         </div>
         <div class="triage-historico">
           <label>Histórico</label>
@@ -1054,10 +1283,10 @@ async function openDetail(id) {
 
     const iaBtnHtml = logado
       ? `<button type="button" id="btn-investigar-ia" class="btn-investigar" title="IA em nuvem emite um parecer único: plausibilidade, análise e status/motivo sugeridos">
-          ✨ ${btnIaLabel}
+          ${ICON.ia} ${btnIaLabel}
         </button>`
       : `<a href="${loginHref}" class="btn-investigar btn-investigar-login" title="Entre para gerar um parecer de IA deste alerta">
-          ✨ Entrar para investigar com IA
+          ${ICON.ia} Entrar para investigar com IA
         </a>`;
 
     content.innerHTML = `
@@ -1111,7 +1340,7 @@ async function openDetail(id) {
       <div class="detail-actions">
         ${pncpLink}
         ${d.fornecedor_ni ? `<a href="/fornecedor/${d.fornecedor_ni}" target="_self" class="detail-link">Ver página do fornecedor →</a>` : ''}
-        <button id="share-btn" class="btn-page" onclick="shareAlert(${id})" style="font-size:0.8rem">🔗 Copiar link</button>
+        <button id="share-btn" class="btn-page" onclick="shareAlert(${id})" style="font-size:0.8rem">${ICON.link} Copiar link</button>
       </div>
     `;
 
@@ -1253,7 +1482,7 @@ async function investigarComIa(alertaId) {
       );
     });
 
-    btn.textContent = '✨ Regenerar parecer';
+    btn.innerHTML = `${ICON.ia} Regenerar parecer`;
     statusEl.textContent = parecer
       ? 'Parecer gerado. Revise e clique em “Aplicar sugestão” para triar.'
       : 'Parecer indisponível.';
@@ -1320,7 +1549,7 @@ async function investigarProfundo(alertaId) {
     _startInvProfundaPolling(alertaId);
   } catch (e) {
     btn.disabled = false;
-    btn.textContent = '🔍 Investigar Profundo';
+    btn.innerHTML = `${ICON.lupa} Investigar Profundo`;
     if (statusEl) statusEl.textContent = `Erro: ${e.message}`;
   }
 }
@@ -1369,7 +1598,7 @@ async function _pollInvProfunda(alertaId) {
 
     if (btn) {
       btn.disabled = false;
-      btn.textContent = '🔍 Re-investigar';
+      btn.innerHTML = `${ICON.lupa} Re-investigar`;
     }
 
     if (data.status === 'erro') {
@@ -1571,7 +1800,7 @@ function shareAlert(id) {
     const btn = document.getElementById('share-btn');
     if (btn) {
       btn.textContent = '✓ Link copiado!';
-      setTimeout(() => { btn.textContent = '🔗 Copiar link'; }, 2000);
+      setTimeout(() => { btn.innerHTML = `${ICON.link} Copiar link`; }, 2000);
     }
   });
 }
@@ -1587,6 +1816,20 @@ function closeDetail() {
     _detailReturnFocus.focus();
   }
   _detailReturnFocus = null;
+  state.currentAlertaId = null;
+}
+
+// Navega para o próximo (dir=1) / anterior (dir=-1) alerta na ordem exibida
+// na fila — para o fiscal percorrer a lista sem voltar à tabela (teclas j/k).
+function navegarAlerta(dir) {
+  const ordem = state.alertaFlatOrder || [];
+  const atual = state.currentAlertaId;
+  if (!ordem.length || atual == null) return;
+  const i = ordem.indexOf(atual);
+  if (i === -1) return;
+  const prox = i + dir;
+  if (prox < 0 || prox >= ordem.length) return;
+  openDetail(ordem[prox]);
 }
 
 // ─── Timeline ──────────────────────────────────────────────────────────────
@@ -2558,6 +2801,26 @@ function endTour() {
 
 // ─── Pipeline status ───────────────────────────────────────────────────────
 
+// Converte uma expressão cron (5 campos) numa frase em pt-BR. Cobre os casos
+// que o pipeline usa (diário/semanal em horário fixo); expressões fora do
+// padrão caem no rótulo cru como fallback, sem quebrar.
+function humanizeCron(expr) {
+  const partes = String(expr).trim().split(/\s+/);
+  if (partes.length < 5) return `Agendamento: ${expr}`;
+  const [min, hora, diaMes, mes, diaSem] = partes;
+  const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const numerico = v => /^\d+$/.test(v);
+  if (!numerico(min) || !numerico(hora)) return `Agendamento: ${expr}`;
+  const horario = `${hora.padStart(2, '0')}h${min === '0' ? '' : min.padStart(2, '0')}`;
+  if (diaMes === '*' && mes === '*') {
+    if (diaSem === '*') return `Todo dia às ${horario}`;
+    if (numerico(diaSem) && DIAS[Number(diaSem) % 7]) {
+      return `Toda ${DIAS[Number(diaSem) % 7]}-feira às ${horario}`.replace('sábado-feira', 'sábado').replace('domingo-feira', 'domingo');
+    }
+  }
+  return `Agendamento: ${expr}`;
+}
+
 async function loadPipelineStatus() {
   const el = document.getElementById('pipeline-status-card');
   if (!el) return;
@@ -2568,7 +2831,7 @@ async function loadPipelineStatus() {
     const saude = data.saude || 'desconhecido';
     const badgeCls = saude === 'ok' ? 'ok' : saude === 'atencao' ? 'warn' : 'fail';
     const linhas = (data.log_ultimas_linhas || []).join('\n');
-    const agendador = cfg.cron ? `cron ${cfg.cron}` : 'manual / Task Scheduler';
+    const agendador = cfg.cron ? humanizeCron(cfg.cron) : 'Manual / Agendador do sistema';
     el.innerHTML = `
       <div class="pipeline-status-header">
         <h3>Pipeline automático</h3>
@@ -2927,6 +3190,37 @@ document.addEventListener('DOMContentLoaded', async () => {
       closeDetail();
       return;
     }
+
+    // Atalhos de triagem (fiscal autenticado). Ctrl/Cmd+Enter salva mesmo com
+    // foco no textarea; as teclas de letra só valem fora de campos de texto,
+    // para não atrapalhar a digitação da nota.
+    if (sessao.usuario) {
+      const salvarBtn = document.getElementById('triage-save');
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && salvarBtn) {
+        e.preventDefault();
+        salvarBtn.click();
+        return;
+      }
+      const alvoEditavel = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+      if (!alvoEditavel && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const setStatus = (valor) => {
+          const sel = document.getElementById('triage-status');
+          if (!sel) return false;
+          const opt = [...sel.options].some(o => o.value === valor);
+          if (!opt) return false;
+          sel.value = valor;
+          sel.dispatchEvent(new Event('change'));
+          return true;
+        };
+        const tecla = e.key.toLowerCase();
+        if (tecla === 'c' && setStatus('confirmado')) { e.preventDefault(); return; }
+        if (tecla === 'd' && setStatus('descartado')) { e.preventDefault(); return; }
+        if (tecla === 'i' && setStatus('investigando')) { e.preventDefault(); return; }
+        if ((tecla === 's' || e.key === 'Enter') && salvarBtn) { e.preventDefault(); salvarBtn.click(); return; }
+        if (tecla === 'j' || tecla === 'k') { e.preventDefault(); navegarAlerta(tecla === 'j' ? 1 : -1); return; }
+      }
+    }
+
     if (e.key === 'Tab') {
       const foco = panel.querySelectorAll(
         'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'

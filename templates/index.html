@@ -47,10 +47,10 @@
     <section id="tab-visao-geral" class="tab-section active">
       <div id="kpi-cards" class="kpi-grid"></div>
       <div class="download-bar">
-        <span>📥 Dados abertos:</span>
-        <a href="/api/export/contratos" class="btn-download">⬇ Contratos (.csv)</a>
-        <a href="/api/export/alertas" class="btn-download">⬇ Alertas (.csv)</a>
-        <a href="/relatorio/pdf" class="btn-download btn-pdf">⬇ Exportar Relatório PDF</a>
+        <span><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9.5 4 3.5h8l2 6"/><path d="M2 9.5v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3"/><path d="M2 9.5h3l1 1.5h4l1-1.5h3"/></svg> Dados abertos:</span>
+        <a href="/api/export/contratos" class="btn-download"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7m0 0 3-3m-3 3L5 6"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1"/></svg> Contratos (.csv)</a>
+        <a href="/api/export/alertas" class="btn-download"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7m0 0 3-3m-3 3L5 6"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1"/></svg> Alertas (.csv)</a>
+        <a href="/relatorio/pdf" class="btn-download btn-pdf"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7m0 0 3-3m-3 3L5 6"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1"/></svg> Exportar Relatório PDF</a>
         <span class="download-hint">Todos os dados disponíveis para verificação independente</span>
       </div>
       <div id="pipeline-status-card" class="pipeline-status-card">
@@ -103,27 +103,24 @@
         </select>
         <select id="filter-ano">
           <option value="">Todos os anos</option>
-          <option value="2023">2023</option>
-          <option value="2024">2024</option>
-          <option value="2025">2025</option>
-          <option value="2026">2026</option>
         </select>
         <input id="filter-fornecedor" type="text" placeholder="Buscar fornecedor...">
         <input type="number" id="filter-valor-min" placeholder="Valor mínimo (R$)" min="0" step="1000000">
       </div>
       <div id="resultados-counter" class="resultados-counter"></div>
+      <div id="lote-bar" class="lote-bar" hidden></div>
       <div id="alertas-table-wrap">
         <table id="alertas-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th data-sort="prioridade">Prioridade</th>
-              <th data-sort="tipo">Tipo</th>
-              <th data-sort="severidade">Severidade</th>
+              <th class="col-select"><input type="checkbox" id="lote-select-all" aria-label="Selecionar todos os grupos visíveis" title="Selecionar todos os grupos visíveis"></th>
+              <th data-sort="prioridade" class="sortable">Prioridade</th>
+              <th data-sort="tipo" class="sortable">Tipo</th>
+              <th data-sort="severidade" class="sortable">Severidade</th>
               <th>Status</th>
-              <th data-sort="valor">Valor ▲▼</th>
-              <th data-sort="fornecedor">Fornecedor</th>
-              <th data-sort="data">Data ▲▼</th>
+              <th data-sort="valor" class="sortable">Valor</th>
+              <th data-sort="fornecedor" class="sortable">Fornecedor</th>
+              <th data-sort="data" class="sortable">Data</th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -358,27 +355,27 @@
       <!-- Pipeline visual -->
       <div class="sobre-pipeline">
         <div class="sobre-pipeline-step">
-          <div class="sobre-pipeline-icon">📥</div>
+          <div class="sobre-pipeline-icon"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14l3-9h12l3 9"/><path d="M3 14v4a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-4"/><path d="M3 14h4l1.5 2h7L17 14h4"/></svg></div>
           <div class="sobre-pipeline-label">Coleta PNCP</div>
         </div>
         <div class="sobre-pipeline-arrow">→</div>
         <div class="sobre-pipeline-step">
-          <div class="sobre-pipeline-icon">🔍</div>
+          <div class="sobre-pipeline-icon"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></div>
           <div class="sobre-pipeline-label">Detectores</div>
         </div>
         <div class="sobre-pipeline-arrow">→</div>
         <div class="sobre-pipeline-step">
-          <div class="sobre-pipeline-icon">⚖️</div>
+          <div class="sobre-pipeline-icon"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M6 6h12"/><path d="M6 6 3 12.5h6z"/><path d="M18 6l-3 6.5h6z"/><path d="M8 21h8"/></svg></div>
           <div class="sobre-pipeline-label">Risk Score</div>
         </div>
         <div class="sobre-pipeline-arrow">→</div>
         <div class="sobre-pipeline-step">
-          <div class="sobre-pipeline-icon">🚨</div>
+          <div class="sobre-pipeline-icon"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 21.5 20H2.5z"/><path d="M12 10v4.5"/><path d="M12 17.5v.5"/></svg></div>
           <div class="sobre-pipeline-label">Alerta</div>
         </div>
         <div class="sobre-pipeline-arrow">→</div>
         <div class="sobre-pipeline-step">
-          <div class="sobre-pipeline-icon">🤖</div>
+          <div class="sobre-pipeline-icon"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="7" width="12" height="11" rx="2"/><path d="M9 4v3M15 4v3M3 11h3M3 15h3M18 11h3M18 15h3"/><circle cx="10" cy="12" r="1"/><circle cx="14" cy="12" r="1"/><path d="M9.5 15.5h5"/></svg></div>
           <div class="sobre-pipeline-label">Investigação IA</div>
         </div>
       </div>
@@ -452,7 +449,7 @@
       <p>Este sistema identifica <em>padrões estatísticos</em> que merecem atenção. Uma anomalia detectada não significa necessariamente irregularidade — pode haver justificativas legais para qualquer contrato. O Sentinela RJ é uma ferramenta de transparência, não de acusação.</p>
 
       <h3>Precisão medida em produção</h3>
-      <p>Cada detector é validado contra <strong>triagem humana real</strong> (não estimativa): precisão = confirmados ÷ (confirmados + descartados), com no mínimo 10 alertas rotulados por detector. Snapshot de jul/2026 — números ao vivo em <a href="/precisao">📊 Precisão medida</a>:</p>
+      <p>Cada detector é validado contra <strong>triagem humana real</strong> (não estimativa): precisão = confirmados ÷ (confirmados + descartados), com no mínimo 10 alertas rotulados por detector. Snapshot de jul/2026 — números ao vivo em <a href="/precisao"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 14h12"/><path d="M4.5 14V8.5"/><path d="M8 14V4"/><path d="M11.5 14v-3.5"/></svg> Precisão medida</a>:</p>
       <div class="sobre-severity-table">
         <div class="sobre-severity-row"><span class="badge badge-green">75,0%</span><span>Inexigibilidade — 15 confirmados / 5 descartados</span></div>
         <div class="sobre-severity-row"><span class="badge badge-green">72,7%</span><span>Concentração de fornecedor — 8 / 3</span></div>
@@ -464,14 +461,14 @@
 
       <h3>Transparência e responsabilidade</h3>
       <p>
-        <a href="/precisao">📊 Precisão medida</a> — taxa de acerto de cada detector, calculada da triagem real ·
-        <a href="/backtesting">🎯 O Sentinela teria detectado?</a> — backtesting contra casos conhecidos ·
-        <a href="/benchmark">🏙️ Benchmark municipal</a> — como seu município contrata vs a mediana regional ·
-        <a href="/dados">🔒 Dados e responsabilidade</a> — base legal (LGPD), fontes e como contestar
+        <a href="/precisao"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 14h12"/><path d="M4.5 14V8.5"/><path d="M8 14V4"/><path d="M11.5 14v-3.5"/></svg> Precisão medida</a> — taxa de acerto de cada detector, calculada da triagem real ·
+        <a href="/backtesting"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><circle cx="8" cy="8" r="0.5" fill="currentColor" stroke="none"/></svg> O Sentinela teria detectado?</a> — backtesting contra casos conhecidos ·
+        <a href="/benchmark"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 14h13"/><rect x="3" y="6.5" width="3.5" height="7.5"/><rect x="8" y="3" width="3.5" height="11"/></svg> Benchmark municipal</a> — como seu município contrata vs a mediana regional ·
+        <a href="/dados"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg> Dados e responsabilidade</a> — base legal (LGPD), fontes e como contestar
       </p>
 
       <h3>API pública</h3>
-      <p>Todos os dados de leitura estão disponíveis via API REST documentada, livre para reuso jornalístico e acadêmico: <a href="/api/docs">🔌 Documentação interativa (Swagger)</a> · alertas, contratos e precisão medida sob <code>/api/v1/</code>.</p>
+      <p>Todos os dados de leitura estão disponíveis via API REST documentada, livre para reuso jornalístico e acadêmico: <a href="/api/docs"><svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4 2.5 8 6 12"/><path d="M10 4l3.5 4L10 12"/></svg> Documentação interativa (Swagger)</a> · alertas, contratos e precisão medida sob <code>/api/v1/</code>.</p>
 
       <h3>Fonte de dados</h3>
       <p>Portal Nacional de Contratações Públicas (PNCP) · <a href="https://pncp.gov.br" target="_blank" rel="noopener">pncp.gov.br</a></p>

@@ -2926,3 +2926,153 @@ th.sort-active {
 .inv-profunda-rec strong {
   color: #e2e8f0;
 }
+
+/* ─── Ícones SVG monocromáticos (substituem emojis) ─── */
+.ico {
+  display: inline-block;
+  vertical-align: -0.14em;
+  flex: none;
+}
+
+/* ─── Indicador de ordenação (consistente em todas as colunas) ─── */
+.sort-ind {
+  display: inline-block;
+  margin-left: 0.3em;
+  font-size: 0.72em;
+  color: var(--muted);
+  vertical-align: middle;
+}
+th.sort-active .sort-ind {
+  color: var(--red);
+}
+
+/* ─── Coluna e checkboxes de seleção para triagem em lote ─── */
+.col-select,
+.cell-select {
+  width: 3rem;
+  white-space: nowrap;
+  text-align: left;
+}
+.cell-select .lote-cb-grupo {
+  vertical-align: middle;
+  margin-right: 0.35rem;
+}
+.cell-select .expand-btn {
+  vertical-align: middle;
+}
+.lote-cb-grupo,
+.lote-cb-item,
+#lote-select-all {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--blue);
+  flex: none;
+}
+.lote-cb-item {
+  margin-right: 0.6rem;
+  vertical-align: middle;
+}
+/* Anônimo não tria: o checkbox "selecionar todos" some (as linhas já não têm
+   checkbox no DOM). A coluna permanece para não desalinhar o botão de expandir. */
+.is-anon #lote-select-all {
+  display: none;
+}
+
+/* ─── Barra de ações em lote ─── */
+.lote-bar {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 5;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blue);
+  border-radius: 8px;
+}
+.lote-bar.visible {
+  display: flex;
+}
+.lote-bar-count {
+  font-size: 0.9rem;
+}
+.lote-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.lote-bar-motivo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.lote-bar-motivo select {
+  padding: 0.3rem 0.5rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.lote-bar-motivo select.campo-invalido {
+  border-color: var(--red);
+}
+.lote-btn-descartar {
+  border-color: var(--red) !important;
+  color: var(--red) !important;
+}
+.lote-progresso {
+  flex-basis: 100%;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.82rem;
+  padding: 0.2rem;
+}
+.btn-link:hover {
+  color: var(--text);
+}
+
+/* ─── Legenda de atalhos de teclado da triagem ─── */
+.triage-atalhos {
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.triage-atalhos kbd {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: 0.05em 0.4em;
+  font-family: inherit;
+  font-size: 0.9em;
+  text-align: center;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Anotação no histórico (nota sem mudança de status) ─── */
+.triage-hist-anotacao {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-right: 0.3rem;
+}
