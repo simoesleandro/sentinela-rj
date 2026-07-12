@@ -3068,6 +3068,52 @@ th.sort-active .sort-ind {
   border-radius: 4px;
 }
 
+/* ─── Selo de conflito de interesse (sócio-servidor) na fila ─── */
+/* Cor reservada (roxo) para "beneficiário identificado" — não colide com
+   severidade (vermelho/amarelo) nem com a seleção em lote (azul). */
+.badge-conflito {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  vertical-align: middle;
+}
+.badge-conflito.forte {
+  color: var(--purple);
+  border-color: color-mix(in srgb, var(--purple) 45%, transparent);
+  background: color-mix(in srgb, var(--purple) 12%, transparent);
+}
+
+/* Bloco de conflito no painel de detalhe */
+.detail-conflito {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 0.75rem 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.detail-conflito.forte {
+  border-left-color: var(--purple);
+}
+.detail-conflito .ico {
+  margin-top: 0.15rem;
+  color: var(--purple);
+  flex: none;
+}
+.detail-conflito strong { display: block; margin-bottom: 0.2rem; }
+.detail-conflito p { color: var(--muted); margin: 0; line-height: 1.5; }
+.detail-conflito .detail-link { margin-left: 0.3rem; }
+
 /* ─── Anotação no histórico (nota sem mudança de status) ─── */
 .triage-hist-anotacao {
   font-size: 0.72rem;

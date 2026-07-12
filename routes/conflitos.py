@@ -1,7 +1,7 @@
 """Conflito de interesse — candidatos sócio × servidor (Supabase/Postgres)."""
 from flask import Blueprint, jsonify, render_template, request
 
-from web_auth import requer_login
+from web_auth import requer_admin, requer_login
 
 import web_app as core
 
@@ -40,6 +40,26 @@ def _serializar_candidato_conflito(item: dict) -> dict:
 @bp.route("/conflitos-interesse")
 def conflitos_interesse_page():
     return render_template("conflitos_interesse.html")
+
+
+@bp.route("/api/admin/sync-conflito-flags", methods=["POST"])
+@requer_admin
+@core.csrf_required
+def api_sync_conflito_flags():
+    """Materializa no core os sinais de conflito por fornecedor (lê o Supabase).
+    Roda em produção — o Supabase é alcançável da app — sem transfer de DB.
+    Alimenta o cruzamento com a fila de alertas (selo + filtro na triagem)."""
+    from db.conflito_flags import sincronizar_flags
+
+    conn_conflito = core.get_conflito_conn()
+    try:
+        db = core.get_db()
+        n = sincronizar_flags(db, conn_conflito)
+        return jsonify({"ok": True, "fornecedores": n})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        conn_conflito.close()
 
 
 @bp.route("/api/conflitos-interesse")

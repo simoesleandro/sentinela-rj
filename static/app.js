@@ -72,7 +72,22 @@ const ICON = {
   lupa: '<svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>',
   link: '<svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5 9.5 6.5"/><path d="M7.2 4.6 8.6 3.2a2.7 2.7 0 0 1 3.8 3.8L11 8.4"/><path d="M8.8 11.4 7.4 12.8a2.7 2.7 0 0 1-3.8-3.8L5 7.6"/></svg>',
   check: '<svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5"/></svg>',
+  flag: '<svg class="ico" viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" stroke="none" aria-hidden="true"><rect x="3.4" y="2" width="1.2" height="12" rx="0.6"/><path d="M5.2 2.8h7.2l-1.7 2.5 1.7 2.5H5.2z"/></svg>',
 };
+
+// Selo de conflito de interesse (sócio-servidor) cruzado com o fornecedor do
+// alerta. `forte` = há candidato com lotação × órgão contratante. Match é por
+// nome, sem certeza — o selo é "candidato a", nunca acusação.
+function conflitoBadge(conflito) {
+  if (!conflito || !conflito.qtd) return '';
+  const n = conflito.qtd;
+  const plural = n > 1 ? 's' : '';
+  const titulo = conflito.forte
+    ? `Sócio de empresa contratada com lotação no órgão contratante (${n} candidato${plural} a conflito). Indício forte — match por nome, verificar identidade.`
+    : `Fornecedor tem ${n} sócio${plural} candidato${plural} a servidor público. Match por nome — verificar.`;
+  const rotulo = conflito.forte ? 'Sócio-servidor' : 'Sócio-servidor?';
+  return `<span class="badge-conflito${conflito.forte ? ' forte' : ''}" title="${esc(titulo)}">${ICON.flag} ${rotulo}</span>`;
+}
 
 const STATUS_BADGE_CLASS = {
   aberto: 'status-aberto',
@@ -106,7 +121,7 @@ const state = {
   coletaRotulo: '',
   monitorados: [],
   alertasPage: 1,
-  alertasFiltros: { status: 'fila', tipo: '', severidade: '', ano: '', fornecedor: '', valorMin: '' },
+  alertasFiltros: { status: 'fila', tipo: '', severidade: '', ano: '', fornecedor: '', valorMin: '', conflito: '' },
   alertasSort: { column: 'prioridade', direction: 'desc' },
   charts: {},
   tabLoaded: {},
@@ -757,6 +772,7 @@ function setupFilters() {
     ['filter-tipo',       'tipo'],
     ['filter-severidade', 'severidade'],
     ['filter-ano',        'ano'],
+    ['filter-conflito',   'conflito'],
   ].forEach(([id, key]) => {
     const el = document.getElementById(id);
     if (el && !el._bound) {
@@ -830,6 +846,7 @@ async function loadAlertas() {
     if (f.ano)        params.set('ano',        f.ano);
     if (f.fornecedor) params.set('fornecedor', f.fornecedor);
     if (f.valorMin)   params.set('valor_min',  f.valorMin);
+    if (f.conflito)   params.set('conflito',   f.conflito);
 
     const res = await fetch(apiUrl(`/api/alertas/agrupados?${params}`));
     if (!res.ok) throw new Error(res.statusText);
@@ -894,7 +911,7 @@ async function loadAlertas() {
             <td>${sevBadge(grupo.severidade)}</td>
             <td>${statusBadge(grupo.status)}${progressoHtml}</td>
             <td style="white-space:nowrap;font-weight:500">${formatCurrency(grupo.valor_total)}</td>
-            <td>${truncate(grupo.fornecedor || '—', 30)} ${countBadge}</td>
+            <td>${truncate(grupo.fornecedor || '—', 30)} ${countBadge}${conflitoBadge(grupo.conflito)}</td>
             <td style="white-space:nowrap;color:var(--muted)">${formatDate(grupo.data_mais_recente)}</td>
             <td>${analisBtn}</td>
           </tr>
@@ -1289,6 +1306,16 @@ async function openDetail(id) {
           ${ICON.ia} Entrar para investigar com IA
         </a>`;
 
+    const conflitoDetailHtml = d.conflito && d.conflito.qtd ? `
+      <div class="detail-conflito${d.conflito.forte ? ' forte' : ''}">
+        ${ICON.flag}
+        <div>
+          <strong>Conflito de interesse — sócio-servidor</strong>
+          <p>${d.conflito.qtd} sócio(s) desta empresa coincidem por nome com servidor(es) público(s)${d.conflito.forte ? ', com <strong>lotação no órgão contratante</strong> (indício forte)' : ''}${d.conflito.cpf_confirmado ? '; ao menos um com CPF confirmado via TSE' : ''}. O casamento é por nome — homônimos são esperados, verifique a identidade.
+          <a href="/conflitos-interesse" class="detail-link">Ver triagem de conflitos →</a></p>
+        </div>
+      </div>` : '';
+
     content.innerHTML = `
       <div class="detail-fornecedor">${escapeHtml(d.fornecedor || 'Fornecedor não identificado')}</div>
       <div class="detail-badges">
@@ -1296,6 +1323,7 @@ async function openDetail(id) {
         ${sevBadge(d.severidade)}
         ${statusBadge(d.status)}
       </div>
+      ${conflitoDetailHtml}
       ${triageBlockHtml}
       <div class="detail-valor">${formatCurrency(d.valor_referencia)}</div>
       <div class="detail-grid">

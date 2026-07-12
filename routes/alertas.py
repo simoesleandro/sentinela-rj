@@ -218,6 +218,32 @@ def alertas_feedback_descartes():
 # ---------------------------------------------------------------------------
 # Alertas — grouped
 # ---------------------------------------------------------------------------
+def _anexar_conflito(db, items) -> None:
+    """Anexa a cada grupo o resumo de conflito de interesse do fornecedor
+    (materializado em fornecedores_conflito por db.conflito_flags). Sem candidato
+    → `conflito` = None. Tabela ausente (DB antigo) é tratada como sem dados."""
+    fnis = [it["fornecedor_ni"] for it in items if it.get("fornecedor_ni")]
+    if not fnis:
+        return
+    placeholders = ",".join("?" * len(fnis))
+    try:
+        rows = db.execute(
+            f"""SELECT fornecedor_ni, qtd_candidatos, tem_lotacao, tem_cpf_confirmado
+                FROM fornecedores_conflito WHERE fornecedor_ni IN ({placeholders})""",
+            fnis,
+        ).fetchall()
+    except Exception:
+        rows = []
+    por_ni = {r["fornecedor_ni"]: r for r in rows}
+    for it in items:
+        r = por_ni.get(it.get("fornecedor_ni"))
+        it["conflito"] = {
+            "qtd": r["qtd_candidatos"],
+            "forte": bool(r["tem_lotacao"]),
+            "cpf_confirmado": bool(r["tem_cpf_confirmado"]),
+        } if r else None
+
+
 @bp.route("/api/alertas/agrupados")
 def alertas_agrupados():
     db = core.get_db()
@@ -230,6 +256,7 @@ def alertas_agrupados():
         fornecedor = request.args.get("fornecedor")
         valor_min = request.args.get("valor_min", type=float)
         status = request.args.get("status")
+        conflito = request.args.get("conflito")
 
         joins = """
             FROM alertas a
@@ -259,6 +286,16 @@ def alertas_agrupados():
         if valor_min is not None:
             conditions.append("a.valor_referencia >= ?")
             params.append(valor_min)
+        # Cruzamento com conflito de interesse (sócio-servidor): 'forte' = há
+        # candidato com lotação × órgão contratante; 'qualquer' = há candidato.
+        if conflito == "forte":
+            conditions.append(
+                "c.fornecedor_ni IN (SELECT fornecedor_ni FROM fornecedores_conflito WHERE tem_lotacao = 1)"
+            )
+        elif conflito in ("qualquer", "1", "true"):
+            conditions.append(
+                "c.fornecedor_ni IN (SELECT fornecedor_ni FROM fornecedores_conflito)"
+            )
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -322,6 +359,7 @@ def alertas_agrupados():
 
             items.append({
                 "grupo_id": f"{fni}__{tp}",
+                "fornecedor_ni": fni,
                 "fornecedor": gr["fornecedor_nome"] or fni,
                 "tipo": tp,
                 "severidade": max_sev,
@@ -346,6 +384,8 @@ def alertas_agrupados():
                     for a in alerts
                 ],
             })
+
+        _anexar_conflito(db, items)
 
         return jsonify({
             "items": items,
@@ -431,6 +471,7 @@ def alertas_detail(alert_id: int):
         payload["transparencia_rj"] = listar_empenhos_vinculados(
             db, payload.get("numero_controle_pncp")
         )
+        _anexar_conflito(db, [payload])  # adiciona payload["conflito"]
         return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

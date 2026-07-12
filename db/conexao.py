@@ -213,6 +213,23 @@ _MIGRACOES_DDL = [
     "CREATE INDEX IF NOT EXISTS idx_doacoes_nome_norm ON doacoes_campanha(doador_nome_norm)",
     "CREATE INDEX IF NOT EXISTS idx_doacoes_cpf ON doacoes_campanha(doador_cpf)",
     "CREATE INDEX IF NOT EXISTS idx_socios_cpf_nome_norm ON socios_cpf_confirmado(nome_socio_norm)",
+    # Materialização, por fornecedor, dos candidatos a conflito de interesse
+    # (sócio-servidor) que vivem no Supabase separado. Serve para cruzar com a
+    # fila de alertas SEM pendurar o Supabase no caminho quente do dashboard:
+    # preenchida periodicamente por db.conflito_flags.sincronizar_flags (via
+    # endpoint admin ou CLI). `tem_lotacao` = há candidato com lotação × órgão
+    # contratante (o sinal forte); `tem_cpf_confirmado` = identidade fechada via
+    # TSE. Descartados não entram (já triados como falso positivo).
+    """
+    CREATE TABLE IF NOT EXISTS fornecedores_conflito (
+        fornecedor_ni       TEXT PRIMARY KEY,
+        qtd_candidatos      INTEGER NOT NULL DEFAULT 0,
+        tem_lotacao         INTEGER NOT NULL DEFAULT 0,
+        tem_cpf_confirmado  INTEGER NOT NULL DEFAULT 0,
+        atualizado_em       TEXT DEFAULT (datetime('now'))
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_forn_conflito_lotacao ON fornecedores_conflito(tem_lotacao)",
 ]
 
 _MIGRACOES_CASOS_CNPJ = [
