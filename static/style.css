@@ -3,7 +3,7 @@
   --surface: #171717;
   --border: #262626;
   --text: #fafafa;
-  --muted: #737373;
+  --muted: #8a8a8a;
   --red: #ef4444;
   --orange: #f97316;
   --purple: #a855f7;
@@ -18,6 +18,17 @@
   padding: 0;
 }
 
+/* Respeita usuários que pedem menos movimento (WCAG 2.3.3 / prefers-reduced-motion).
+   Neutraliza animações e transições sem quebrar a leitura. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--bg);
@@ -25,6 +36,28 @@ body {
   line-height: 1.5;
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
+}
+
+/* Pular para o conteúdo — visível só ao receber foco pelo teclado (WCAG 2.4.1). */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -3rem;
+  z-index: 100;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: top 0.15s;
+}
+
+.skip-link:focus {
+  top: 0.5rem;
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 
 /* ─── Header ─── */
@@ -185,16 +218,26 @@ main {
   margin-bottom: 2rem;
 }
 
+/* O painel principal tem 6 KPIs: grade 3×2 no desktop fecha certo, sem o 6º
+   card órfão que o auto-fit (5+1) deixava. Tablet/mobile herdam os overrides
+   de .kpi-grid. Não afeta #orgaos-cards / #empenhos-resumo-cards (contagem
+   variável, seguem no auto-fit). */
+@media (min-width: 769px) {
+  #kpi-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 .kpi-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--border);
   border-radius: 8px;
   padding: 1.25rem;
 }
 
+/* Realce por borda completa tênue, não por faixa lateral (side-stripe). */
 .kpi-card.highlight {
-  border-left-color: var(--red);
+  border-color: rgba(239, 68, 68, 0.45);
 }
 
 .kpi-card.kpi-clickable {
@@ -449,7 +492,7 @@ tr:last-child td {
 .toggle-btn {
   background: #171717;
   border: none;
-  color: #737373;
+  color: #8a8a8a;
   padding: 0.4rem 1rem;
   font-family: inherit;
   font-size: 0.8rem;
@@ -1275,7 +1318,7 @@ tr:last-child td {
 }
 
 .download-hint {
-  color: #737373;
+  color: #8a8a8a;
   font-size: 0.75rem;
 }
 
@@ -1840,18 +1883,19 @@ th.sort-active {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #ef4444;
-  color: #fff;
-  border: none;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
   font-size: 1.25rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   z-index: 500;
-  transition: transform 0.2s;
+  transition: transform 0.2s, border-color 0.2s;
 }
 #tour-btn:hover {
   transform: scale(1.1);
+  border-color: var(--blue);
 }
 
 /* ─── Custom tour ─── */
@@ -1894,7 +1938,7 @@ th.sort-active {
 
 .tour-step-count {
   font-size: 0.7rem;
-  color: #737373;
+  color: #8a8a8a;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1958,7 +2002,7 @@ th.sort-active {
 .tour-skip {
   background: none;
   border: none;
-  color: #737373;
+  color: #8a8a8a;
   font-size: 0.75rem;
   font-family: inherit;
   cursor: pointer;
@@ -1973,7 +2017,7 @@ th.sort-active {
 .count-red    { color: #ef4444; font-weight: 600; }
 .count-orange { color: #f97316; font-weight: 600; }
 .count-green  { color: #22c55e; font-weight: 600; }
-.count-gray   { color: #737373; }
+.count-gray   { color: #8a8a8a; }
 
 /* ─── Triagem ─── */
 .section-heading {
@@ -2070,6 +2114,23 @@ th.sort-active {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #121212;
+}
+
+/* Modo leitor: CTA de login no lugar do formulário/botão de escrita.
+   Os CTAs são <a> reusando classes de botão; removemos o sublinhado de link
+   e garantimos o layout de botão. */
+.btn-entrar-triar,
+.btn-investigar-login {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.btn-entrar-triar {
+  margin-top: 0.75rem;
+}
+
+.triage-block-readonly .section-note {
+  margin: 0 0 0.75rem;
 }
 
 .triage-form label {

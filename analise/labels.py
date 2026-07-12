@@ -1,19 +1,31 @@
 """Labels compartilhadas para tipos e severidades de alertas."""
 from __future__ import annotations
 
+# Fonte canônica de rótulos de tipo — sóbria e factual, espelhando o vocabulário
+# do dashboard (static/app.js TIPO_LABELS). O produto afirma indícios, não
+# vereditos: nada de rótulos alarmistas ("Monopólio", "Muito Acima").
 LABEL_TIPO: dict[str, str] = {
-    "outlier_valor": "Valor Muito Acima do Padrão",
-    "concentracao_fornecedor": "Monopólio de Fornecedor",
-    "sem_licitacao_inexigibilidade": "Dispensa por Inexigibilidade",
-    "sem_licitacao_emergencia": "Contratação de Emergência",
-    "sem_licitacao_dispensa": "Dispensa de Licitação",
-    "fracionamento_ap": "Fracionamento de Despesa",
-    "empresa_inativa": "Empresa Inativa",
-    "capital_social_baixo": "Capital Social Baixo",
-    "empresa_jovem_contrato_grande": "Empresa Jovem — Contrato Grande",
-    "socio_compartilhado": "Sócio Compartilhado entre Fornecedores",
+    "outlier_valor": "Outlier de valor",
+    "concentracao_fornecedor": "Concentração de fornecedor",
+    "sem_licitacao_inexigibilidade": "Inexigibilidade",
+    "sem_licitacao_emergencia": "Emergência",
+    "sem_licitacao_dispensa": "Dispensa",
+    "fracionamento_ap": "Fracionamento",
+    "fracionamento_empenhos": "Fracionamento de empenhos",
+    "asfalto_fatiado": "Asfalto fatiado",
+    "contrato_sem_empenho": "Contrato sem empenho",
+    "empenho_total_dia_unico": "Empenho total em dia único",
+    "empenho_acima_contrato": "Empenho acima do contrato",
+    "desconto_zero_licitacao": "Desconto zero em licitação",
+    "licitacao_itens_desertos": "Itens desertos na licitação",
+    "socio_doou_campanha": "Sócio doou à campanha",
+    "socio_compartilhado": "Sócio compartilhado",
+    "adesao_carona": "Adesão a ata (carona)",
+    "empresa_inativa": "Empresa inativa",
+    "capital_social_baixo": "Capital social baixo",
+    "empresa_jovem_contrato_grande": "Empresa jovem, contrato alto",
     "watchlist_match": "Match em Watchlist",
-    "evolucao_temporal_fornecedor": "Aceleração Contratual",
+    "evolucao_temporal_fornecedor": "Aceleração contratual",
 }
 
 LABEL_SEVERIDADE: dict[str, str] = {

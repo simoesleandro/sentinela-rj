@@ -26,6 +26,20 @@ _MIN_FORNECEDORES    = 2
 _MIN_VALOR           = 5_000_000
 
 
+def _moeda_br(valor: float) -> str:
+    """Formata valor no padrão brasileiro: R$ 212.269.757,28."""
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _resumir(texto: str, n: int) -> str:
+    """Trunca em no máximo n caracteres sem cortar palavra no meio."""
+    texto = texto.strip()
+    if len(texto) <= n:
+        return texto
+    corte = texto[:n].rsplit(" ", 1)[0].rstrip()
+    return f"{corte}…"
+
+
 def _fingerprint(objeto: str) -> str:
     texto = objeto.lower()
     texto = _AP_RE.sub('', texto)
@@ -74,11 +88,11 @@ def detectar(conn: sqlite3.Connection) -> list[AnomaliaResult]:
 
         descricao = (
             f"Possível fracionamento por AP: {distinct_fornecedores} fornecedores, "
-            f"valor total R$ {total_valor:,.2f}. "
-            f"Objeto similar: '{fingerprint[:80]}'"
+            f"valor total {_moeda_br(total_valor)}. "
+            f"Objeto similar: '{_resumir(fingerprint, 80)}'"
         )
         metodologia = "Agrupamento por similaridade de objeto + detecção de APs distintas"
-        titulo = f"Fracionamento AP: {distinct_fornecedores} fornecedores — {fingerprint[:50]}"
+        titulo = f"Fracionamento AP: {distinct_fornecedores} fornecedores — {_resumir(fingerprint, 50)}"
 
         for contrato in contratos:
             resultados.append(AnomaliaResult(

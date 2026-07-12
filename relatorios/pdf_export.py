@@ -13,6 +13,8 @@ from io import BytesIO
 
 from fpdf import FPDF
 
+from analise.labels import label_tipo
+
 # Substituições pontuais para os poucos chars unicode fora do latin-1
 # que aparecem em dados reais (tipografia, etc.). Chars PT-BR (ã á ç é...)
 # são U+00C0-U+00FF e entram em latin-1 diretamente — não precisam de conversão.
@@ -49,21 +51,10 @@ _BRANCO    = (255, 255, 255)
 _PRETO     = (  0,   0,   0)
 
 # Mapeamentos de tipo de alerta (espelha analise/labels.py)
-_LABEL_TIPO: dict[str, str] = {
-    "concentracao_fornecedor":      "Concentração de fornecedor",
-    "sem_licitacao_inexigibilidade":"Inexigibilidade",
-    "sem_licitacao_emergencia":     "Contrato emergencial",
-    "outlier_valor":                "Valor outlier",
-    "fracionamento_ap":             "Fracionamento (AP)",
-    "asfalto_fatiado":              "Asfalto fatiado",
-    "contrato_sem_empenho":         "Contrato sem empenho",
-    "empenho_total_dia_unico":      "Empenho em dia único",
-    "empenho_acima_contrato":       "Empenho acima do contrato",
-}
-
-
+# Rótulos de tipo vêm da fonte canônica (analise.labels), não de um dicionário
+# próprio — mantém o vocabulário consistente entre dashboard, dossiê e PDF.
 def _label(tipo: str) -> str:
-    return _LABEL_TIPO.get(tipo, tipo.replace("_", " ").title())
+    return label_tipo(tipo)
 
 
 def _cor_sev(sev: str) -> tuple[int, int, int]:

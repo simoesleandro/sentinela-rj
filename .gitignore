@@ -64,3 +64,5 @@ reflex.lock/
 
 # ── Scratch ──────────────────────────────────────────────────────────────
 scratch/
+# ── Impeccable (estado de trabalho da ferramenta de design) ──────────────
+.impeccable/

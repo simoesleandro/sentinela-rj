@@ -9,19 +9,41 @@ const TIPO_LABELS = {
   sem_licitacao_emergencia: 'Emergência',
   sem_licitacao_dispensa: 'Dispensa',
   fracionamento_ap: 'Fracionamento',
+  fracionamento_empenhos: 'Fracionamento de empenhos',
+  asfalto_fatiado: 'Asfalto fatiado',
+  contrato_sem_empenho: 'Contrato sem empenho',
+  empenho_total_dia_unico: 'Empenho total em dia único',
+  empenho_acima_contrato: 'Empenho acima do contrato',
+  desconto_zero_licitacao: 'Desconto zero em licitação',
+  licitacao_itens_desertos: 'Itens desertos na licitação',
+  socio_doou_campanha: 'Sócio doou à campanha',
+  socio_compartilhado: 'Sócio compartilhado',
+  adesao_carona: 'Adesão a ata (carona)',
+  empresa_inativa: 'Empresa inativa',
+  capital_social_baixo: 'Capital social baixo',
+  empresa_jovem_contrato_grande: 'Empresa jovem, contrato alto',
   watchlist_match: 'Match em Watchlist',
   evolucao_temporal_fornecedor: 'Aceleração contratual',
 };
 
-const TIPO_COLORS = {
-  outlier_valor: '#ef4444',
-  concentracao_fornecedor: '#f97316',
-  sem_licitacao_inexigibilidade: '#a855f7',
-  sem_licitacao_emergencia: '#eab308',
-  sem_licitacao_dispensa: '#3b82f6',
-  fracionamento_ap: '#22c55e',
-  evolucao_temporal_fornecedor: '#06b6d4',
+// Rótulo humano de um tipo de alerta. Fallback humaniza qualquer slug novo
+// (troca _ por espaço, capitaliza) para nunca exibir o identificador cru.
+function labelTipo(tipo) {
+  if (TIPO_LABELS[tipo]) return TIPO_LABELS[tipo];
+  return String(tipo || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const SEV_LABELS = {
+  alta: 'Alta',
+  media: 'Média',
+  baixa: 'Baixa',
 };
+
+function labelSeveridade(sev) {
+  return SEV_LABELS[sev] || String(sev || '').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const SEV_COLORS = {
   alta: '#ef4444',
@@ -49,15 +71,6 @@ const STATUS_BADGE_CLASS = {
   investigando: 'status-investigando',
   confirmado: 'status-confirmado',
   descartado: 'status-descartado',
-};
-
-const TIPO_BADGE_CLASS = {
-  outlier_valor: 'red',
-  concentracao_fornecedor: 'orange',
-  sem_licitacao_inexigibilidade: 'purple',
-  sem_licitacao_emergencia: 'yellow',
-  sem_licitacao_dispensa: 'blue',
-  fracionamento_ap: 'green',
 };
 
 const TIPO_TOOLTIPS = {
@@ -219,10 +232,26 @@ function formatCurrency(val) {
 
 function formatDate(str) {
   if (!str) return '—';
+  let s = String(str);
+  // 'YYYYMMDD' compacto (ex.: período do pipeline PNCP) → normaliza p/ ISO
+  if (/^\d{8}$/.test(s)) {
+    s = `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+  }
   // Handles 'YYYY-MM-DD' and ISO strings
-  const d = new Date(str.length === 10 ? str + 'T12:00:00' : str);
+  const d = new Date(s.length === 10 ? s + 'T12:00:00' : s);
   if (isNaN(d.getTime())) return str;
   return d.toLocaleDateString('pt-BR');
+}
+
+function formatDateTime(str) {
+  if (!str) return '—';
+  // Aceita 'YYYY-MM-DD HH:MM:SS' (SQLite) e ISO; devolve data + hora pt-BR.
+  const d = new Date(String(str).replace(' ', 'T'));
+  if (isNaN(d.getTime())) return String(str);
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
 function truncate(str, n) {
@@ -269,6 +298,19 @@ function escapeHtml(str) {
 }
 
 const esc = escapeHtml;
+
+// Remove marcadores de markdown que a IA às vezes emite (**negrito**, *itálico*,
+// ### títulos, listas) — o parecer é renderizado como texto puro, não markdown.
+function limparMarkdown(str) {
+  return String(str || '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')  // **negrito**
+    .replace(/__([^_]+)__/g, '$1')       // __negrito__
+    .replace(/\*([^*]+)\*/g, '$1')       // *itálico*
+    .replace(/(^|\s)#{1,6}\s+/g, '$1')  // ### títulos
+    .replace(/[*_#]+/g, '')              // marcadores soltos remanescentes
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
 
 async function api(path, { method = 'GET', body, ...rest } = {}) {
   const init = { method, ...rest };
@@ -405,7 +447,7 @@ function renderParecerHtml(parecer, provedorNome) {
         <span class="plaus-pill ${plaus.cls}">${plaus.label}</span>
         <span class="parecer-prov">${provedorNome ? 'IA · ' + escapeHtml(provedorNome) : 'IA'}</span>
       </div>
-      <p class="parecer-analise">${escapeHtml(parecer.analise || '')}</p>
+      <p class="parecer-analise">${escapeHtml(limparMarkdown(parecer.analise))}</p>
       <div class="parecer-sug">
         <span class="parecer-sug-txt">Sugestão: <strong>${escapeHtml(statusLabel)}</strong>${motivoLabel ? ` — ${escapeHtml(motivoLabel)}` : ''}</span>
         <button type="button" id="btn-aplicar-parecer" class="btn-aplicar-veredito">Aplicar sugestão</button>
@@ -414,8 +456,11 @@ function renderParecerHtml(parecer, provedorNome) {
 }
 
 function tipoBadge(tipo) {
-  const label = TIPO_LABELS[tipo] || tipo;
-  const cls = TIPO_BADGE_CLASS[tipo] || 'gray';
+  const label = labelTipo(tipo);
+  // Cor é reservada para severidade e status (o que define prioridade de
+  // triagem). O tipo é um rótulo neutro — evita o arco-íris e a colisão de
+  // "verde = ok" num tipo grave. (PRODUCT.md: severidade com sobriedade.)
+  const cls = 'gray';
   const tooltip = TIPO_TOOLTIPS[tipo];
   if (tooltip) {
     return `<span class="badge badge-${cls} tooltip-wrap">${label}<span class="tooltip-text">${tooltip}</span></span>`;
@@ -426,7 +471,7 @@ function tipoBadge(tipo) {
 function sevBadge(sev) {
   const map = { alta: 'red', media: 'orange', baixa: 'gray' };
   const cls = map[sev] || 'gray';
-  const label = sev ? sev.charAt(0).toUpperCase() + sev.slice(1) : '—';
+  const label = sev ? labelSeveridade(sev) : '—';
   return `<span class="badge badge-${cls}">${label}</span>`;
 }
 
@@ -469,12 +514,20 @@ function showError(containerId, msg) {
   if (el) el.innerHTML = `<div class="error-msg">Erro ao carregar: ${msg}</div>`;
 }
 
+// Chart.js anima com 1000ms por padrão — motion decorativo de page-load que
+// disputa a main-thread. Encurtamos para um draw rápido e respeitamos
+// prefers-reduced-motion (que o Chart.js, controlado por JS, ignora sozinho).
+if (window.Chart) {
+  const _reduzMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  Chart.defaults.animation = _reduzMovimento ? false : { duration: 300 };
+}
+
 function chartOptions(extraX = {}, extraY = {}) {
   return {
     plugins: { legend: { display: false } },
     scales: {
-      x: { ticks: { color: '#737373', font: { size: 11 } }, grid: { color: '#1f1f1f' }, ...extraX },
-      y: { ticks: { color: '#737373', font: { size: 11 } }, grid: { color: '#1f1f1f' }, ...extraY },
+      x: { ticks: { color: '#8a8a8a', font: { size: 11 } }, grid: { color: '#1f1f1f' }, ...extraX },
+      y: { ticks: { color: '#8a8a8a', font: { size: 11 } }, grid: { color: '#1f1f1f' }, ...extraY },
     },
   };
 }
@@ -612,10 +665,10 @@ async function loadChartTipos() {
     state.charts.tipos = new Chart(document.getElementById('chart-tipos'), {
       type: 'bar',
       data: {
-        labels: Object.keys(byTipo).map(t => TIPO_LABELS[t] || t),
+        labels: Object.keys(byTipo).map(t => labelTipo(t)),
         datasets: [{
           data: Object.values(byTipo),
-          backgroundColor: Object.keys(byTipo).map(t => TIPO_COLORS[t] || '#6b7280'),
+          backgroundColor: '#64748b',
           borderRadius: 4,
         }],
       },
@@ -631,7 +684,7 @@ async function loadChartTipos() {
     state.charts.severidade = new Chart(document.getElementById('chart-severidade'), {
       type: 'doughnut',
       data: {
-        labels: sevKeys.map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+        labels: sevKeys.map(s => labelSeveridade(s)),
         datasets: [{
           data: sevKeys.map(s => bySev[s]),
           backgroundColor: sevKeys.map(s => SEV_COLORS[s] || '#6b7280'),
@@ -797,7 +850,6 @@ async function loadAlertas() {
           </tr>
         `);
 
-        const tipoColor = TIPO_COLORS[grupo.tipo] || '#6b7280';
         grupo.alertas.forEach(a => {
           const pncpBtn = a.numero_controle_pncp
             ? `<a href="https://pncp.gov.br/app/contratos/${a.numero_controle_pncp}" target="_blank" rel="noopener" class="btn-pncp">PNCP ↗</a>`
@@ -805,7 +857,7 @@ async function loadAlertas() {
           html.push(`
             <tr class="row-detail" data-grupo="${gid}">
               <td colspan="9">
-                <div class="detail-compact" style="border-left-color:${tipoColor}">
+                <div class="detail-compact">
                   <span class="detail-compact-status">${statusBadge(a.status)}</span>
                   <span class="detail-compact-valor">${formatCurrency(a.valor_referencia)}</span>
                   <span class="detail-compact-data">${formatDate(a.data_assinatura)}</span>
@@ -886,15 +938,25 @@ async function loadAlertas() {
 
 // ─── Detail panel ──────────────────────────────────────────────────────────
 
+// Elemento que tinha o foco antes de abrir o painel — para devolvê-lo ao fechar.
+let _detailReturnFocus = null;
+
 async function openDetail(id) {
   const panel    = document.getElementById('detail-panel');
   const backdrop = document.getElementById('detail-backdrop');
   const content  = document.getElementById('detail-content');
 
   _stopInvProfundaPolling();
+  // Guarda o foco de origem só na primeira abertura (openDetail se re-chama
+  // após salvar a triagem; não queremos sobrescrever com o botão interno).
+  if (!panel.classList.contains('panel-open')) {
+    _detailReturnFocus = document.activeElement;
+  }
   content.innerHTML = '<div class="loading-msg">Carregando…</div>';
   panel.classList.add('panel-open');
   backdrop.classList.add('backdrop-open');
+  // Move o foco para dentro do diálogo (botão fechar sempre presente).
+  document.getElementById('detail-close')?.focus();
 
   try {
     const res = await fetch(`${BASE}/api/alertas/${id}`);
@@ -920,9 +982,14 @@ async function openDetail(id) {
     // Back-compat: narrativas salvas no formato antigo carregam o corpo; mostramos
     // só o texto da análise (sem o antigo bloco de veredito).
     const parecerSalvo = temNarrativa ? parseVereditoIa(d.narrativa_ia).corpo : '';
+    const logado = !!sessao.usuario;
+    const loginHref = `/login?next=${encodeURIComponent(location.pathname)}`;
+    const parecerVazioMsg = logado
+      ? 'Nenhum parecer ainda. Clique em “Investigar com IA” para um parecer único: plausibilidade, análise e status/motivo sugeridos.'
+      : 'Nenhum parecer de IA para este alerta. A geração de pareceres é feita por fiscais autenticados.';
     const parecerInicialHtml = parecerSalvo
-      ? `<p class="parecer-analise">${escapeHtml(parecerSalvo)}</p>`
-      : '<p class="narrativa-empty">Nenhum parecer ainda. Clique em “Investigar com IA” para um parecer único: plausibilidade, análise e status/motivo sugeridos.</p>';
+      ? `<p class="parecer-analise">${escapeHtml(limparMarkdown(parecerSalvo))}</p>`
+      : `<p class="narrativa-empty">${parecerVazioMsg}</p>`;
     const btnIaLabel = temNarrativa ? 'Regenerar parecer' : 'Investigar com IA';
 
     const transicoes = (d.transicoes_permitidas || []).map(st =>
@@ -943,13 +1010,12 @@ async function openDetail(id) {
         `).join('')
       : '<li class="triage-hist-empty">Nenhuma movimentação registrada.</li>';
 
-    content.innerHTML = `
-      <div class="detail-fornecedor">${escapeHtml(d.fornecedor || 'Fornecedor não identificado')}</div>
-      <div class="detail-badges">
-        ${tipoBadge(d.tipo)}
-        ${sevBadge(d.severidade)}
-        ${statusBadge(d.status)}
-      </div>
+    // Modo leitor: a triagem e a IA são operações de escrita autenticadas
+    // (o backend responde 401 sem sessão). Para o visitante anônimo — o
+    // jornalista/cidadão — mostramos o status e o histórico (leitura) com um
+    // convite a entrar, em vez de um formulário que falharia ao salvar.
+    const triageBlockHtml = logado
+      ? `
       <div class="triage-block">
         <label class="section-title" style="margin-bottom:0.75rem">Triagem</label>
         <div class="triage-form">
@@ -974,7 +1040,34 @@ async function openDetail(id) {
           <label>Histórico</label>
           <ul>${historicoHtml}</ul>
         </div>
+      </div>`
+      : `
+      <div class="triage-block triage-block-readonly">
+        <label class="section-title" style="margin-bottom:0.75rem">Triagem</label>
+        <p class="section-note">Status atual: ${statusBadge(d.status)}. A triagem — confirmar, descartar ou anotar — é feita por fiscais autenticados.</p>
+        <a href="${loginHref}" class="btn-page btn-entrar-triar">Entrar para triar</a>
+        <div class="triage-historico">
+          <label>Histórico</label>
+          <ul>${historicoHtml}</ul>
+        </div>
+      </div>`;
+
+    const iaBtnHtml = logado
+      ? `<button type="button" id="btn-investigar-ia" class="btn-investigar" title="IA em nuvem emite um parecer único: plausibilidade, análise e status/motivo sugeridos">
+          ✨ ${btnIaLabel}
+        </button>`
+      : `<a href="${loginHref}" class="btn-investigar btn-investigar-login" title="Entre para gerar um parecer de IA deste alerta">
+          ✨ Entrar para investigar com IA
+        </a>`;
+
+    content.innerHTML = `
+      <div class="detail-fornecedor">${escapeHtml(d.fornecedor || 'Fornecedor não identificado')}</div>
+      <div class="detail-badges">
+        ${tipoBadge(d.tipo)}
+        ${sevBadge(d.severidade)}
+        ${statusBadge(d.status)}
       </div>
+      ${triageBlockHtml}
       <div class="detail-valor">${formatCurrency(d.valor_referencia)}</div>
       <div class="detail-grid">
         <div class="detail-field">
@@ -1005,9 +1098,7 @@ async function openDetail(id) {
       ${complementar}
       ${renderTransparenciaRjHtml(d.transparencia_rj)}
       <div class="investigation-toolbar">
-        <button type="button" id="btn-investigar-ia" class="btn-investigar" title="IA em nuvem emite um parecer único: plausibilidade, análise e status/motivo sugeridos">
-          ✨ ${btnIaLabel}
-        </button>
+        ${iaBtnHtml}
         <button type="button" id="btn-export-dossie" class="btn-dossie" title="Baixa dossiê Markdown deste alerta">
           📄 Exportar Dossiê
         </button>
@@ -1024,22 +1115,27 @@ async function openDetail(id) {
       </div>
     `;
 
-    const statusAtual = d.status;
-    const toggleMotivoDescarte = () => {
-      const sel = document.getElementById('triage-status');
-      const wrap = document.getElementById('triage-motivo-wrap');
-      if (!sel || !wrap) return;
-      wrap.hidden = !(sel.value === 'descartado' && sel.value !== statusAtual);
-    };
-    document.getElementById('triage-status')?.addEventListener('change', toggleMotivoDescarte);
-    toggleMotivoDescarte();
+    // Listeners de escrita só existem no modo autenticado; no modo leitor os
+    // controles correspondentes são links de login, não botões.
+    if (logado) {
+      const statusAtual = d.status;
+      const toggleMotivoDescarte = () => {
+        const sel = document.getElementById('triage-status');
+        const wrap = document.getElementById('triage-motivo-wrap');
+        if (!sel || !wrap) return;
+        wrap.hidden = !(sel.value === 'descartado' && sel.value !== statusAtual);
+      };
+      document.getElementById('triage-status')?.addEventListener('change', toggleMotivoDescarte);
+      toggleMotivoDescarte();
 
-    document.getElementById('triage-save')?.addEventListener('click', () => {
-      salvarTriagem(id);
-    });
-    document.getElementById('btn-investigar-ia')?.addEventListener('click', () => {
-      investigarComIa(id);
-    });
+      document.getElementById('triage-save')?.addEventListener('click', () => {
+        salvarTriagem(id);
+      });
+      document.getElementById('btn-investigar-ia')?.addEventListener('click', () => {
+        investigarComIa(id);
+      });
+    }
+    // Dossiê é leitura pública (sem gerar_ia): disponível para todos.
     document.getElementById('btn-export-dossie')?.addEventListener('click', () => {
       exportarDossie(id);
     });
@@ -1447,7 +1543,13 @@ async function salvarTriagem(alertaId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    const payload = await res.json();
+    const payload = await res.json().catch(() => ({}));
+    if (res.status === 401 || payload.auth === 'login') {
+      const href = `/login?next=${encodeURIComponent(location.pathname)}`;
+      erroEl.innerHTML = `Sua sessão expirou. <a href="${href}">Entre novamente</a> para salvar a triagem.`;
+      erroEl.style.display = 'block';
+      return;
+    }
     if (!res.ok) throw new Error(payload.error || res.statusText);
 
     await openDetail(alertaId);
@@ -1475,8 +1577,16 @@ function shareAlert(id) {
 }
 
 function closeDetail() {
-  document.getElementById('detail-panel').classList.remove('panel-open');
+  const panel = document.getElementById('detail-panel');
+  if (!panel.classList.contains('panel-open')) return;
+  panel.classList.remove('panel-open');
   document.getElementById('detail-backdrop').classList.remove('backdrop-open');
+  _stopInvProfundaPolling();
+  // Devolve o foco a quem abriu o painel (WCAG 2.4.3 — ordem de foco).
+  if (_detailReturnFocus && typeof _detailReturnFocus.focus === 'function') {
+    _detailReturnFocus.focus();
+  }
+  _detailReturnFocus = null;
 }
 
 // ─── Timeline ──────────────────────────────────────────────────────────────
@@ -1513,7 +1623,7 @@ function renderTimeline() {
     { labels: [], contratos: [], valor: [] }
   );
 
-  const xTicks = { color: '#737373', font: { size: 10 }, maxRotation: 45 };
+  const xTicks = { color: '#8a8a8a', font: { size: 10 }, maxRotation: 45 };
 
   if (state.charts.timelineContratos) state.charts.timelineContratos.destroy();
   state.charts.timelineContratos = new Chart(
@@ -1536,7 +1646,7 @@ function renderTimeline() {
         plugins: { legend: { display: false } },
         scales: {
           x: { ticks: xTicks, grid: { color: '#1f1f1f' } },
-          y: { ticks: { color: '#737373', font: { size: 11 } }, grid: { color: '#1f1f1f' } },
+          y: { ticks: { color: '#8a8a8a', font: { size: 11 } }, grid: { color: '#1f1f1f' } },
         },
       },
     }
@@ -1562,7 +1672,7 @@ function renderTimeline() {
           x: { ticks: xTicks, grid: { color: '#1f1f1f' } },
           y: {
             ticks: {
-              color: '#737373',
+              color: '#8a8a8a',
               font: { size: 11 },
               callback: v =>
                 v >= 1e9 ? `${(v / 1e9).toFixed(1)}bi`
@@ -1608,7 +1718,7 @@ async function loadFornecedores() {
         scales: {
           x: {
             ticks: {
-              color: '#737373',
+              color: '#8a8a8a',
               font: { size: 11 },
               callback: v => isValor
                 ? (v >= 1e6 ? `${(v / 1e6).toFixed(0)}mi` : v)
@@ -1739,7 +1849,7 @@ async function loadOrgaos() {
         indexAxis: 'y',
         plugins: { legend: { display: false } },
         scales: {
-          x: { ticks: { color: '#737373', font: { size: 11 } }, grid: { color: '#1f1f1f' } },
+          x: { ticks: { color: '#8a8a8a', font: { size: 11 } }, grid: { color: '#1f1f1f' } },
           y: { ticks: { color: '#a3a3a3', font: { size: 10 } }, grid: { color: '#1f1f1f' } },
         },
       },
@@ -1760,7 +1870,7 @@ async function loadOrgaos() {
         scales: {
           x: {
             ticks: {
-              color: '#737373',
+              color: '#8a8a8a',
               font: { size: 11 },
               callback: v => v >= 1e9 ? `${(v / 1e9).toFixed(1)}bi` : v >= 1e6 ? `${(v / 1e6).toFixed(0)}mi` : v,
             },
@@ -2204,7 +2314,7 @@ async function loadGrafoFornecedor(ni, nome) {
         label: e.label || '',
         arrows: 'to',
         color: { color: '#525252', highlight: '#a3a3a3' },
-        font: { color: '#737373', size: 10, strokeWidth: 0 },
+        font: { color: '#8a8a8a', size: 10, strokeWidth: 0 },
       }))
     );
 
@@ -2465,8 +2575,8 @@ async function loadPipelineStatus() {
         <span class="pipeline-badge ${badgeCls}">${esc(saude)}</span>
       </div>
       <div class="pipeline-status-grid">
-        <div class="pipeline-stat"><label>Última coleta</label><span>${esc(ultima.finalizado_em || ultima.iniciado_em || '—')}</span></div>
-        <div class="pipeline-stat"><label>Período</label><span>${esc(ultima.data_inicial || '—')} → ${esc(ultima.data_final || '—')}</span></div>
+        <div class="pipeline-stat"><label>Última coleta</label><span>${esc(formatDateTime(ultima.finalizado_em || ultima.iniciado_em))}</span></div>
+        <div class="pipeline-stat"><label>Período coletado</label><span>${esc(formatDate(ultima.data_inicial))} → ${esc(formatDate(ultima.data_final))}</span></div>
         <div class="pipeline-stat"><label>Registros RJ</label><span>${ultima.registros_municipio ?? '—'}</span></div>
         <div class="pipeline-stat"><label>Agendador</label><span>${esc(agendador)}</span></div>
         <div class="pipeline-stat"><label>Janela (dias)</label><span>${cfg.janela_dias ?? '—'}</span></div>
@@ -2524,7 +2634,7 @@ function _regraFormHtml(r = {}) {
     <label>Tipo de alerta</label>
     <select name="tipo">
       ${tipos.map(t => {
-        const label = t ? (TIPO_LABELS[t] || t) : 'Todos os tipos';
+        const label = t ? labelTipo(t) : 'Todos os tipos';
         return `<option value="${esc(t)}" ${(r.tipo || '') === t ? 'selected' : ''}>${esc(label)}</option>`;
       }).join('')}
     </select>
@@ -2619,7 +2729,7 @@ async function loadRegras() {
         <thead><tr><th>Tipo</th><th>Severidade mín.</th><th>Valor mín.</th><th>Ativo</th><th></th></tr></thead>
         <tbody>${rows.map(r => `
           <tr>
-            <td>${esc(r.tipo ? (TIPO_LABELS[r.tipo] || r.tipo) : 'Todos')}</td>
+            <td>${esc(r.tipo ? labelTipo(r.tipo) : 'Todos')}</td>
             <td>${esc(r.severidade_min)}</td>
             <td>${formatCurrency(r.valor_min)}</td>
             <td>${r.ativo ? 'sim' : 'não'}</td>
@@ -2807,6 +2917,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     ?.addEventListener('click', closeDetail);
   document.getElementById('detail-backdrop')
     ?.addEventListener('click', closeDetail);
+
+  // Diálogo modal: Esc fecha e Tab fica preso dentro do painel (WCAG 2.1.2).
+  document.addEventListener('keydown', (e) => {
+    const panel = document.getElementById('detail-panel');
+    if (!panel || !panel.classList.contains('panel-open')) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeDetail();
+      return;
+    }
+    if (e.key === 'Tab') {
+      const foco = panel.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!foco.length) return;
+      const primeiro = foco[0];
+      const ultimo = foco[foco.length - 1];
+      if (e.shiftKey && document.activeElement === primeiro) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault();
+        primeiro.focus();
+      }
+    }
+  });
 
   // Timeline granularity toggle
   document.querySelectorAll('#timeline-toggle [data-granularity]').forEach(btn => {
